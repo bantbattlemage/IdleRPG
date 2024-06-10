@@ -40,8 +40,6 @@ public class CharactersPanelController : MonoBehaviour
 
 	private void AddCreateNewCharacterPanel()
 	{
-		Debug.Log("NEW PANEL");
-
 		GameObject newPanelObject = Instantiate(NewCharacterPanelPrefab, transform);
 		NewCharacterPanel newPanel = newPanelObject.GetComponent<NewCharacterPanel>();
 		newCharacterPanels.Add(newPanel);

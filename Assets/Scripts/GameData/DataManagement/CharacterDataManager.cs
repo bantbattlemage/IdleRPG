@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using static EnumDefinitions;
 
 public class CharacterDataManager : MonoBehaviour, IDataPersistence
 {
@@ -38,7 +39,7 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 		Debug.Log("saved character data");
 	}
 
-	public bool CreateNewCharacter(string name)
+	public bool CreateNewCharacter(string name, GameClassEnum classType)
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
@@ -51,6 +52,9 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 		CharacterData characterData = new CharacterData();
 		characterData.Name = name;
 		characterData.MaxHealthPoints = 100;
+		characterData.CurrentHealthPoints= 100;
+		characterData.CharacterClass = classType;
+		characterData.Level = 1;
 
 		LocalData.Add(name, characterData);
 		DataPersistenceManager.Instance.SaveGame();
