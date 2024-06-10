@@ -114,7 +114,10 @@ public class DataPersistenceManager : MonoBehaviour
 
     public void NewGame() 
     {
-        this.gameData = new GameData();
+        gameData = new GameData();
+        gameData.CurrentCharacterData = new SerializableDictionary<string, CharacterData>();
+
+        SaveGame();
     }
 
     public void LoadGame()

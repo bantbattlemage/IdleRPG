@@ -55,6 +55,9 @@ public class MainMenuController : MonoBehaviour
 	{
 		//DataPersistenceManager.Instance.BeginAutoSaveCoroutine();
 		ObjectsToLoad.ToList().ForEach(x => { x.SetActive(true); });
+
+		FindObjectOfType<CharactersPanelController>().InitailizeCharacterPanels();
+
 		gameObject.SetActive(false);
 	}
 }

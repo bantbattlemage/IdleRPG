@@ -11,6 +11,6 @@ public class GameData
 
     public GameData() 
     {
-
+        CurrentCharacterData = new SerializableDictionary<string, CharacterData>();
     }
 }

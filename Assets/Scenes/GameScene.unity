@@ -392,7 +392,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &141260297
 RectTransform:
   m_ObjectHideFlags: 0
@@ -407,10 +407,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 789177483}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1690, y: 1079.3907}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &141260298
 MonoBehaviour:
@@ -508,7 +508,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e10b618232143340a8a258664f2ed41, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  CharacterPanelPrefab: {fileID: 7360000444844836736, guid: f1a1c2ea7fa54c04e805ebc9cbd91aad, type: 3}
+  NewCharacterPanelPrefab: {fileID: 7360000444844836736, guid: 8e1906a7a38f2fc4db8d258023daa20d, type: 3}
+  DisplayCharacterPrefab: {fileID: 7360000444844836736, guid: f1a1c2ea7fa54c04e805ebc9cbd91aad, type: 3}
 --- !u!1 &180595127
 GameObject:
   m_ObjectHideFlags: 0
@@ -2674,7 +2675,7 @@ GameObject:
   - component: {fileID: 1608884815}
   - component: {fileID: 1608884814}
   m_Layer: 0
-  m_Name: CharacterDataController
+  m_Name: CharacterDataManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

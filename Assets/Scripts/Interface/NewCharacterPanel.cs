@@ -5,24 +5,21 @@ using UnityEngine.UI;
 using System.Linq;
 using TMPro;
 
-public class CharacterPanel : MonoBehaviour
+public class NewCharacterPanel : MonoBehaviour
 {
-	public Text CharacterNameText;
+	public TextMeshProUGUI CharacterNameText;
 	public Button CreateNewCharacterButton;
 	public Button ConfirmNewCharacterButton;
 	public TMP_InputField NewCharacterNameInputField;
 
 	public GameObject[] NewCharacterPanelObjects;
-	public GameObject[] DisplayCharacterPanelObjects;
-
-
-	public void InitializeNewCharacterButtonPanel(System.Action confirmCallback, System.Action<CharacterPanel> beginCallback)
+	
+	public void InitializeNewCharacterButtonPanel(System.Action<NewCharacterPanel> beginCallback, System.Action<NewCharacterPanel> confirmCallback)
 	{
-		DisplayCharacterPanelObjects.ToList().ForEach(x => { x.SetActive(false); });
 		NewCharacterPanelObjects.ToList().ForEach(x => { x.SetActive(false); });
 		ConfirmNewCharacterButton.gameObject.SetActive(false);
-
 		CreateNewCharacterButton.gameObject.SetActive(true);
+
 		CreateNewCharacterButton.onClick.AddListener(() => 
 		{
 			NewCharacterPanelObjects.ToList().ForEach(x => { x.SetActive(true); });
@@ -35,8 +32,10 @@ public class CharacterPanel : MonoBehaviour
 
 				if(name != null && name.Length > 0)
 				{
-					CharacterDataController.Instance.CreateNewCharacter(name);
-					confirmCallback();
+					if (CharacterDataManager.Instance.CreateNewCharacter(name))
+					{
+						confirmCallback(this);
+					}
 				}
 			});
 
@@ -45,16 +44,5 @@ public class CharacterPanel : MonoBehaviour
 
 			beginCallback(this);
 		});
-	}
-
-	public void InitializeCharacterPanel(CharacterData characterData)
-	{
-		DisplayCharacterPanelObjects.ToList().ForEach(x => { x.SetActive(true); });
-		NewCharacterPanelObjects.ToList().ForEach(x => { x.SetActive(false); });
-
-		CreateNewCharacterButton.gameObject.SetActive(false);
-		ConfirmNewCharacterButton.gameObject.SetActive(false);
-
-		CharacterNameText.text = characterData.Name;
 	}
 }
