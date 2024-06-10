@@ -33,7 +33,7 @@ public class DisplayCharacterPanel : MonoBehaviour
 	{
 		CharacterNameText.text = characterData.Name;
 		MaxHealthPoints.text = string.Format("{0}/{1}", characterData.CurrentHealthPoints, characterData.MaxHealthPoints.ToString());
-		CharacterLevel.text = characterData.Level.ToString();
+		CharacterLevel.text = "Lvl. " + characterData.Level.ToString();
 		CharacterClass.text = characterData.CharacterClass.ToString();
 	}
 }

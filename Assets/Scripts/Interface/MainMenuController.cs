@@ -17,7 +17,7 @@ public class MainMenuController : MonoBehaviour
 	{
 		ContinueButton.onClick.AddListener(() => 
 		{
-			DataPersistenceManager.Instance.ChangeSelectedProfileId("test");
+			DataPersistenceManager.Instance.LoadGame();
 			BeginGame();
 		});
 
@@ -25,14 +25,13 @@ public class MainMenuController : MonoBehaviour
 		{
 			DataPersistenceManager.Instance.NewGame();
 			DataPersistenceManager.Instance.SaveGame();
-			DataPersistenceManager.Instance.ChangeSelectedProfileId("test");
-			DataPersistenceManager.Instance.SaveGame();
 			BeginGame();
 		});
 
 		LoadGameButton.onClick.AddListener(() =>
 		{
-			DataPersistenceManager.Instance.ChangeSelectedProfileId("test");
+			DataPersistenceManager.Instance.LoadGame();
+			BeginGame();
 		});
 
 		ExitGameButton.onClick.AddListener(() =>
@@ -56,8 +55,27 @@ public class MainMenuController : MonoBehaviour
 		//DataPersistenceManager.Instance.BeginAutoSaveCoroutine();
 		ObjectsToLoad.ToList().ForEach(x => { x.SetActive(true); });
 
-		FindObjectOfType<CharactersPanelController>().InitailizeCharacterPanels();
+		InitializeRandomTestQuests();
 
 		gameObject.SetActive(false);
+	}
+
+	public void InitializeRandomTestQuests()
+	{
+		DataPersistenceManager.Instance.LoadGame();
+
+		if (QuestDataManager.Instance.LocalData.Values.Count > 0)
+		{
+			return;
+		}
+
+		for (int i = 0; i < 5; i++)
+		{
+			QuestData newQuest = QuestDataManager.Instance.AddRandomNewQuest();
+		}
+
+		Debug.Log("Set up test quests");
+
+		DataPersistenceManager.Instance.SaveGame();
 	}
 }

@@ -5,7 +5,7 @@ using UnityEngine;
 using static EnumDefinitions;
 
 [CreateAssetMenu]
-public class ClassData : ScriptableObject
+public class ClassDataObject : ScriptableObject
 {
 	public string ClassName;
 	public GameClassEnum ClassType; 

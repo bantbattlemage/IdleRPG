@@ -13,8 +13,18 @@ public class CharactersPanelController : MonoBehaviour
 	private System.Action<NewCharacterPanel> beginCreateNewCharacterCallback = null;
 	private System.Action<NewCharacterPanel> confirmNewCharacterCallback = null;
 
-	public void InitailizeCharacterPanels()
+	private void OnEnable()
 	{
+		InitializeCharacterPanels();
+	}
+
+	public void InitializeCharacterPanels()
+	{
+		RemoveAllPanels();
+
+		displayCharacterPanels = new List<DisplayCharacterPanel>();
+		newCharacterPanels = new List<NewCharacterPanel>();
+
 		//	create a new character button panel if there are no characters
 		if (CharacterDataManager.Instance.LocalData == null || CharacterDataManager.Instance.LocalData.Values.Count == 0)
 		{
@@ -46,51 +56,47 @@ public class CharactersPanelController : MonoBehaviour
 
 		beginCreateNewCharacterCallback += (NewCharacterPanel sender) =>
 		{
-			foreach (DisplayCharacterPanel p in displayCharacterPanels)
+			DataPersistenceManager.Instance.LoadGame();
+
+			foreach (var panel in displayCharacterPanels)
 			{
-				Destroy(p.gameObject);
+				Destroy(panel.gameObject);
 			}
 			displayCharacterPanels = new List<DisplayCharacterPanel>();
-
-			DataPersistenceManager.Instance.LoadGame();
 
 			beginCreateNewCharacterCallback = null;
 		};
 
 		confirmNewCharacterCallback += (NewCharacterPanel sender) =>
 		{
-			foreach (DisplayCharacterPanel p in displayCharacterPanels)
-			{
-				Destroy(p.gameObject);
-			}
-			displayCharacterPanels = new List<DisplayCharacterPanel>();
-
-			foreach (NewCharacterPanel p in newCharacterPanels)
-			{
-				Destroy(p.gameObject);
-			}
-			newCharacterPanels = new List<NewCharacterPanel>();
+			RemoveAllPanels();
 
 			confirmNewCharacterCallback = null;
 
-			InitailizeCharacterPanels();
+			InitializeCharacterPanels();
 		};
 
 		newPanel.InitializeNewCharacterButtonPanel(beginCreateNewCharacterCallback, confirmNewCharacterCallback);
+	}
 
-		//DisplayCharacterPanel newPanel = newPanelObject.GetComponent<DisplayCharacterPanel>();
-		//newPanel.InitializeCharacterPanel(CharacterDataController.Instance.loca)
-		//characterPanels.Add(newPanel);
+	private void RemoveAllPanels()
+	{
+		foreach (var panel in newCharacterPanels)
+		{
+			Destroy(panel.gameObject);
+		}
 
+		foreach (var panel in displayCharacterPanels)
+		{
+			Destroy(panel.gameObject);
+		}
+
+		newCharacterPanels = new List<NewCharacterPanel>();
+		displayCharacterPanels = new List<DisplayCharacterPanel>();
 	}
 
 	public void OnDisable()
 	{
-		foreach(var panel in newCharacterPanels)
-		{
-			Destroy(panel);
-		}
-
-		newCharacterPanels = new List<NewCharacterPanel>();
+		RemoveAllPanels();
 	}
 }

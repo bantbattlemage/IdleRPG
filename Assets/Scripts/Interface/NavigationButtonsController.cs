@@ -6,13 +6,15 @@ using UnityEngine.UI;
 
 public class NavigationButtonsController : MonoBehaviour
 {
-	public Button QuestsButton;
+	public Button ActiveQuestsButton;
+	public Button QuestBoardButton;
 	public Button CharactersButton;
 	public Button InventoryButton;
 	public Button ProfessionsButton;
 	public Button GuildButton;
 
 	public GameObject QuestsPanel;
+	public GameObject QuestBoardPanel;
 	public GameObject CharactersPanel;
 	public GameObject InventoryPanel;
 	public GameObject ProfessionsPanel;
@@ -25,15 +27,16 @@ public class NavigationButtonsController : MonoBehaviour
 	{
 		buttons = new List<Button>()
 		{
-			QuestsButton, CharactersButton, InventoryButton, ProfessionsButton, GuildButton
+			ActiveQuestsButton, QuestBoardButton, CharactersButton, InventoryButton, ProfessionsButton, GuildButton
 		};
 
 		panels = new List<GameObject>()
 		{
-			QuestsPanel, CharactersPanel, InventoryPanel, ProfessionsPanel, GuildPanel
+			QuestsPanel, QuestBoardPanel, CharactersPanel, InventoryPanel, ProfessionsPanel, GuildPanel
 		};
 
-		QuestsButton.onClick.AddListener(QuestButtonClicked);
+		ActiveQuestsButton.onClick.AddListener(ActiveQuestButtonClicked);
+		QuestBoardButton.onClick.AddListener(QuestBoardButtonClicked);
 		CharactersButton.onClick.AddListener(CharactersButtonClicked);
 		InventoryButton.onClick.AddListener(InventoryButtonClicked);
 		ProfessionsButton.onClick.AddListener(ProfessionsButtonClicked);
@@ -53,13 +56,22 @@ public class NavigationButtonsController : MonoBehaviour
 		panels.ForEach(panel => { panel.SetActive(enable); });
 	}
 
-	private void QuestButtonClicked()
+	private void ActiveQuestButtonClicked()
 	{
 		SetAllButtons(true);
 		SetAllPanels(false);
 
-		QuestsButton.interactable = false;
+		ActiveQuestsButton.interactable = false;
 		QuestsPanel.SetActive(true);
+	}
+
+	private void QuestBoardButtonClicked()
+	{
+		SetAllButtons(true);
+		SetAllPanels(false);
+
+		QuestBoardButton.interactable = false;
+		QuestBoardPanel.SetActive(true);
 	}
 
 	private void CharactersButtonClicked()

@@ -18,25 +18,11 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 	public void LoadData(GameData persistantData)
 	{
 		LocalData = persistantData.CurrentCharacterData;
-
-		foreach (string key in persistantData.CurrentCharacterData.Keys)
-		{
-			Debug.Log(key);
-		}
-
-		Debug.Log("loaded character data");
 	}
 
 	public void SaveData(GameData persistantData)
 	{
 		persistantData.CurrentCharacterData = LocalData;
-
-		foreach(string key in persistantData.CurrentCharacterData.Keys)
-		{
-			Debug.Log(key);
-		}
-
-		Debug.Log("saved character data");
 	}
 
 	public bool CreateNewCharacter(string name, GameClassEnum classType)
@@ -45,7 +31,6 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 
 		if (LocalData.ContainsKey(name))
 		{
-			Debug.LogWarning(name + " already exists");
 			return false;
 		}
 
@@ -58,8 +43,6 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 
 		LocalData.Add(name, characterData);
 		DataPersistenceManager.Instance.SaveGame();
-
-		Debug.Log("added new character");
 
 		return true;
 	}
