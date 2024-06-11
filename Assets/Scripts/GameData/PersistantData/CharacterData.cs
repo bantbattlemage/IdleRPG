@@ -12,4 +12,5 @@ public class CharacterData
 	public int Level;
 	public int MaxHealthPoints;
 	public int CurrentHealthPoints;
+	public int ActiveQuestId;
 }

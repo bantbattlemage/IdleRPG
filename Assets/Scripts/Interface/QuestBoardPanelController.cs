@@ -7,21 +7,35 @@ public class QuestBoardPanelController : MonoBehaviour
 {
 	public GameObject QuestBoardTilePrefab;
 
+	public QuestDetailsTile QuestTileDetails;
+
 	public Transform ContentRoot;
 
 	private List<QuestBoardTile> questBoardTiles = new List<QuestBoardTile>();
 
+	private Action<QuestBoardTile> viewCallback;
 	private Action<QuestBoardTile> acceptCallback;
+	private Action<QuestBoardTile> rejectCallback;
 
 	private void OnEnable()
 	{
 		acceptCallback = OnAcceptCallback;
+		viewCallback = OnViewCallback;
+		rejectCallback = OnRejectCallback;
+
 		DisplayAvailableQuests();
+
+		QuestTileDetails.gameObject.SetActive(false);
 	}
 
 	private void OnDisable()
 	{
-		foreach(QuestBoardTile tile in questBoardTiles)
+		RemoveAllQuestTiles();
+	}
+
+	private void RemoveAllQuestTiles()
+	{
+		foreach (QuestBoardTile tile in questBoardTiles)
 		{
 			Destroy(tile.gameObject);
 		}
@@ -40,15 +54,33 @@ public class QuestBoardPanelController : MonoBehaviour
 		GameObject newInstance = Instantiate(QuestBoardTilePrefab, ContentRoot);
 		QuestBoardTile newQuestTile = newInstance.GetComponent<QuestBoardTile>();
 
-		newQuestTile.InitializeQuestTile(questAccessorIndex, acceptCallback);
+		newQuestTile.InitializeQuestTile(questAccessorIndex, viewCallback, rejectCallback);
 
 		questBoardTiles.Add(newQuestTile);
 	}
 
 	private void OnAcceptCallback(QuestBoardTile quest)
 	{
-		questBoardTiles.Remove(quest);
-		Destroy(quest.gameObject);
+		QuestDataManager.Instance.ActivateQuest(quest.CurrentQuestIndexId, new List<CharacterData>());
+
+		QuestTileDetails.gameObject.SetActive(false);
+
+		RemoveAllQuestTiles();
+		DisplayAvailableQuests();
+	}
+
+	private void OnViewCallback(QuestBoardTile quest)
+	{
+		RemoveAllQuestTiles();
+		QuestTileDetails.gameObject.SetActive(true);
+		QuestTileDetails.InitializeQuestTile(quest.CurrentQuestIndexId, acceptCallback, rejectCallback);
+	}
+
+	private void OnRejectCallback(QuestBoardTile quest)
+	{
+		QuestTileDetails.gameObject.SetActive(false);
+		RemoveAllQuestTiles();
+		DisplayAvailableQuests();
 	}
 
 	public void DisplayAvailableQuests()

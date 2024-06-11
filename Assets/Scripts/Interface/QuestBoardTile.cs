@@ -8,13 +8,15 @@ public class QuestBoardTile : MonoBehaviour
 {
 	public TextMeshProUGUI QuestTitle;
 	public TextMeshProUGUI QuestDescription;
+	public TextMeshProUGUI QuestRewards;
+
 	public Button AcceptButton;
 	public Button RejectButton;
 
-	public int CurrentQuestIndexId { get; private set; }
+	public int CurrentQuestIndexId { get; protected set; }
 	public QuestData CurrentQuestData { get { return QuestDataManager.Instance.LocalData[CurrentQuestIndexId]; } }
 
-	public void InitializeQuestTile(int questIndexId, System.Action<QuestBoardTile> acceptCallback)
+	public virtual void InitializeQuestTile(int questIndexId, System.Action<QuestBoardTile> buttonCallbackOne, System.Action<QuestBoardTile> buttonCallbackTwo)
 	{
 		CurrentQuestIndexId = questIndexId;
 
@@ -23,8 +25,7 @@ public class QuestBoardTile : MonoBehaviour
 
 		AcceptButton.onClick.AddListener(() => 
 		{
-			QuestDataManager.Instance.ActivateQuest(questIndexId, new List<CharacterData>());
-			acceptCallback(this);
+			buttonCallbackOne(this);
 		});
 
 		RejectButton.onClick.AddListener(() => 
