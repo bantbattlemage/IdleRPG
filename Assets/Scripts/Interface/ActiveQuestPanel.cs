@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,6 +9,7 @@ public class ActiveQuestPanel : MonoBehaviour
 {
 	public TextMeshProUGUI QuestTitle;
 	public TextMeshProUGUI QuestDescription;
+	public TextMeshProUGUI AssignedCharactersDisplay;
 
 	public Button SelectQuestButton { get { return GetComponent<Button>(); } }
 	public Button AbandonQuestButton;
@@ -28,11 +30,24 @@ public class ActiveQuestPanel : MonoBehaviour
 		QuestTitle.text = CurrentQuestData.BaseQuestDefinition.QuestName;
 		QuestDescription.text = CurrentQuestData.BaseQuestDefinition.QuestDescription;
 
+		AssignedCharactersDisplay.text = string.Empty;
+		foreach(string s in CurrentQuestData.ActiveCharacters)
+		{
+			AssignedCharactersDisplay.text += s;
+
+			if(s != CurrentQuestData.ActiveCharacters.Last())
+			{
+				AssignedCharactersDisplay.text += ", ";
+			}
+		}
+
+		AbandonQuestButton.onClick.RemoveAllListeners();
 		AbandonQuestButton.onClick.AddListener(() => 
 		{
 
 		});
 
+		SelectQuestButton.onClick.RemoveAllListeners();
 		SelectQuestButton.onClick.AddListener(() => 
 		{
 			DisplayFullQuestInfo();

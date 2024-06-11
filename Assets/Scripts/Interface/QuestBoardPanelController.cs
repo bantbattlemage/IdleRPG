@@ -14,7 +14,7 @@ public class QuestBoardPanelController : MonoBehaviour
 	private List<QuestBoardTile> questBoardTiles = new List<QuestBoardTile>();
 
 	private Action<QuestBoardTile> viewCallback;
-	private Action<QuestBoardTile> acceptCallback;
+	private Action<QuestDetailsTile> acceptCallback;
 	private Action<QuestBoardTile> rejectCallback;
 
 	private void OnEnable()
@@ -59,9 +59,9 @@ public class QuestBoardPanelController : MonoBehaviour
 		questBoardTiles.Add(newQuestTile);
 	}
 
-	private void OnAcceptCallback(QuestBoardTile quest)
+	private void OnAcceptCallback(QuestDetailsTile questBoardTile)
 	{
-		QuestDataManager.Instance.ActivateQuest(quest.CurrentQuestIndexId, new List<CharacterData>());
+		QuestDataManager.Instance.ActivateQuest(questBoardTile.CurrentQuestIndexId, questBoardTile.SelectedCharacters);
 
 		QuestTileDetails.gameObject.SetActive(false);
 
@@ -69,14 +69,14 @@ public class QuestBoardPanelController : MonoBehaviour
 		DisplayAvailableQuests();
 	}
 
-	private void OnViewCallback(QuestBoardTile quest)
+	private void OnViewCallback(QuestBoardTile questBoardTile)
 	{
 		RemoveAllQuestTiles();
 		QuestTileDetails.gameObject.SetActive(true);
-		QuestTileDetails.InitializeQuestTile(quest.CurrentQuestIndexId, acceptCallback, rejectCallback);
+		QuestTileDetails.InitializeQuestTile(questBoardTile.CurrentQuestIndexId, acceptCallback, rejectCallback);
 	}
 
-	private void OnRejectCallback(QuestBoardTile quest)
+	private void OnRejectCallback(QuestBoardTile questBoardTile)
 	{
 		QuestTileDetails.gameObject.SetActive(false);
 		RemoveAllQuestTiles();

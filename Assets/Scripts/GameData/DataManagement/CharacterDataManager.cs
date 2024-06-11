@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using static EnumDefinitions;
 
@@ -23,6 +24,11 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 	public void SaveData(GameData persistantData)
 	{
 		persistantData.CurrentCharacterData = LocalData;
+	}
+
+	public List<CharacterData> GetAllCharacterData()
+	{
+		return LocalData.Values.ToList();
 	}
 
 	public bool CreateNewCharacter(string name, GameClassEnum classType)

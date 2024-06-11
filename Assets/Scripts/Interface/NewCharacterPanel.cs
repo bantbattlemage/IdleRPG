@@ -34,13 +34,15 @@ public class NewCharacterPanel : MonoBehaviour
 		CreateNewCharacterButton.gameObject.SetActive(true);
 
 		ClassSelectButtons.ToList().ForEach(x => 
-		{ 
+		{
+			x.onClick.RemoveAllListeners();
 			x.onClick.AddListener(() => 
 			{
 				OnClassButtonPressed(x);
 			});
 		});
 
+		CreateNewCharacterButton.onClick.RemoveAllListeners();
 		CreateNewCharacterButton.onClick.AddListener(() => 
 		{
 			NewCharacterPanelObjects.ToList().ForEach(x => { x.SetActive(true); });

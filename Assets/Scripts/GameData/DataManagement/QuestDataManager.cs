@@ -61,12 +61,12 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 		return AddNewQuest(QuestDataObjects.ToArray()[randomIndex].Value);
 	}
 
-	public void ActivateQuest(int questToActivate, List<CharacterData> characters)
+	public void ActivateQuest(int questToActivate, List<string> characterNames)
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
 		LocalData[questToActivate].Active = true;
-		LocalData[questToActivate].ActiveCharacters = characters.Select(c => c.Name).ToArray();
+		LocalData[questToActivate].ActiveCharacters = characterNames.ToArray();
 
 		DataPersistenceManager.Instance.SaveGame();
 	}
