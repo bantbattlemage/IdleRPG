@@ -4,22 +4,18 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
-public class QuestData : IDataPersistence
+public class QuestData
 {
 	public QuestDataObject BaseQuestDefinition;
+	public int AccessorId;
+	public bool Active;
+	public string[] ActiveCharacters;
 
-	public QuestData(QuestDataObject questDataObject)
+	public QuestData(QuestDataObject questDataObject, int questAccessorId)
 	{
 		BaseQuestDefinition = questDataObject;
-	}
-
-	public void LoadData(GameData persistantData)
-	{
-
-	}
-
-	public void SaveData(GameData persistantData)
-	{
-
+		Active = false;
+		ActiveCharacters = new string[0];
+		AccessorId = questAccessorId;
 	}
 }

@@ -18,7 +18,7 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 
 		var loadedQuests = Resources.LoadAll<QuestDataObject>("GameData/Quests");
 
-		foreach(QuestDataObject obj in loadedQuests)
+		foreach (QuestDataObject obj in loadedQuests)
 		{
 			QuestDataObjects.Add(obj.name, obj);
 		}
@@ -38,9 +38,14 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		QuestData newQuest = new QuestData(questDefinition);
+		int newQuestId = Random.Range(0, int.MaxValue);
 
-		int newQuestId = LocalData.Count;
+		while (LocalData.Keys.Contains(newQuestId))
+		{
+			newQuestId = Random.Range(0, int.MaxValue);
+		}
+
+		QuestData newQuest = new QuestData(questDefinition, newQuestId);
 
 		LocalData.Add(newQuestId, newQuest);
 
@@ -52,7 +57,17 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 	public QuestData AddRandomNewQuest()
 	{
 		int randomIndex = Random.Range(0, QuestDataObjects.Count);
-		
+
 		return AddNewQuest(QuestDataObjects.ToArray()[randomIndex].Value);
+	}
+
+	public void ActivateQuest(int questToActivate, List<CharacterData> characters)
+	{
+		DataPersistenceManager.Instance.LoadGame();
+
+		LocalData[questToActivate].Active = true;
+		LocalData[questToActivate].ActiveCharacters = characters.Select(c => c.Name).ToArray();
+
+		DataPersistenceManager.Instance.SaveGame();
 	}
 }

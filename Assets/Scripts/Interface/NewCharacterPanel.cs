@@ -11,6 +11,7 @@ public class NewCharacterPanel : MonoBehaviour
 	public TextMeshProUGUI CharacterNameText;
 	public Button CreateNewCharacterButton;
 	public Button ConfirmNewCharacterButton;
+	public Button CancelButton;
 	public TMP_InputField NewCharacterNameInputField;
 	public TMP_Dropdown NewCharacterClassInputDropdown;
 
@@ -57,6 +58,11 @@ public class NewCharacterPanel : MonoBehaviour
 			CreateNewCharacterButton.onClick.RemoveAllListeners();
 
 			beginCallback(this);
+		});
+
+		CancelButton.onClick.AddListener(() =>
+		{
+			confirmCallback(this);
 		});
 	}
 }

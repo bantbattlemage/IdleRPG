@@ -116,9 +116,6 @@ public class DataPersistenceManager : MonoBehaviour
     {
         gameData = new GameData();
 
-        CharacterDataManager.Instance.LocalData = new SerializableDictionary<string, CharacterData>();
-        QuestDataManager.Instance.LocalData = new SerializableDictionary<int, QuestData>();
-
         SaveGame();
     }
 
