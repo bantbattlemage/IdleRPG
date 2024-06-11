@@ -13,12 +13,14 @@ public class NewCharacterPanel : MonoBehaviour
 	public Button ConfirmNewCharacterButton;
 	public Button CancelButton;
 	public TMP_InputField NewCharacterNameInputField;
-	public TMP_Dropdown NewCharacterClassInputDropdown;
+	public Button[] ClassSelectButtons;
 
 	public GameObject HeaderGroup;
 	public GameObject BodyGroup;
 	public GameObject FooterGroup;
 	public GameObject[] NewCharacterPanelObjects;
+
+	private GameClassEnum selectedClass;
 	
 	public void InitializeNewCharacterButtonPanel(System.Action<NewCharacterPanel> beginCallback, System.Action<NewCharacterPanel> confirmCallback)
 	{
@@ -30,6 +32,14 @@ public class NewCharacterPanel : MonoBehaviour
 
 		ConfirmNewCharacterButton.gameObject.SetActive(false);
 		CreateNewCharacterButton.gameObject.SetActive(true);
+
+		ClassSelectButtons.ToList().ForEach(x => 
+		{ 
+			x.onClick.AddListener(() => 
+			{
+				OnClassButtonPressed(x);
+			});
+		});
 
 		CreateNewCharacterButton.onClick.AddListener(() => 
 		{
@@ -43,11 +53,10 @@ public class NewCharacterPanel : MonoBehaviour
 			ConfirmNewCharacterButton.onClick.AddListener(() =>
 			{
 				string name = NewCharacterNameInputField.text;
-				GameClassEnum gameClass = (GameClassEnum)NewCharacterClassInputDropdown.value;
 
 				if(name != null && name.Length > 0)
 				{
-					if (CharacterDataManager.Instance.CreateNewCharacter(name, gameClass))
+					if (CharacterDataManager.Instance.CreateNewCharacter(name, selectedClass))
 					{
 						confirmCallback(this);
 					}
@@ -64,5 +73,18 @@ public class NewCharacterPanel : MonoBehaviour
 		{
 			confirmCallback(this);
 		});
+	}
+
+	private void OnClassButtonPressed(Button b)
+	{
+		int index = ClassSelectButtons.ToList().IndexOf(b);
+		selectedClass = (GameClassEnum)index;
+
+		foreach(Button button in ClassSelectButtons)
+		{
+			button.interactable = true;
+		}
+
+		b.interactable = false;
 	}
 }
