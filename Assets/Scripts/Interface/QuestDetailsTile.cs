@@ -40,15 +40,28 @@ public class QuestDetailsTile : QuestBoardTile
 		List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData();
 		for (int i = 0; i < characters.Count; i++)
 		{
-			CharacterAssignmentButtons[i].interactable = true;
-			CharacterAssignmentButtons[i].GetComponentInChildren<TextMeshProUGUI>().text = characters[i].Name;
+			if (characters[i].ActiveQuestId != 0)
+			{
+				CharacterAssignmentButtons[i].interactable = false;
+				CharacterAssignmentButtons[i].GetComponentInChildren<TextMeshProUGUI>().text = characters[i].Name + " (Already On Quest)";
+			}
+			else
+			{
+				CharacterAssignmentButtons[i].interactable = true;
+				CharacterAssignmentButtons[i].GetComponentInChildren<TextMeshProUGUI>().text = characters[i].Name;
+			}
+
 			buttonCharacterAssignments[i] = characters[i].Name;
+
 		}
 
 		AcceptButton.onClick.RemoveAllListeners();
 		AcceptButton.onClick.AddListener(() =>
 		{
-			buttonCallbackOne(this);
+			if(SelectedCharacters.Count > 0)
+			{
+				buttonCallbackOne(this);
+			}
 		});
 
 		RejectButton.onClick.RemoveAllListeners();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class QuestBoardPanelController : MonoBehaviour
@@ -61,6 +62,16 @@ public class QuestBoardPanelController : MonoBehaviour
 
 	private void OnAcceptCallback(QuestDetailsTile questBoardTile)
 	{
+		//	make sure any selected characters are not already on a quest
+		var charactersOnQuests = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId > 0).ToList();
+		foreach (var character in charactersOnQuests)
+		{
+			if (questBoardTile.SelectedCharacters.Contains(character.Name)) 
+			{
+				return;
+			}
+		}
+
 		QuestDataManager.Instance.ActivateQuest(questBoardTile.CurrentQuestIndexId, questBoardTile.SelectedCharacters);
 
 		QuestTileDetails.gameObject.SetActive(false);

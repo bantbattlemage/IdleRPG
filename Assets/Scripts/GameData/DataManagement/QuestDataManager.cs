@@ -38,11 +38,11 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		int newQuestId = Random.Range(0, int.MaxValue);
-
+		//	assign a random int as a quest id, and don't use 0 since it is default value
+		int newQuestId = Random.Range(1, int.MaxValue);
 		while (LocalData.Keys.Contains(newQuestId))
 		{
-			newQuestId = Random.Range(0, int.MaxValue);
+			newQuestId = Random.Range(1, int.MaxValue);
 		}
 
 		QuestData newQuest = new QuestData(questDefinition, newQuestId);
@@ -67,6 +67,11 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 
 		LocalData[questToActivate].Active = true;
 		LocalData[questToActivate].ActiveCharacters = characterNames.ToArray();
+
+		foreach (string characterName in characterNames) 
+		{
+			CharacterDataManager.Instance.LocalData[characterName].ActiveQuestId = questToActivate;
+		}
 
 		DataPersistenceManager.Instance.SaveGame();
 	}
