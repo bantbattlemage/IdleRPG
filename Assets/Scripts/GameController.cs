@@ -32,6 +32,11 @@ public class GameController : MonoBehaviour
 		MainMenu.gameObject.SetActive(true);
 	}
 
+	private void Update()
+	{
+		
+	}
+
 	public void EnablePanels()
 	{
 		LeftPanelGroup.SetActive(true);

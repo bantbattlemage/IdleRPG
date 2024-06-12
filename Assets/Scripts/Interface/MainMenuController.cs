@@ -56,6 +56,7 @@ public class MainMenuController : MonoBehaviour
 		ObjectsToLoad.ToList().ForEach(x => { x.SetActive(true); });
 
 		InitializeRandomTestQuests();
+		QuestController.Instance.Active = true;
 
 		gameObject.SetActive(false);
 	}

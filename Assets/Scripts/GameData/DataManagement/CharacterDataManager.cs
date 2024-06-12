@@ -42,10 +42,7 @@ public class CharacterDataManager : MonoBehaviour, IDataPersistence
 
 		CharacterData characterData = new CharacterData();
 		characterData.Name = name;
-		characterData.MaxHealthPoints = 100;
-		characterData.CurrentHealthPoints= 100;
 		characterData.CharacterClass = classType;
-		characterData.Level = 1;
 
 		LocalData.Add(name, characterData);
 		DataPersistenceManager.Instance.SaveGame();
