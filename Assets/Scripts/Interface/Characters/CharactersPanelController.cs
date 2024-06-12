@@ -6,6 +6,7 @@ public class CharactersPanelController : MonoBehaviour
 {
 	public GameObject NewCharacterPanelPrefab;
 	public GameObject DisplayCharacterPrefab;
+	public Transform ContentRoot;
 
 	private List<DisplayCharacterPanel> displayCharacterPanels = new List<DisplayCharacterPanel>();
 	private List<NewCharacterPanel> newCharacterPanels = new List<NewCharacterPanel>();
@@ -35,7 +36,7 @@ public class CharactersPanelController : MonoBehaviour
 		{
 			foreach (var character in CharacterDataManager.Instance.LocalData.Values)
 			{
-				GameObject newPanelObject = Instantiate(DisplayCharacterPrefab, transform);
+				GameObject newPanelObject = Instantiate(DisplayCharacterPrefab, ContentRoot);
 				DisplayCharacterPanel newPanel = newPanelObject.GetComponent<DisplayCharacterPanel>();
 				newPanel.InitializeCharacterPanel(character);
 				displayCharacterPanels.Add(newPanel);
@@ -50,7 +51,7 @@ public class CharactersPanelController : MonoBehaviour
 
 	private void AddCreateNewCharacterPanel()
 	{
-		GameObject newPanelObject = Instantiate(NewCharacterPanelPrefab, transform);
+		GameObject newPanelObject = Instantiate(NewCharacterPanelPrefab, ContentRoot);
 		NewCharacterPanel newPanel = newPanelObject.GetComponent<NewCharacterPanel>();
 		newCharacterPanels.Add(newPanel);
 
