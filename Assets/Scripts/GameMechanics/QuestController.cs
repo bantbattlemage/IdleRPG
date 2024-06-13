@@ -37,13 +37,23 @@ public class QuestController : MonoBehaviour
 		{
 			List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
 			List<EnemyData> enemies = EnemyDataManager.Instance.GetAllEnemyData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
+
 			List<IGameEntityData> orderedGameEntities = new List<IGameEntityData>();
 			orderedGameEntities.AddRange(characters);
 			orderedGameEntities.AddRange(enemies);
 
+			foreach(CharacterData character in characters)
+			{
+				character.SetCurrentTarget(enemies[Random.Range(0, enemies.Count)]);
+			}
+			foreach(EnemyData enemy in enemies)
+			{
+				enemy.SetCurrentTarget(characters[Random.Range(0, characters.Count)]);
+			}
+
 			foreach (IGameEntityData gameEntity in orderedGameEntities)
 			{
-				gameEntity.IterateSwingTimer(Time.deltaTime, new List<IGameEntityData>());
+				gameEntity.IterateSwingTimer(Time.deltaTime);
 			}
 		}
 	}

@@ -16,4 +16,6 @@ public class GameEntityView : MonoBehaviour
 	public Image HealthBar;
 	public Image ManaBar;
 	public Image ExperienceBar;
+	public Transform BuffGroupHolder;
+	public GameObject BuffPrefab;
 }
