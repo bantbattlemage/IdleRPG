@@ -41,20 +41,20 @@ public class GameEntityData : IGameEntityData
 	/// <summary>
 	/// Progresses the entity's swing timer for the current attack using the time since the last frame.
 	/// </summary>
-	public virtual void IterateSwingTimer(float timeElapsed)
+	public virtual void IterateSwingTimer(float timeElapsed, List<IGameEntityData> targets)
 	{
 		SwingTimer += timeElapsed;
 
 		if (SwingTimer >= AttackSpeed)
 		{
-			PerformBasicAttack();
+			PerformBasicAttack(targets);
 
 			float overflow = SwingTimer - AttackSpeed;
 			SwingTimer = overflow;
 		}
 	}
 
-	public virtual void PerformBasicAttack()
+	public virtual void PerformBasicAttack(List<IGameEntityData> targets)
 	{
 		Debug.Log(Name + " attacks!");
 	}
@@ -62,6 +62,6 @@ public class GameEntityData : IGameEntityData
 
 public interface IGameEntityData
 {
-	public void IterateSwingTimer(float timeElapsed);
-	public void PerformBasicAttack();
+	public void IterateSwingTimer(float timeElapsed, List<IGameEntityData> targets);
+	public void PerformBasicAttack(List<IGameEntityData> targets);
 }

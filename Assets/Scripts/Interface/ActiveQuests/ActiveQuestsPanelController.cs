@@ -10,9 +10,15 @@ public class ActiveQuestsPanelController : MonoBehaviour
 
 	private List<ActiveQuestPanel> activeQuestPanels = new List<ActiveQuestPanel>();
 
+	private System.Action<ActiveQuestPanel> fullViewCallback;
+	private System.Action<ActiveQuestPanel> abandonCallback;
+
 	private void OnEnable()
 	{
 		activeQuestPanels = new List<ActiveQuestPanel>();
+
+		fullViewCallback = OnQuestFullViewButtonPressedCallback;
+		abandonCallback = OnReturnButtonPressedCallback;
 
 		DisplayActiveQuests();
 	}
@@ -44,8 +50,35 @@ public class ActiveQuestsPanelController : MonoBehaviour
 		GameObject newPanel = Instantiate(ActiveQuestPanelPrefab, ContentRoot);
 		ActiveQuestPanel panel = newPanel.GetComponent<ActiveQuestPanel>();
 
-		panel.InitializeQuestPanel(questAccessorId);
+		panel.InitializeQuestPanel(questAccessorId, fullViewCallback, abandonCallback);
 
 		activeQuestPanels.Add(panel);
+	}
+
+	private void OnQuestFullViewButtonPressedCallback(ActiveQuestPanel sender)
+	{
+		for (int i = 0; i < activeQuestPanels.Count; i++) 
+		{
+			if (activeQuestPanels[i] != sender)
+			{
+				Destroy(activeQuestPanels[i].gameObject);
+			}
+		}
+
+		activeQuestPanels = new List<ActiveQuestPanel>() { sender };
+
+		sender.DisplayFullQuestInfo();
+	}
+
+	private void OnReturnButtonPressedCallback(ActiveQuestPanel sender)
+	{
+		for (int i = 0; i < activeQuestPanels.Count; i++)
+		{
+			Destroy(activeQuestPanels[i].gameObject);
+		}
+
+		activeQuestPanels = new List<ActiveQuestPanel>();
+
+		DisplayActiveQuests();
 	}
 }

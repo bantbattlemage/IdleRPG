@@ -1,10 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class EnemyDataManager : MonoBehaviour, IDataPersistence
 {
-	public SerializableDictionary<int, EnemyDataObject> LocalData;
+	public SerializableDictionary<int, EnemyData> LocalData;
 	public Dictionary<string, EnemyDataObject> EnemyDataObjects;
 
 	public static EnemyDataManager Instance { get { if (instance == null) instance = FindObjectOfType<EnemyDataManager>(); return instance; } private set { instance = value; } }
@@ -20,6 +21,11 @@ public class EnemyDataManager : MonoBehaviour, IDataPersistence
 		{
 			EnemyDataObjects.Add(obj.name, obj);
 		}
+	}
+
+	public List<EnemyData> GetAllEnemyData()
+	{
+		return LocalData.Values.ToList();
 	}
 
 	public void LoadData(GameData persistantData)

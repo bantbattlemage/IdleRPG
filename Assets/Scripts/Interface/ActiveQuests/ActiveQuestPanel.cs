@@ -11,7 +11,7 @@ public class ActiveQuestPanel : MonoBehaviour
 	public TextMeshProUGUI QuestDescription;
 	public TextMeshProUGUI AssignedCharactersDisplay;
 
-	public Button SelectQuestButton { get { return GetComponent<Button>(); } }
+	public Button FullViewButton;
 	public Button AbandonQuestButton;
 
 	public List<GameObject> OverviewObjects;
@@ -20,8 +20,7 @@ public class ActiveQuestPanel : MonoBehaviour
 	public int CurrentQuestIndexId { get; private set; }
 	public QuestData CurrentQuestData { get { return QuestDataManager.Instance.LocalData[CurrentQuestIndexId]; } }
 
-
-	public void InitializeQuestPanel(int questAccessorId)
+	public void InitializeQuestPanel(int questAccessorId, System.Action<ActiveQuestPanel> fullViewCallback, System.Action<ActiveQuestPanel> abandonCallback)
 	{
 		DisplayOverviewInfo();
 
@@ -44,13 +43,13 @@ public class ActiveQuestPanel : MonoBehaviour
 		AbandonQuestButton.onClick.RemoveAllListeners();
 		AbandonQuestButton.onClick.AddListener(() => 
 		{
-
+			abandonCallback(this);
 		});
 
-		SelectQuestButton.onClick.RemoveAllListeners();
-		SelectQuestButton.onClick.AddListener(() => 
+		FullViewButton.onClick.RemoveAllListeners();
+		FullViewButton.onClick.AddListener(() =>
 		{
-			DisplayFullQuestInfo();
+			fullViewCallback(this);
 		});
 	}
 

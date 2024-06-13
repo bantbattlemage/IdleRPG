@@ -8,9 +8,4 @@ using static EnumDefinitions;
 public class CharacterData : GameEntityData
 {
 	public GameClassEnum CharacterClass;
-
-	public CharacterData()
-	{
-
-	}
 }

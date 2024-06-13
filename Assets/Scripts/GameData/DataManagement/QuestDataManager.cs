@@ -34,6 +34,16 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 		persistantData.CurrentQuestData = LocalData;
 	}
 
+	public List<QuestData> GetAllQuests()
+	{
+		return LocalData.Values.ToList();
+	}
+
+	public List<QuestData> GetAllActiveQuests(bool active = true) 
+	{
+		return LocalData.Values.Where(x => x.Active == active).ToList();
+	}
+
 	public QuestData AddNewQuest(QuestDataObject questDefinition)
 	{
 		DataPersistenceManager.Instance.LoadGame();

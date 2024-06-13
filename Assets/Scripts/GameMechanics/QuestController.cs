@@ -33,10 +33,16 @@ public class QuestController : MonoBehaviour
 	{
 		//	get all characters that are on an active quest
 		List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId != 0).ToList();
+		List<EnemyData> enemies = EnemyDataManager.Instance.GetAllEnemyData().ToList();
 
-		foreach (CharacterData character in characters)
+		List<IGameEntityData> orderedGameEntities = new List<IGameEntityData>();
+
+		orderedGameEntities.AddRange(characters);
+		orderedGameEntities.AddRange(enemies);
+
+		foreach (IGameEntityData gameEntity in orderedGameEntities)
 		{
-			character.IterateSwingTimer(Time.deltaTime);
+			gameEntity.IterateSwingTimer(Time.deltaTime, new List<IGameEntityData>());
 		}
 	}
 }
