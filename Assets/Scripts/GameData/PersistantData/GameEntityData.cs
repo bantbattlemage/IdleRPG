@@ -14,6 +14,8 @@ public class GameEntityData : IGameEntityData
 	public int CurrentHealthPoints;
 	public int HealthRegenPerSecond;
 
+	public int EntityId;
+
 	/// <summary>
 	/// Quest accessor id that this entity is assigned to
 	/// </summary>
@@ -30,6 +32,11 @@ public class GameEntityData : IGameEntityData
 	public float SwingTimer;
 
 	public GameEntityData()
+	{
+		InitializeBasicValues();
+	}
+
+	protected virtual void InitializeBasicValues()
 	{
 		Level = 1;
 		MaxHealthPoints = 100;

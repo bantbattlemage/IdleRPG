@@ -28,13 +28,29 @@ public class EnemyDataManager : MonoBehaviour, IDataPersistence
 		return LocalData.Values.ToList();
 	}
 
+	public EnemyData AddNewEnemy(EnemyDataObject enemyDefinition, int questId)
+	{
+		//	assign a random int id, and don't use 0 since it is default value
+		int newEnemyId = Random.Range(1, int.MaxValue);
+		while (LocalData.Keys.Contains(newEnemyId))
+		{
+			newEnemyId = Random.Range(1, int.MaxValue);
+		}
+
+		EnemyData newEnemy = new EnemyData(enemyDefinition, newEnemyId, questId);
+
+		LocalData.Add(newEnemyId, newEnemy);
+
+		return newEnemy;
+	}
+
 	public void LoadData(GameData persistantData)
 	{
-
+		LocalData = persistantData.CurrentEnemyData;
 	}
 
 	public void SaveData(GameData persistantData)
 	{
-
+		persistantData.CurrentEnemyData = LocalData;
 	}
 }

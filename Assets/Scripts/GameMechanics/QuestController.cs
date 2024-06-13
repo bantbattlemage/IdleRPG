@@ -31,18 +31,20 @@ public class QuestController : MonoBehaviour
 
 	public void RunQuestLoopIteration()
 	{
-		//	get all characters that are on an active quest
-		List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId != 0).ToList();
-		List<EnemyData> enemies = EnemyDataManager.Instance.GetAllEnemyData().ToList();
+		List<QuestData> allActiveQuests = QuestDataManager.Instance.GetAllActiveQuests();
 
-		List<IGameEntityData> orderedGameEntities = new List<IGameEntityData>();
-
-		orderedGameEntities.AddRange(characters);
-		orderedGameEntities.AddRange(enemies);
-
-		foreach (IGameEntityData gameEntity in orderedGameEntities)
+		foreach(QuestData questData in allActiveQuests)
 		{
-			gameEntity.IterateSwingTimer(Time.deltaTime, new List<IGameEntityData>());
+			List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
+			List<EnemyData> enemies = EnemyDataManager.Instance.GetAllEnemyData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
+			List<IGameEntityData> orderedGameEntities = new List<IGameEntityData>();
+			orderedGameEntities.AddRange(characters);
+			orderedGameEntities.AddRange(enemies);
+
+			foreach (IGameEntityData gameEntity in orderedGameEntities)
+			{
+				gameEntity.IterateSwingTimer(Time.deltaTime, new List<IGameEntityData>());
+			}
 		}
 	}
 }

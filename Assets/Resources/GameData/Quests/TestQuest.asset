@@ -14,3 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   QuestName: Test Quest
   QuestDescription: do a thing
+  PartySize: 5
+  Floors: 10
+  Enemies:
+  - {fileID: 11400000, guid: a5960299e6265404d8987acaad7e8d02, type: 2}

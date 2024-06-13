@@ -7,4 +7,14 @@ using UnityEngine;
 public class EnemyData : GameEntityData
 {
 	public EnemyDataObject BaseEnemyDefinition;
+
+	public EnemyData(in EnemyDataObject baseEnemyDefinition, int entityId, int questId)
+	{
+		InitializeBasicValues();
+
+		BaseEnemyDefinition = baseEnemyDefinition;
+		ActiveQuestId = questId;
+		EntityId = entityId;
+		Name = BaseEnemyDefinition.EnemyName;
+	}
 }

@@ -12,4 +12,8 @@ public class GameEntityView : MonoBehaviour
 	public TextMeshProUGUI MP;
 	public TextMeshProUGUI XP;
 	public TextMeshProUGUI SwingTimerText;
+	public Image SwingTimerBar;
+	public Image HealthBar;
+	public Image ManaBar;
+	public Image ExperienceBar;
 }

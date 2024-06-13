@@ -75,7 +75,6 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		LocalData[questToActivate].Active = true;
 		LocalData[questToActivate].ActiveCharacters = characterNames.ToArray();
 
 		foreach (string characterName in characterNames) 
@@ -83,6 +82,19 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 			CharacterDataManager.Instance.LocalData[characterName].ActiveQuestId = questToActivate;
 		}
 
+		int enemiesToSpawn = Random.Range(1, LocalData[questToActivate].BaseQuestDefinition.PartySize);
+		for (int i = 0; i < enemiesToSpawn; i++)
+		{
+			SpawnNewEnemy(questToActivate);
+		}
+
+		LocalData[questToActivate].Active = true;
+
 		DataPersistenceManager.Instance.SaveGame();
+	}
+
+	public void SpawnNewEnemy(int quest)
+	{
+		EnemyDataManager.Instance.AddNewEnemy(LocalData[quest].BaseQuestDefinition.Enemies[Random.Range(0, LocalData[quest].BaseQuestDefinition.Enemies.Length)], quest);
 	}
 }
