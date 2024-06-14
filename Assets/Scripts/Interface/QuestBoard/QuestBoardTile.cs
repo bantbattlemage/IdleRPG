@@ -14,14 +14,14 @@ public class QuestBoardTile : MonoBehaviour
 	public Button RejectButton;
 
 	public int CurrentQuestIndexId { get; protected set; }
-	public QuestData CurrentQuestData { get { return QuestDataManager.Instance.LocalData[CurrentQuestIndexId]; } }
+	public QuestData CurrentQuestData { get { return QuestDataManager.Instance.GetData(CurrentQuestIndexId); } }
 
 	public virtual void InitializeQuestTile(int questIndexId, System.Action<QuestBoardTile> buttonCallbackOne, System.Action<QuestBoardTile> buttonCallbackTwo)
 	{
 		CurrentQuestIndexId = questIndexId;
 
-		QuestTitle.text = CurrentQuestData.BaseQuestDefinition.QuestName;
-		QuestDescription.text = CurrentQuestData.BaseQuestDefinition.QuestDescription;
+		QuestTitle.text = CurrentQuestData.GetBaseQuestData().QuestName;
+		QuestDescription.text = CurrentQuestData.GetBaseQuestData().QuestDescription;
 
 		AcceptButton.onClick.AddListener(() => 
 		{

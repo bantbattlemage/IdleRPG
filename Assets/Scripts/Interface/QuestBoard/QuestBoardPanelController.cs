@@ -47,7 +47,7 @@ public class QuestBoardPanelController : MonoBehaviour
 	public void AddQuestToQuestBoard(int questAccessorIndex)
 	{
 		//	only add quests that haven't already been accepted
-		if (QuestDataManager.Instance.LocalData[questAccessorIndex].Active)
+		if (QuestDataManager.Instance.GetData(questAccessorIndex).Active)
 		{
 			return;
 		}
@@ -63,7 +63,7 @@ public class QuestBoardPanelController : MonoBehaviour
 	private void OnAcceptCallback(QuestDetailsTile questBoardTile)
 	{
 		//	make sure any selected characters are not already on a quest
-		var charactersOnQuests = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId > 0).ToList();
+		var charactersOnQuests = CharacterDataManager.Instance.GetAllData().Where(x => x.ActiveQuestId > 0).ToList();
 		foreach (var character in charactersOnQuests)
 		{
 			if (questBoardTile.SelectedCharacters.Contains(character.Name)) 
@@ -98,9 +98,9 @@ public class QuestBoardPanelController : MonoBehaviour
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		foreach(var kvp in QuestDataManager.Instance.LocalData)
+		foreach(QuestData quest in QuestDataManager.Instance.GetAllActiveQuests(false))
 		{
-			AddQuestToQuestBoard(kvp.Key);
+			AddQuestToQuestBoard(quest.AccessorId);
 		}
 	}
 }

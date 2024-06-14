@@ -1,0 +1,66 @@
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Unity.VisualScripting;
+using UnityEngine;
+
+public abstract class DataManager<T, D> : MonoBehaviour, IDataPersistence, IDataManager<D> where T : DataManager<T, D> where D : Data
+{
+	protected SerializableDictionary<int, D> LocalData;
+
+	public static T Instance { get { if (instance == null) instance = (T)FindObjectOfType(typeof(T)); return instance; } private set { instance = value; } }
+	private static T instance;
+
+	protected DataManager()
+	{
+		LocalData = new SerializableDictionary<int, D>();
+	}
+
+	public virtual void LoadData(GameData persistantData)
+	{
+		throw new System.NotImplementedException();
+	}
+
+	public virtual void SaveData(GameData persistantData)
+	{
+		throw new System.NotImplementedException();
+	}
+
+	public D GetData(int accessor)
+	{
+		return LocalData[accessor];
+	}
+
+	public List<D> GetAllData()
+	{
+		return LocalData.Values.ToList();
+	}
+
+	public void AddNewData(D newData)
+	{
+		LocalData.Add(GenerateUniqueAccessorId(LocalData.Keys.ToList()), newData);
+	}
+
+	protected int GenerateUniqueAccessorId(List<int> existingIds)
+	{
+		int newId = Random.Range(1, int.MaxValue);
+
+		while (existingIds.Contains(newId))
+		{
+			newId = Random.Range(1, int.MaxValue);
+		}
+
+		return newId;
+	}
+}
+
+public interface IDataManager<D>
+{
+	public abstract D GetData(int accessor);
+	public abstract List<D> GetAllData();
+}
+
+public abstract class Data
+{
+	public int AccessorId;
+}

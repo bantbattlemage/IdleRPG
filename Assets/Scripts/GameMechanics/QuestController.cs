@@ -35,8 +35,8 @@ public class QuestController : MonoBehaviour
 
 		foreach(QuestData questData in allActiveQuests)
 		{
-			List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
-			List<EnemyData> enemies = EnemyDataManager.Instance.GetAllEnemyData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
+			List<CharacterData> characters = CharacterDataManager.Instance.GetAllData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
+			List<EnemyData> enemies = EnemyDataManager.Instance.GetAllData().Where(x => x.ActiveQuestId == questData.AccessorId).ToList();
 
 			List<IGameEntityData> orderedGameEntities = new List<IGameEntityData>();
 			orderedGameEntities.AddRange(characters);

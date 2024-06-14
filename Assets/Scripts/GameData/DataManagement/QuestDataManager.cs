@@ -4,13 +4,9 @@ using UnityEngine;
 using System.Linq;
 using Random = UnityEngine.Random;
 
-public class QuestDataManager : MonoBehaviour, IDataPersistence
+public class QuestDataManager : DataManager<QuestDataManager, QuestData>
 {
-	public SerializableDictionary<int, QuestData> LocalData;
 	public Dictionary<string, QuestDataObject> QuestDataObjects;
-
-	public static QuestDataManager Instance { get { if (instance == null) instance = FindObjectOfType<QuestDataManager>(); return instance; } private set { instance = value; } }
-	private static QuestDataManager instance;
 
 	void Start()
 	{
@@ -24,19 +20,14 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 		}
 	}
 
-	public void LoadData(GameData persistantData)
+	public override void LoadData(GameData persistantData)
 	{
 		LocalData = persistantData.CurrentQuestData;
 	}
 
-	public void SaveData(GameData persistantData)
+	public override void SaveData(GameData persistantData)
 	{
 		persistantData.CurrentQuestData = LocalData;
-	}
-
-	public List<QuestData> GetAllQuests()
-	{
-		return LocalData.Values.ToList();
 	}
 
 	public List<QuestData> GetAllActiveQuests(bool active = true) 
@@ -48,15 +39,8 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		//	assign a random int as a quest id, and don't use 0 since it is default value
-		int newQuestId = Random.Range(1, int.MaxValue);
-		while (LocalData.Keys.Contains(newQuestId))
-		{
-			newQuestId = Random.Range(1, int.MaxValue);
-		}
-
+		int newQuestId = GenerateUniqueAccessorId(LocalData.Keys.ToList());
 		QuestData newQuest = new QuestData(questDefinition, newQuestId);
-
 		LocalData.Add(newQuestId, newQuest);
 
 		DataPersistenceManager.Instance.SaveGame();
@@ -79,10 +63,10 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 
 		foreach (string characterName in characterNames) 
 		{
-			CharacterDataManager.Instance.LocalData[characterName].ActiveQuestId = questToActivate;
+			CharacterDataManager.Instance.GetCharacterData(characterName).ActiveQuestId = questToActivate;
 		}
 
-		int enemiesToSpawn = Random.Range(1, LocalData[questToActivate].BaseQuestDefinition.PartySize);
+		int enemiesToSpawn = Random.Range(1, LocalData[questToActivate].GetBaseQuestData().PartySize);
 		for (int i = 0; i < enemiesToSpawn; i++)
 		{
 			SpawnNewEnemy(questToActivate);
@@ -95,6 +79,7 @@ public class QuestDataManager : MonoBehaviour, IDataPersistence
 
 	public void SpawnNewEnemy(int quest)
 	{
-		EnemyDataManager.Instance.AddNewEnemy(LocalData[quest].BaseQuestDefinition.Enemies[Random.Range(0, LocalData[quest].BaseQuestDefinition.Enemies.Length)], quest);
+		QuestDataObject baseQuestdata = LocalData[quest].GetBaseQuestData();
+		EnemyDataManager.Instance.AddNewEnemy(baseQuestdata.Enemies[Random.Range(0, baseQuestdata.Enemies.Length)], quest);
 	}
 }

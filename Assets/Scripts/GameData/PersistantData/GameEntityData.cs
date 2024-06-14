@@ -1,12 +1,10 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using UnityEditor.U2D.Animation;
 using UnityEngine;
-using static EnumDefinitions;
+
 
 [Serializable]
-public class GameEntityData : IGameEntityData
+public class GameEntityData : Data, IGameEntityData
 {
 	public string Name;
 	public int Level;
@@ -103,13 +101,13 @@ public class GameEntityData : IGameEntityData
 			try
 			{
 				int value = Convert.ToInt32(target);
-				EnemyData targetEnemy = EnemyDataManager.Instance.LocalData[value];
+				EnemyData targetEnemy = EnemyDataManager.Instance.GetData(value);
 				targetName = targetEnemy.Name;
 			}
 			//	value is a string, the target is a character
 			catch
 			{
-				CharacterData characterData = CharacterDataManager.Instance.LocalData[target];
+				CharacterData characterData = CharacterDataManager.Instance.GetCharacterData(target);
 				targetName = characterData.Name;
 			}
 

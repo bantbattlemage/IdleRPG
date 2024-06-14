@@ -4,47 +4,32 @@ using System.Linq;
 using UnityEngine;
 using static EnumDefinitions;
 
-public class CharacterDataManager : MonoBehaviour, IDataPersistence
+public class CharacterDataManager : DataManager<CharacterDataManager, CharacterData>
 {
-	public SerializableDictionary<string, CharacterData> LocalData;
-
-	public static CharacterDataManager Instance { get { if (instance == null) instance = FindObjectOfType<CharacterDataManager>(); return instance; } private set{ instance = value; } }
-	private static CharacterDataManager instance;
-
-	private void Awake()
-	{
-		LocalData = new SerializableDictionary<string, CharacterData>();
-	}
-
-	public void LoadData(GameData persistantData)
+	public override void LoadData(GameData persistantData)
 	{
 		LocalData = persistantData.CurrentCharacterData;
 	}
 
-	public void SaveData(GameData persistantData)
+	public override void SaveData(GameData persistantData)
 	{
 		persistantData.CurrentCharacterData = LocalData;
 	}
 
-	public List<CharacterData> GetAllCharacterData()
+	public CharacterData GetCharacterData(string name)
 	{
-		return LocalData.Values.ToList();
+		return LocalData.Values.Where(x => x.Name == name).FirstOrDefault();
 	}
 
 	public bool CreateNewCharacter(string name, GameClassEnum classType)
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		if (LocalData.ContainsKey(name))
-		{
-			return false;
-		}
-
 		CharacterData characterData = new CharacterData();
 		characterData.Name = name;
 		characterData.CharacterClass = classType;
+		AddNewData(characterData);
 
-		LocalData.Add(name, characterData);
 		DataPersistenceManager.Instance.SaveGame();
 
 		return true;

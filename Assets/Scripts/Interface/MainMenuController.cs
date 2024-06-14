@@ -65,7 +65,7 @@ public class MainMenuController : MonoBehaviour
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		if (QuestDataManager.Instance.LocalData.Values.Count > 0)
+		if (QuestDataManager.Instance.GetAllData().Count > 0)
 		{
 			return;
 		}

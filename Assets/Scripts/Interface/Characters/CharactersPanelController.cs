@@ -27,14 +27,14 @@ public class CharactersPanelController : MonoBehaviour
 		newCharacterPanels = new List<NewCharacterPanel>();
 
 		//	create a new character button panel if there are no characters
-		if (CharacterDataManager.Instance.LocalData == null || CharacterDataManager.Instance.LocalData.Values.Count == 0)
+		if (CharacterDataManager.Instance.GetAllData() == null || CharacterDataManager.Instance.GetAllData().Count == 0)
 		{
 			AddCreateNewCharacterPanel();
 		}
 		//	load characters
 		else
 		{
-			foreach (var character in CharacterDataManager.Instance.LocalData.Values)
+			foreach (var character in CharacterDataManager.Instance.GetAllData())
 			{
 				GameObject newPanelObject = Instantiate(DisplayCharacterPrefab, ContentRoot);
 				DisplayCharacterPanel newPanel = newPanelObject.GetComponent<DisplayCharacterPanel>();
@@ -42,7 +42,7 @@ public class CharactersPanelController : MonoBehaviour
 				displayCharacterPanels.Add(newPanel);
 			}
 
-			if (CharacterDataManager.Instance.LocalData.Values.Count < 5)
+			if (CharacterDataManager.Instance.GetAllData().Count < 5)
 			{
 				AddCreateNewCharacterPanel();
 			}

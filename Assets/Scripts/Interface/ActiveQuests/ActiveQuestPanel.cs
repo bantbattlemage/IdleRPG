@@ -24,7 +24,7 @@ public class ActiveQuestPanel : MonoBehaviour
 	public List<GameObject> DetailsObjects;
 
 	public int CurrentQuestIndexId { get; private set; }
-	public QuestData CurrentQuestData { get { return QuestDataManager.Instance.LocalData[CurrentQuestIndexId]; } }
+	public QuestData CurrentQuestData { get { return QuestDataManager.Instance.GetData(CurrentQuestIndexId); } }
 
 	private int[] fullViewPopulateOrder = new int[] { 2, 1, 3, 0, 4 };
 	private bool fullView = false;
@@ -45,8 +45,10 @@ public class ActiveQuestPanel : MonoBehaviour
 
 		CurrentQuestIndexId = questAccessorId;
 
-		QuestTitle.text = CurrentQuestData.BaseQuestDefinition.QuestName;
-		QuestDescription.text = CurrentQuestData.BaseQuestDefinition.QuestDescription;
+		QuestDataObject baseQuestData = CurrentQuestData.GetBaseQuestData();
+
+		QuestTitle.text = baseQuestData.QuestName;
+		QuestDescription.text = baseQuestData.QuestDescription;
 
 		ResetAllDisplays();
 		UpdateEntityDisplays();
@@ -109,7 +111,7 @@ public class ActiveQuestPanel : MonoBehaviour
 			int displayIndex = populationOrder[i];
 
 			string characterName = CurrentQuestData.ActiveCharacters[i];
-			CharacterData characterData = CharacterDataManager.Instance.LocalData[characterName];
+			CharacterData characterData = CharacterDataManager.Instance.GetCharacterData(characterName);
 
 			if(!fullView)
 			{
@@ -123,7 +125,7 @@ public class ActiveQuestPanel : MonoBehaviour
 			}
 		}
 
-		var enemyData = EnemyDataManager.Instance.GetAllEnemyData().Where(x => x.ActiveQuestId == CurrentQuestIndexId).ToArray();
+		var enemyData = EnemyDataManager.Instance.GetAllData().Where(x => x.ActiveQuestId == CurrentQuestIndexId).ToArray();
 		for(int i = 0; i < enemyData.Length; i++)
 		{
 			int displayIndex = populationOrder[i];

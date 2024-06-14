@@ -6,15 +6,15 @@ using UnityEngine;
 [Serializable]
 public class EnemyData : GameEntityData
 {
-	public EnemyDataObject BaseEnemyDefinition;
+	public string EnemyDataObjectAccessor;
 
-	public EnemyData(in EnemyDataObject baseEnemyDefinition, int entityId, int questId)
+	public EnemyData(EnemyDataObject baseEnemyDefinition, int entityId, int questId)
 	{
 		InitializeBasicValues();
 
-		BaseEnemyDefinition = baseEnemyDefinition;
+		EnemyDataObjectAccessor = baseEnemyDefinition.name;
 		ActiveQuestId = questId;
 		EntityId = entityId;
-		Name = BaseEnemyDefinition.EnemyName;
+		Name = baseEnemyDefinition.EnemyName;
 	}
 }

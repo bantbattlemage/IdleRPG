@@ -19,8 +19,8 @@ public class QuestDetailsTile : QuestBoardTile
 	{
 		CurrentQuestIndexId = questIndexId;
 
-		QuestTitle.text = CurrentQuestData.BaseQuestDefinition.QuestName;
-		QuestDescription.text = CurrentQuestData.BaseQuestDefinition.QuestDescription;
+		QuestTitle.text = CurrentQuestData.GetBaseQuestData().QuestName;
+		QuestDescription.text = CurrentQuestData.GetBaseQuestData().QuestDescription;
 
 		buttonCharacterAssignments = new string[CharacterAssignmentButtons.Length];
 		SelectedCharacters = new List<string>();
@@ -37,7 +37,7 @@ public class QuestDetailsTile : QuestBoardTile
 			});
 		}
 
-		List<CharacterData> characters = CharacterDataManager.Instance.GetAllCharacterData();
+		List<CharacterData> characters = CharacterDataManager.Instance.GetAllData();
 		for (int i = 0; i < characters.Count; i++)
 		{
 			if (characters[i].ActiveQuestId != 0)

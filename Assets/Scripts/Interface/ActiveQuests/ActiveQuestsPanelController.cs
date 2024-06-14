@@ -37,7 +37,7 @@ public class ActiveQuestsPanelController : MonoBehaviour
 	{
 		DataPersistenceManager.Instance.LoadGame();
 
-		List<QuestData> activeQuests = QuestDataManager.Instance.LocalData.Values.Where(x => x.Active).ToList();
+		List<QuestData> activeQuests = QuestDataManager.Instance.GetAllActiveQuests();
 
 		foreach(QuestData data in activeQuests)
 		{
