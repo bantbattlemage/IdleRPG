@@ -18,20 +18,23 @@ public class MainMenuController : MonoBehaviour
 		ContinueButton.onClick.AddListener(() => 
 		{
 			DataPersistenceManager.Instance.LoadGame();
-			BeginGame();
+			
+			GameStartController.Instance.BeginGame();
 		});
 
 		NewGameButton.onClick.AddListener(() =>
 		{
 			DataPersistenceManager.Instance.NewGame();
 			DataPersistenceManager.Instance.SaveGame();
-			BeginGame();
+
+			GameStartController.Instance.BeginGame();
 		});
 
 		LoadGameButton.onClick.AddListener(() =>
 		{
 			DataPersistenceManager.Instance.LoadGame();
-			BeginGame();
+
+			GameStartController.Instance.BeginGame();
 		});
 
 		ExitGameButton.onClick.AddListener(() =>
@@ -50,33 +53,9 @@ public class MainMenuController : MonoBehaviour
 		}
 	}
 
-	private void BeginGame()
+	public void CloseMainMenu()
 	{
-		//DataPersistenceManager.Instance.BeginAutoSaveCoroutine();
 		ObjectsToLoad.ToList().ForEach(x => { x.SetActive(true); });
-
-		InitializeRandomTestQuests();
-		QuestController.Instance.Active = true;
-
 		gameObject.SetActive(false);
-	}
-
-	public void InitializeRandomTestQuests()
-	{
-		DataPersistenceManager.Instance.LoadGame();
-
-		if (QuestDataManager.Instance.GetAllData().Count > 0)
-		{
-			return;
-		}
-
-		for (int i = 0; i < 5; i++)
-		{
-			QuestData newQuest = QuestDataManager.Instance.AddRandomNewQuest();
-		}
-
-		Debug.Log("Set up test quests");
-
-		DataPersistenceManager.Instance.SaveGame();
 	}
 }

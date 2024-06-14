@@ -4,12 +4,9 @@ using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
 
-public abstract class DataManager<T, D> : MonoBehaviour, IDataPersistence, IDataManager<D> where T : DataManager<T, D> where D : Data
+public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataManager<D> where T : DataManager<T, D> where D : Data
 {
 	protected SerializableDictionary<int, D> LocalData;
-
-	public static T Instance { get { if (instance == null) instance = (T)FindObjectOfType(typeof(T)); return instance; } private set { instance = value; } }
-	private static T instance;
 
 	protected DataManager()
 	{

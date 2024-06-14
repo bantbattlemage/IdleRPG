@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public class QuestController : MonoBehaviour
+public class QuestController : Singleton<QuestController>
 {
+	[HideInInspector]
 	public bool Active = false;
-
-	public static QuestController Instance { get { if (instance == null) instance = FindObjectOfType<QuestController>(); return instance; } private set { instance = value; } }
-	private static QuestController instance;
 
 	public void Awake()
 	{

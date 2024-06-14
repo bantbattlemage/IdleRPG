@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Linq;
 using TMPro;
-using static EnumDefinitions;
 
 public class NewCharacterPanel : MonoBehaviour
 {

@@ -32,7 +32,7 @@ public class QuestDataManager : DataManager<QuestDataManager, QuestData>
 
 	public List<QuestData> GetAllActiveQuests(bool active = true) 
 	{
-		return LocalData.Values.Where(x => x.Active == active).ToList();
+		return GetAllData().Where(x => x.Active == active).ToList();
 	}
 
 	public QuestData AddNewQuest(QuestDataObject questDefinition)
@@ -50,9 +50,7 @@ public class QuestDataManager : DataManager<QuestDataManager, QuestData>
 
 	public QuestData AddRandomNewQuest()
 	{
-		int randomIndex = Random.Range(0, QuestDataObjects.Count);
-
-		return AddNewQuest(QuestDataObjects.ToArray()[randomIndex].Value);
+		return AddNewQuest(QuestDataObjects.Values.GetRandom());
 	}
 
 	public void ActivateQuest(int questToActivate, List<string> characterNames)
@@ -80,6 +78,6 @@ public class QuestDataManager : DataManager<QuestDataManager, QuestData>
 	public void SpawnNewEnemy(int quest)
 	{
 		QuestDataObject baseQuestdata = LocalData[quest].GetBaseQuestData();
-		EnemyDataManager.Instance.AddNewEnemy(baseQuestdata.Enemies[Random.Range(0, baseQuestdata.Enemies.Length)], quest);
+		EnemyDataManager.Instance.AddNewEnemy(baseQuestdata.Enemies.GetRandom(), quest);
 	}
 }
