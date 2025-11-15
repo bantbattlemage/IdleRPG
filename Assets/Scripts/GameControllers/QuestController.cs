@@ -42,11 +42,11 @@ public class QuestController : Singleton<QuestController>
 
 			foreach(CharacterData character in characters)
 			{
-				character.SetCurrentTarget(enemies[Random.Range(0, enemies.Count)]);
+				character.SetCurrentTarget(enemies.GetRandom());
 			}
 			foreach(EnemyData enemy in enemies)
 			{
-				enemy.SetCurrentTarget(characters[Random.Range(0, characters.Count)]);
+				enemy.SetCurrentTarget(characters.GetRandom());
 			}
 
 			foreach (IGameEntityData gameEntity in orderedGameEntities)

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 51a0d0dac37fb9b449fac72ae8cb206a, type: 3}
   m_Name: BasicAttack
   m_EditorClassIdentifier: 
-  Name: Basic Attack
+  AbilityName: Basic Attack
   BaseDamageLow: 1
   BaseDamageHigh: 10
   ManaCost: 0

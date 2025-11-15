@@ -7,4 +7,5 @@ public class EnemyDataObject : ScriptableObject
 	public string EnemyName;
 	public int BaseHealth;
 	public int BaseAttack;
+	public AbilityDataObject BaseAbility;
 }

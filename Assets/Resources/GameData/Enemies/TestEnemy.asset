@@ -15,3 +15,4 @@ MonoBehaviour:
   EnemyName: TestEnemy
   BaseHealth: 50
   BaseAttack: 10
+  BaseAbility: {fileID: 11400000, guid: e720dd6072397b243a6a8f26d02fea35, type: 2}
