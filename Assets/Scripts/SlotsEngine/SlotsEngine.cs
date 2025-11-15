@@ -28,20 +28,15 @@ public class SlotsEngine : Singleton<MonoBehaviour>
 	{
 		for (int i = 0; i < reels.Count; i++)
 		{
-			int index = i;
-
-			reels[i].transform.DOLocalMoveY(-500, 1).SetEase(Ease.OutBounce).OnComplete(() =>
-			{
-				Transform t = reels[index].gameObject.transform;
-				t.localPosition = new Vector3(t.localPosition.x, 0, t.localPosition.z);
-			});
+			reels[i].FallOut();
 		}
 	}
 
 	private void SpawnReels()
 	{
-		GameObject reelsGroup = Instantiate(new GameObject(), gameCanvas.transform);
-		reelsGroup.name = "ReelsGroup";
+		Transform reelsGroup = new GameObject("ReelsGroup").transform;
+		reelsGroup.parent = gameCanvas.transform;
+		reelsGroup.localScale = new Vector3(1, 1, 1);
 
 		for (int i = 0; i < reelCount; i++)
 		{
