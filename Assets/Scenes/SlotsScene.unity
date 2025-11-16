@@ -1686,7 +1686,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SlotsEngine
   gameCanvas: {fileID: 48874304}
   reelPrefab: {fileID: 3654211360053236743, guid: bac720592de7d334aa422d501c022c9a, type: 3}
-  slotsDefinition: {fileID: 11400000, guid: fbbe7dcef54fbcb43b9b3d0a8ac099c0, type: 2}
+  slotsDefinition: {fileID: 11400000, guid: 0fb33e413c57175429703b52f76635bd, type: 2}
 --- !u!4 &1658930344
 Transform:
   m_ObjectHideFlags: 0
