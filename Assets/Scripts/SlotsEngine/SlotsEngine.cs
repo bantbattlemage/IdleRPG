@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using DG.Tweening;
@@ -16,8 +17,11 @@ public class SlotsEngine : Singleton<SlotsEngine>
 	void Start()
 	{
 		SpawnReels();
-	}
 
+		EventManager.Instance.RegisterEvent("SpinCompleted", OnSpinCompleted);
+		EventManager.Instance.RegisterEvent("ReelCompleted", OnReelCompleted);
+	}
+	
 	void Update()
 	{
 		if (Input.GetKeyDown(KeyCode.Space))
@@ -43,6 +47,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 			else
 			{
 				reels[i].CompleteSpin();
+				EventManager.Instance.BroadcastEvent("ReelCompleted", i);
 			}
 		}
 
@@ -65,5 +70,17 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		}
 
 		reelsGroup.transform.localPosition = new Vector3(-((reelCount-1) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize))/2f, -((reelDefinition.SymbolCount-1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize))/2f, 0);
+	}
+
+	void OnSpinCompleted(object e)
+	{
+		Debug.Log($"Spin Completed");
+	}
+
+	void OnReelCompleted(object e)
+	{
+		int value = (int)e;
+
+		Debug.Log($"Reel {value} Completed");
 	}
 }
