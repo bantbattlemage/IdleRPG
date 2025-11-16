@@ -19,13 +19,19 @@ public class StateMachine : Singleton<StateMachine>
 
 	void Awake()
 	{
-		RegisterState(State.Init, () => { SetState(State.Idle); });
+		RegisterState(State.Init);
 		RegisterState(State.Idle);
 		RegisterState(State.Spinning);
 		RegisterState(State.Presentation);
 
+		EventManager.Instance.RegisterEvent("InitEnter", OnInitEnter);
 		currentState = State.Init;
-		states[State.Init].EnterState();
+		states[currentState].EnterState();
+	}
+
+	private void OnInitEnter(object obj)
+	{
+
 	}
 
 	private void RegisterState(State state, Action enterAction = null, Action exitAction = null)

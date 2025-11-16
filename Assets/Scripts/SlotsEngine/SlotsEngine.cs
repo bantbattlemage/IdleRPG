@@ -23,6 +23,10 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnSpinButtonPressed);
 		EventManager.Instance.RegisterEvent("StopButtonPressed", OnStopButtonPressed);
+
+		SlotConsoleController.Instance.InitializeConsole();
+
+		StateMachine.Instance.SetState(State.Idle);
 	}
 
 	void Update()
