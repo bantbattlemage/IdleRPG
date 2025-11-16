@@ -2636,7 +2636,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SlotsEngine
   gameCanvas: {fileID: 48874304}
   reelPrefab: {fileID: 3654211360053236743, guid: bac720592de7d334aa422d501c022c9a, type: 3}
-  slotsDefinition: {fileID: 11400000, guid: fbbe7dcef54fbcb43b9b3d0a8ac099c0, type: 2}
+  slotsDefinition: {fileID: 11400000, guid: fb446478731521f4dbfd4283c2935a95, type: 2}
 --- !u!4 &1658930344
 Transform:
   m_ObjectHideFlags: 0
@@ -3007,7 +3007,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a460de8f89324b4294fb35a5122362d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GamePlayer
-  definition: {fileID: 0}
+  definition: {fileID: 11400000, guid: 290bd63b06582124f86fdfffa990dcfa, type: 2}
 --- !u!1 &1755886562
 GameObject:
   m_ObjectHideFlags: 0

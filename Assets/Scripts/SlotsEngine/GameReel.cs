@@ -71,8 +71,8 @@ public class GameReel : MonoBehaviour, IReel
 		completeOnNextSpin = true;
 
 		//	slam the reels
-		activeSpinTweens[0].timeScale = 2f;
-		activeSpinTweens[1].timeScale = 2f;
+		activeSpinTweens[0].timeScale = 4f;
+		activeSpinTweens[1].timeScale = 4f;
 	}
 
 	public void ApplySolution(List<SymbolDefinition> symbols)

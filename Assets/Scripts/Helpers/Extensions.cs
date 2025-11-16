@@ -15,6 +15,8 @@ public static class Extensions
 
 		foreach (GameSymbol s in symbols)
 		{
+			if(s == null) continue;
+
 			definitions.Add(s.Definition);
 		}
 

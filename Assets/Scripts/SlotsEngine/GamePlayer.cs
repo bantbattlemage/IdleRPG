@@ -20,6 +20,14 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 	}
 
+	void Update()
+	{
+		if (Input.GetKeyDown(KeyCode.Space))
+		{
+			EventManager.Instance.BroadcastEvent("PlayerInputPressed");
+		}
+	}
+
 	public BetLevelDefinition CurrentBet
 	{
 		get

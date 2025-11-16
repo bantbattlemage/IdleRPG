@@ -24,8 +24,9 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		EventManager.Instance.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
 		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
 		
-		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnSpinButtonPressed);
-		EventManager.Instance.RegisterEvent("StopButtonPressed", OnStopButtonPressed);
+		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
+		EventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
+		EventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		SpawnReels();
 
@@ -35,20 +36,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		StateMachine.Instance.SetState(State.Idle);
 	}
 
-	void Update()
-	{
-		if (Input.GetKeyDown(KeyCode.Space))
-		{
-			PlayerInputPressed();
-		}
-	}
-
-	private void OnSpinPurchased(object obj)
-	{
-		SpinAllReels();
-	}
-
-	private void PlayerInputPressed()
+	private void OnPlayerInputPressed(object obj)
 	{
 		if (!spinInProgress && StateMachine.Instance.CurrentState == State.Idle)
 		{
@@ -58,6 +46,11 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		{
 			StopAllReels();
 		}
+	}
+
+	private void OnSpinPurchased(object obj)
+	{
+		SpinAllReels();
 	}
 
 	private void SpinAllReels()
@@ -126,16 +119,6 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
 	}
 
-	private void OnSpinButtonPressed(object obj)
-	{
-		PlayerInputPressed();
-	}
-
-	private void OnStopButtonPressed(object obj)
-	{
-		PlayerInputPressed();
-	}
-
 	void OnReelCompleted(object e)
 	{
 		//int value = (int)e;
@@ -202,12 +185,12 @@ public class SlotsEngine : Singleton<SlotsEngine>
 	public GameSymbol[] GetCurrentSymbolGrid()
 	{
 		List<GameSymbol[]> reelSymbols = new List<GameSymbol[]>();
-		foreach (GameReel g in reels)
+		foreach (GameReel gameReel in reels)
 		{
-			var newList = new GameSymbol[g.Symbols.Count];
-			for(int i = 0; i < g.Symbols.Count; i++)
+			var newList = new GameSymbol[gameReel.Symbols.Count];
+			for(int i = 0; i < gameReel.Symbols.Count; i++)
 			{
-				newList[i] = g.Symbols[i];
+				newList[i] = gameReel.Symbols[i];
 			}
 			reelSymbols.Add(newList);
 		}
