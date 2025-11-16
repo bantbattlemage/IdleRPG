@@ -1,10 +1,10 @@
 using UnityEngine;
 using System.Linq;
 
-[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/SymbolDefinition", order = 2)]
+[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/SymbolDefinition")]
 public class SymbolDefinition : ScriptableObject
 {
-	[SerializeField] private string name;
+	[SerializeField] private new string name;
 	[SerializeField] private Sprite sprite;
 	[SerializeField] private int[] baseValueMultiplier;
 

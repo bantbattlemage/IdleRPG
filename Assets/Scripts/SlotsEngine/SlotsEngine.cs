@@ -30,6 +30,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		SpawnReels();
 
 		SlotConsoleController.Instance.InitializeConsole();
+		GamePlayer.Instance.InitializePlayer();
 
 		StateMachine.Instance.SetState(State.Idle);
 	}
@@ -137,7 +138,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 	void OnReelCompleted(object e)
 	{
-		int value = (int)e;
+		//int value = (int)e;
 
 		//Debug.Log($"Reel {value} Completed");
 

@@ -8,25 +8,59 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 {
 	public Button SpinButton;
 	public Button StopButton;
+	public Button BetUpButton;
+	public Button BetDownButton;
 
 	public Toggle AutoSpinToggle;
 
 	public Text WinText;
 	public Text ConsoleMessageText;
+	public Text BetText;
+	public Text CreditsText;
 
 	public void InitializeConsole()
 	{
 		SpinButton.onClick.AddListener(OnSpinPressed);
 		StopButton.onClick.AddListener(OnStopPressed);
+		BetDownButton.onClick.AddListener(OnBetDownPressed);
+		BetUpButton.onClick.AddListener(OnBetUpPressed);
 
 		EventManager.Instance.RegisterEvent("IdleEnter", OnIdleEnter);
 		EventManager.Instance.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
 		EventManager.Instance.RegisterEvent("SpinningEnter", OnSpinningEnter);
 		EventManager.Instance.RegisterEvent("SpinningExit", OnSpinningExit);
 		EventManager.Instance.RegisterEvent("StoppingReels", OnStoppingReels);
+		EventManager.Instance.RegisterEvent("BetChanged", OnBetChanged);
 
 		WinText.text = string.Empty;
 		SetConsoleMessage(string.Empty);
+
+		BetText.text = string.Empty;
+		CreditsText.text = string.Empty;
+	}
+
+	public void ToggleConsoleButtons(bool state)
+	{
+		SpinButton.interactable = state;
+		StopButton.interactable = state;
+		BetUpButton.interactable = state;
+		BetDownButton.interactable = state;
+	}
+
+	private void OnBetUpPressed()
+	{
+		EventManager.Instance.BroadcastEvent("BetUpPressed");
+	}
+
+	private void OnBetDownPressed()
+	{
+		EventManager.Instance.BroadcastEvent("BetDownPressed");
+	}
+	private void OnBetChanged(object obj)
+	{
+		BetLevelDefinition definition = (BetLevelDefinition)obj;
+
+		BetText.text = definition.CreditCost.ToString();
 	}
 
 	public void SetConsoleMessage(string message)

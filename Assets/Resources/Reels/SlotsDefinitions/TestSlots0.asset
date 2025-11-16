@@ -12,12 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dcdccfe3193ee7e4284cb42f01a9f193, type: 3}
   m_Name: TestSlots0
   m_EditorClassIdentifier: Assembly-CSharp::SlotsDefinition
-  Name: 3x3_1payline
-  ReelDefinitions:
-  - {fileID: 11400000, guid: a4348d44a4cf6cd468ac226cffe5ddcb, type: 2}
-  - {fileID: 11400000, guid: a4348d44a4cf6cd468ac226cffe5ddcb, type: 2}
-  - {fileID: 11400000, guid: a4348d44a4cf6cd468ac226cffe5ddcb, type: 2}
-  WinlineDefinitions:
-  - {fileID: 11400000, guid: e566fff81f313b0488d84530071f28d7, type: 2}
-  - {fileID: 11400000, guid: d41bb1a7c5e9f7d4bbacadf6bf79a339, type: 2}
-  - {fileID: 11400000, guid: be50c54153a0a6e47b08f4644923b649, type: 2}
+  reelDefinitions:
+  - {fileID: 11400000, guid: b02a367ba43aedd4d8c003b72579c9ff, type: 2}
+  - {fileID: 11400000, guid: b02a367ba43aedd4d8c003b72579c9ff, type: 2}
+  - {fileID: 11400000, guid: b02a367ba43aedd4d8c003b72579c9ff, type: 2}
+  - {fileID: 11400000, guid: b02a367ba43aedd4d8c003b72579c9ff, type: 2}
+  - {fileID: 11400000, guid: b02a367ba43aedd4d8c003b72579c9ff, type: 2}
+  winlineDefinitions:
+  - {fileID: 11400000, guid: d06d9c4babadec141b50a2bc02c224f9, type: 2}
+  - {fileID: 11400000, guid: f95a52bcfbd8cae49812c41ee9802861, type: 2}
+  - {fileID: 11400000, guid: 690ad6d9e284eb4468f58a36e0f4021f, type: 2}
+  - {fileID: 11400000, guid: f4fec873c90239649add61b4153c29c2, type: 2}
+  - {fileID: 11400000, guid: e9e16177a076c7d4b9d358cbc54026f8, type: 2}
+  betLevelDefinitions:
+  - {fileID: 11400000, guid: 96bf0fc9e9c987b4ba91c2ebace1020d, type: 2}
+  - {fileID: 11400000, guid: fafe5611c7f04494caa24ba0e909b721, type: 2}
+  - {fileID: 11400000, guid: 7478cfc5d2311ce4ca22a9b4cd374c2b, type: 2}
+  - {fileID: 11400000, guid: 45d953bc559c52a4c8353ab303571a49, type: 2}

@@ -182,12 +182,13 @@ public class GameReel : MonoBehaviour, IReel
 			}
 			else
 			{
+				spinning = false;
+
 				for (int i = 0; i < symbols.Count; i++)
 				{
 					EventManager.Instance.BroadcastEvent("SymbolLanded", symbols[i]);
 				}
 
-				spinning = false;
 				EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
 			}
 		});
