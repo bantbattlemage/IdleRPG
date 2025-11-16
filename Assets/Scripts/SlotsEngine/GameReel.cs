@@ -8,78 +8,26 @@ public class GameReel : MonoBehaviour, IReel
 	[SerializeField] private GameObject SymbolPrefab;
 
 	public ReelDefinition Definition => definition;
+	public int ID => id;
+	private int id;
 
 	private ReelDefinition definition;
-	private List<GameSymbol> symbols = new List<GameSymbol>();
 	private Transform symbolRoot;
 
 	private Transform nextSymbolsRoot;
 
+	private List<GameSymbol> symbols = new List<GameSymbol>();
 	private List<GameSymbol> topDummySymbols = new List<GameSymbol>();
 	private List<GameSymbol> bottomDummySymbols = new List<GameSymbol>();
 
 	private bool completeOnNextSpin = false;
 
-	public void InitializeReel(ReelDefinition reelDefinition)
+	public void InitializeReel(ReelDefinition reelDefinition, int reelID)
 	{
 		definition = reelDefinition;
+		id = reelID;
 
 		SpawnReel();
-	}
-
-	public void BeginSpin(List<SymbolDefinition> solution = null)
-	{
-		completeOnNextSpin = false;
-
-		FallOut(solution);
-	}
-
-	public void CompleteSpin()
-	{
-		completeOnNextSpin = true;
-	}
-
-	public void ApplySolution(List<SymbolDefinition> symbols)
-	{
-
-	}
-
-	private void SpawnNextReel(List<SymbolDefinition> solution = null)
-	{
-		Transform test = new GameObject("Test").transform;
-		test.parent = transform;
-		test.localScale = new Vector3(1, 1, 1);
-		test.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * ((definition.SymbolCount-1) * 3)), 0);
-
-		List<GameSymbol> newSymbols = new List<GameSymbol>();
-		for (int i = 0; i < definition.SymbolCount; i++)
-		{
-			GameObject symbol = Instantiate(SymbolPrefab, test);
-			GameSymbol sym = symbol.GetComponent<GameSymbol>();
-
-			SymbolDefinition def;
-
-			if (solution != null)
-			{
-				def = solution[i];
-			}
-			else
-			{
-				def = symbols[i].Definition;
-			}
-
-			sym.ApplySymbol(def);
-
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * i), 0);
-
-			newSymbols.Add(sym);
-		}
-
-		SpawnDummySymbols(test);
-		SpawnDummySymbols(test, false);
-
-		nextSymbolsRoot = test;
 	}
 
 	private void SpawnReel()
@@ -104,16 +52,97 @@ public class GameReel : MonoBehaviour, IReel
 		SpawnDummySymbols(symbolRoot, false);
 	}
 
+	public void BeginSpin(List<SymbolDefinition> solution = null)
+	{
+		completeOnNextSpin = false;
+
+		FallOut(solution);
+	}
+
+	public void CompleteSpin()
+	{
+		completeOnNextSpin = true;
+	}
+
+	public void ApplySolution(List<SymbolDefinition> symbols)
+	{
+
+	}
+
+	private void SpawnNextReel(List<SymbolDefinition> solution = null)
+	{
+		Transform nextReel = new GameObject("Next").transform;
+		nextReel.parent = transform;
+		nextReel.localScale = new Vector3(1, 1, 1);
+		nextReel.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * ((definition.SymbolCount-1) * 3)), 0);
+
+		List<GameSymbol> newSymbols = new List<GameSymbol>();
+		for (int i = 0; i < definition.SymbolCount; i++)
+		{
+			GameObject symbol = Instantiate(SymbolPrefab, nextReel);
+			GameSymbol sym = symbol.GetComponent<GameSymbol>();
+
+			SymbolDefinition def;
+
+			if (solution != null)
+			{
+				def = solution[i];
+			}
+			else
+			{
+				def = symbols[i].Definition;
+			}
+
+			sym.ApplySymbol(def);
+
+			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
+			symbol.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * i), 0);
+
+			newSymbols.Add(sym);
+		}
+
+		symbols = newSymbols;
+
+		List<SymbolDefinition> topSyms = null;
+		//if (topDummySymbols is { Count: > 0 })
+		//{
+		//	topSyms = new List<SymbolDefinition>();
+		//	foreach (GameSymbol topSym in topDummySymbols)
+		//	{
+		//		topSyms.Add(topSym.Definition);
+		//	}
+		//}
+
+		List<SymbolDefinition> botSyms = null;
+		//if (bottomDummySymbols is { Count: > 0 })
+		//{
+		//	botSyms = new List<SymbolDefinition>();
+		//	foreach (GameSymbol botSym in bottomDummySymbols)
+		//	{
+		//		botSyms.Add(botSym.Definition);
+		//	}
+		//}
+
+		SpawnDummySymbols(nextReel, definitions: topSyms);
+		SpawnDummySymbols(nextReel, false, botSyms);
+
+		nextSymbolsRoot = nextReel;
+	}
+
 	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolDefinition> definitions = null)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
 
-		int startIndex = !bottom ? definition.SymbolCount - 1 : 0;
+		int startIndex = !bottom ? definition.SymbolCount : 1;
 		int flip = bottom ? -1 : 1;
+		int total = bottom ? definition.SymbolCount - 1 : definition.SymbolCount;
+		string name = bottom ? "bot" : "top";
 
-		for (int i = 0; i < definition.SymbolCount; i++)
+		for (int i = 0; i < total; i++)
 		{
 			GameObject symbol = Instantiate(SymbolPrefab, root);
+			symbol.name = name;
+
 			GameSymbol sym = symbol.GetComponent<GameSymbol>();
 
 			SymbolDefinition def;
@@ -148,17 +177,27 @@ public class GameReel : MonoBehaviour, IReel
 		SpawnNextReel(solution);
 
 		float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
+		float duration = 5f;
 
-		symbolRoot.transform.DOLocalMoveY(fallDistance, 0.99f).SetEase(Ease.Linear);
+		symbolRoot.transform.DOLocalMoveY(fallDistance, duration - 0.01f).SetEase(Ease.Linear);
 		
-		nextSymbolsRoot.transform.DOLocalMoveY(0, 1f).SetEase(Ease.Linear).OnComplete(() =>
+		nextSymbolsRoot.transform.DOLocalMoveY(0, duration).SetEase(Ease.Linear).OnComplete(() =>
 		{
 			Destroy(symbolRoot.gameObject);
 			symbolRoot = nextSymbolsRoot;
 
 			if (!completeOnNextSpin)
 			{
-				FallOut();
+				FallOut(solution);
+			}
+			else
+			{
+				for (int i = 0; i < symbols.Count; i++)
+				{
+					EventManager.Instance.BroadcastEvent("SymbolLanded", symbols[i]);
+				}
+
+				EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
 			}
 		});
 	}

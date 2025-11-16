@@ -47,7 +47,6 @@ public class SlotsEngine : Singleton<SlotsEngine>
 			else
 			{
 				reels[i].CompleteSpin();
-				EventManager.Instance.BroadcastEvent("ReelCompleted", i);
 			}
 		}
 
@@ -64,7 +63,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		{
 			GameObject r = Instantiate(reelPrefab, reelsGroup.transform);
 			GameReel reel = r.GetComponent<GameReel>();
-			reel.InitializeReel(reelDefinition);
+			reel.InitializeReel(reelDefinition, i);
 			r.transform.localPosition = new Vector3((reelDefinition.ReelsSpacing + reelDefinition.SymbolSize) * i, 0, 0);
 			reels.Add(reel);
 		}

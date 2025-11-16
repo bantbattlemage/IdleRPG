@@ -24,6 +24,18 @@ public class EventManager : Singleton<EventManager>
 		}
 	}
 
+	public void UnregisterEvent(string eventName, Action<object> action)
+	{
+		if (events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
+		{
+			currentRegisteredEvents.Remove(action);
+		}
+		else
+		{
+			Debug.LogWarning($"tried to unregister {eventName} but not registered!");
+		}
+	}
+
 	public void BroadcastEvent(string eventName, object value)
 	{
 		if (events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
@@ -35,7 +47,8 @@ public class EventManager : Singleton<EventManager>
 		}
 		else
 		{
-			throw new System.Exception($"Tried to broadcast event {eventName} but event is not registered!");
+			Debug.Log($"{eventName} broadcast with no listeners.");
+			//throw new System.Exception($"Tried to broadcast event {eventName} but event is not registered!");
 		}
 	}
 }

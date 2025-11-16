@@ -724,7 +724,7 @@ MonoBehaviour:
   gameCanvas: {fileID: 106035619}
   reelCount: 5
   reelPrefab: {fileID: 3654211360053236743, guid: bac720592de7d334aa422d501c022c9a, type: 3}
-  reelDefinition: {fileID: 11400000, guid: 4ce29f8799897d241a0f97cb1e6bf215, type: 2}
+  reelDefinition: {fileID: 11400000, guid: b02a367ba43aedd4d8c003b72579c9ff, type: 2}
 --- !u!4 &1658930344
 Transform:
   m_ObjectHideFlags: 0
