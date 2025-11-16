@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d3721aafd79ace94ea6a727ceeb82299, type: 3}
-  m_Name: TestReel2
+  m_Name: TestReel3
   m_EditorClassIdentifier: Assembly-CSharp::ReelDefinition
   reelCount: 5
   reelSpinDuration: 1
-  symbolCount: 3
-  symbolSize: 200
-  symbolSpacing: 25
-  reelsSpacing: 50
+  symbolCount: 4
+  symbolSize: 150
+  symbolSpacing: 10
+  reelsSpacing: 10

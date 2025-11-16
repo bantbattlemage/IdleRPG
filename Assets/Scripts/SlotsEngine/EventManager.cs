@@ -36,7 +36,7 @@ public class EventManager : Singleton<EventManager>
 		}
 	}
 
-	public void BroadcastEvent(string eventName, object value)
+	public void BroadcastEvent(string eventName, object value = null)
 	{
 		if (events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
 		{

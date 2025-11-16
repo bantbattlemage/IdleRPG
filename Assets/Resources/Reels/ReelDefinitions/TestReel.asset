@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d3721aafd79ace94ea6a727ceeb82299, type: 3}
   m_Name: TestReel
   m_EditorClassIdentifier: Assembly-CSharp::ReelDefinition
+  reelCount: 5
+  reelSpinDuration: 1
   symbolCount: 6
   symbolSize: 100
   symbolSpacing: 25

@@ -11,6 +11,9 @@ public class GameReel : MonoBehaviour, IReel
 	public int ID => id;
 	private int id;
 
+	public bool Spinning => spinning;
+	private bool spinning = false;
+
 	private ReelDefinition definition;
 	private Transform symbolRoot;
 
@@ -55,6 +58,7 @@ public class GameReel : MonoBehaviour, IReel
 	public void BeginSpin(List<SymbolDefinition> solution = null)
 	{
 		completeOnNextSpin = false;
+		spinning = true;
 
 		FallOut(solution);
 	}
@@ -177,7 +181,7 @@ public class GameReel : MonoBehaviour, IReel
 		SpawnNextReel(solution);
 
 		float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
-		float duration = 5f;
+		float duration = definition.ReelSpinDuration;
 
 		symbolRoot.transform.DOLocalMoveY(fallDistance, duration - 0.01f).SetEase(Ease.Linear);
 		
@@ -197,6 +201,7 @@ public class GameReel : MonoBehaviour, IReel
 					EventManager.Instance.BroadcastEvent("SymbolLanded", symbols[i]);
 				}
 
+				spinning = false;
 				EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
 			}
 		});
