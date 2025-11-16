@@ -20,20 +20,28 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		EventManager.Instance.RegisterEvent("SpinCompleted", OnSpinCompleted);
 		EventManager.Instance.RegisterEvent("ReelCompleted", OnReelCompleted);
 		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
+
+		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnSpinButtonPressed);
+		EventManager.Instance.RegisterEvent("StopButtonPressed", OnStopButtonPressed);
 	}
 
 	void Update()
 	{
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
-			if (!spinInProgress && StateMachine.Instance.CurrentState == State.Idle)
-			{
-				SpinAllReels();
-			}
-			else if (spinInProgress && StateMachine.Instance.CurrentState == State.Spinning)
-			{
-				StopAllReels();
-			}
+			PlayerInputPressed();
+		}
+	}
+
+	private void PlayerInputPressed()
+	{
+		if (!spinInProgress && StateMachine.Instance.CurrentState == State.Idle)
+		{
+			SpinAllReels();
+		}
+		else if (spinInProgress && StateMachine.Instance.CurrentState == State.Spinning)
+		{
+			StopAllReels();
 		}
 	}
 
@@ -65,6 +73,8 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		{
 			reels[i].CompleteSpin();
 		}
+
+		EventManager.Instance.BroadcastEvent("StoppingReels");
 	}
 
 	private void SpawnReels()
@@ -83,6 +93,16 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		}
 
 		reelsGroup.transform.localPosition = new Vector3(-((reelDefinition.ReelCount-1) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize))/2f, -((reelDefinition.SymbolCount-1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize))/2f, 0);
+	}
+
+	private void OnSpinButtonPressed(object obj)
+	{
+		PlayerInputPressed();
+	}
+
+	private void OnStopButtonPressed(object obj)
+	{
+		PlayerInputPressed();
 	}
 
 	void OnReelCompleted(object e)

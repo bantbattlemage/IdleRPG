@@ -6,11 +6,6 @@ public class EventManager : Singleton<EventManager>
 {
 	private Dictionary<string, List<Action<object>>> events = new Dictionary<string, List<Action<object>>>();
 
-	void Start()
-	{
-		events = new Dictionary<string, List<Action<object>>>();
-	}
-
 	public void RegisterEvent(string eventName, Action<object> action)
 	{
 		if(events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))

@@ -17,7 +17,7 @@ public class StateMachine : Singleton<StateMachine>
 
 	private Dictionary<State, GameState> states = new Dictionary<State, GameState>();
 
-	void Start()
+	void Awake()
 	{
 		RegisterState(State.Init, () => { SetState(State.Idle); });
 		RegisterState(State.Idle);
