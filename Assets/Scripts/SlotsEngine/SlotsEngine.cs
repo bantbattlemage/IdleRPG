@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using DG.Tweening;
-using NUnit.Framework;
 
 public class SlotsEngine : Singleton<SlotsEngine>
 {
@@ -16,41 +15,29 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 	private bool spinInProgress = false;
 
-	void Start()
+	public void InitializeSlotsEngine()
 	{
 		EventManager.Instance.RegisterEvent("SpinCompleted", OnSpinCompleted);
 		EventManager.Instance.RegisterEvent("ReelCompleted", OnReelCompleted);
-
-		EventManager.Instance.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
 		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
-		
-		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
-		EventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
-		EventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		SpawnReels();
-
-		SlotConsoleController.Instance.InitializeConsole();
-		GamePlayer.Instance.InitializePlayer();
-
-		StateMachine.Instance.SetState(State.Idle);
 	}
 
-	private void OnPlayerInputPressed(object obj)
+	public void SpinOrStopReels(bool spin)
 	{
-		if (!spinInProgress && StateMachine.Instance.CurrentState == State.Idle)
+		if (!spinInProgress && spin)
 		{
-			StateMachine.Instance.SetState(State.SpinPurchased);
+			SpinAllReels();
 		}
-		else if (spinInProgress && StateMachine.Instance.CurrentState == State.Spinning)
+		else if (spinInProgress && !spin && StateMachine.Instance.CurrentState == State.Spinning)
 		{
 			StopAllReels();
 		}
-	}
-
-	private void OnSpinPurchased(object obj)
-	{
-		SpinAllReels();
+		else
+		{
+			Debug.Log("SpinOrStopReels called but no action could be taken.");
+		}
 	}
 
 	private void SpinAllReels()
@@ -154,9 +141,10 @@ public class SlotsEngine : Singleton<SlotsEngine>
 			}
 
 			int totalWin = winData.Sum((x => x.WinValue));
+			GamePlayer.Instance.AddCredits(totalWin);
 			SlotConsoleController.Instance.SetWinText(totalWin);
 
-			string winMessage = String.Empty;
+			string winMessage = string.Empty;
 			if (winData.Count == 1)
 			{
 				winMessage = $"Won {winData[0].WinValue} on line {winData[0].LineIndex}!";
@@ -196,17 +184,5 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		}
 
 		return Helpers.CombineColumnsToGrid(reelSymbols);
-	}
-
-	public SymbolDefinition[] ToSymbolDefinitions(List<GameSymbol> symbols)
-	{
-		List<SymbolDefinition> definitions = new List<SymbolDefinition>();
-
-		foreach (GameSymbol s in symbols)
-		{
-			definitions.Add(s.Definition);
-		}
-
-		return definitions.ToArray();
 	}
 }

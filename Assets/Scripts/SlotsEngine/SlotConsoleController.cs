@@ -31,6 +31,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		EventManager.Instance.RegisterEvent("SpinningExit", OnSpinningExit);
 		EventManager.Instance.RegisterEvent("StoppingReels", OnStoppingReels);
 		EventManager.Instance.RegisterEvent("BetChanged", OnBetChanged);
+		EventManager.Instance.RegisterEvent("CreditsChanged", OnCreditsChanged);
 
 		WinText.text = string.Empty;
 		SetConsoleMessage(string.Empty);
@@ -39,12 +40,11 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		CreditsText.text = string.Empty;
 	}
 
-	public void ToggleConsoleButtons(bool state)
+	private void OnCreditsChanged(object obj)
 	{
-		SpinButton.interactable = state;
-		StopButton.interactable = state;
-		BetUpButton.interactable = state;
-		BetDownButton.interactable = state;
+		int value = (int)obj;
+
+		CreditsText.text = value.ToString();
 	}
 
 	private void OnBetUpPressed()
@@ -61,6 +61,14 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		BetLevelDefinition definition = (BetLevelDefinition)obj;
 
 		BetText.text = definition.CreditCost.ToString();
+	}
+
+	public void ToggleConsoleButtons(bool state)
+	{
+		SpinButton.interactable = state;
+		StopButton.interactable = state;
+		BetUpButton.interactable = state;
+		BetDownButton.interactable = state;
 	}
 
 	public void SetConsoleMessage(string message)

@@ -5,10 +5,16 @@ public class GamePlayer : Singleton<GamePlayer>
 	[SerializeField] private PlayerDefinition definition;
 	public PlayerDefinition PlayerDefinition => definition;
 
+	public BetLevelDefinition CurrentBet => definition.CurrentBet;
+	public int CurrentCredits => definition.Credits;
+
 	public void InitializePlayer()
 	{
 		EventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
 		EventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
+		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
+		EventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
+		EventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		if (definition.CurrentBet == null)
 		{
@@ -18,6 +24,8 @@ public class GamePlayer : Singleton<GamePlayer>
 		{
 			SetCurrentBet(definition.CurrentBet);
 		}
+
+		EventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
 	void Update()
@@ -28,16 +36,43 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 	}
 
-	public BetLevelDefinition CurrentBet
+	private void OnPlayerInputPressed(object obj)
 	{
-		get
+		SlotsEngine.Instance.SpinOrStopReels(RequestSpinPurchase());
+	}
+
+	public bool RequestSpinPurchase()
+	{
+		if (StateMachine.Instance.CurrentState != State.Idle)
 		{
-			return definition.CurrentBet;
+			return false;
 		}
+
+		if (CurrentCredits < CurrentBet.CreditCost)
+		{
+			return false;
+		}
+
+		AddCredits(-CurrentBet.CreditCost);
+
+		StateMachine.Instance.SetState(State.SpinPurchased);
+
+		return true;
+	}
+
+	public void AddCredits(int value)
+	{
+		definition.SetCurrentCredits(CurrentCredits + value);
+		EventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
 	public void SetCurrentBet(BetLevelDefinition bet)
 	{
+		if (StateMachine.Instance.CurrentState != State.Idle && StateMachine.Instance.CurrentState != State.Init)
+		{
+			return;
+		}
+
 		definition.SetCurrentBet(bet);
 		EventManager.Instance.BroadcastEvent("BetChanged", bet);
 	}

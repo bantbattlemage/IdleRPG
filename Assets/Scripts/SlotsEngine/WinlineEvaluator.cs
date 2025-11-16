@@ -30,6 +30,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 			{
 				int lineIndex = i;
 				int value = grid[winningIndexes[0]].BaseValueMultiplier[winningIndexes.Count - 1];
+				value *= GamePlayer.Instance.CurrentBet.CreditCost;
 				WinData data = new WinData(lineIndex, value, winningIndexes.ToArray());
 				winData.Add(data);
 			}

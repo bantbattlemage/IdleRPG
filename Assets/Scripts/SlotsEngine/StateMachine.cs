@@ -29,13 +29,21 @@ public class StateMachine : Singleton<StateMachine>
 		RegisterState(State.Presentation);
 
 		EventManager.Instance.RegisterEvent("InitEnter", OnInitEnter);
+	}
+
+	void Start()
+	{
 		currentState = State.Init;
 		states[currentState].EnterState();
 	}
 
 	private void OnInitEnter(object obj)
 	{
+		SlotsEngine.Instance.InitializeSlotsEngine();
+		SlotConsoleController.Instance.InitializeConsole();
+		GamePlayer.Instance.InitializePlayer();
 
+		SetState(State.Idle);
 	}
 
 	private void RegisterState(State state, Action enterAction = null, Action exitAction = null)
