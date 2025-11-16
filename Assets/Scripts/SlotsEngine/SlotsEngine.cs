@@ -2,14 +2,16 @@ using System.Collections.Generic;
 using UnityEngine;
 using DG.Tweening;
 
-public class SlotsEngine : Singleton<MonoBehaviour>
+public class SlotsEngine : Singleton<SlotsEngine>
 {
 	[SerializeField] private Canvas gameCanvas;
 	[SerializeField] private int reelCount; 
 	[SerializeField] private GameObject reelPrefab;
 	[SerializeField] private ReelDefinition reelDefinition;
 
-	List<GameReel> reels = new List<GameReel>();
+	private List<GameReel> reels = new List<GameReel>();
+
+	private bool spinning = false;
 
 	void Start()
 	{
@@ -28,8 +30,23 @@ public class SlotsEngine : Singleton<MonoBehaviour>
 	{
 		for (int i = 0; i < reels.Count; i++)
 		{
-			reels[i].FallOut();
+			if (!spinning)
+			{
+				List<SymbolDefinition> testSolution = new List<SymbolDefinition>();
+				for (int k = 0; k < reels[i].Definition.SymbolCount; k++)
+				{
+					testSolution.Add(SymbolSpawner.Instance.GetRandomSymbol());
+				}
+
+				reels[i].BeginSpin(testSolution);
+			}
+			else
+			{
+				reels[i].CompleteSpin();
+			}
 		}
+
+		spinning = !spinning;
 	}
 
 	private void SpawnReels()
