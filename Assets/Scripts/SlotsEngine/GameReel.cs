@@ -26,6 +26,8 @@ public class GameReel : MonoBehaviour, IReel
 
 	private bool completeOnNextSpin = false;
 
+	private Tweener[] activeSpinTweens = new Tweener[2];
+
 	public void InitializeReel(ReelDefinition reelDefinition, int reelID)
 	{
 		definition = reelDefinition;
@@ -67,6 +69,10 @@ public class GameReel : MonoBehaviour, IReel
 	public void CompleteSpin()
 	{
 		completeOnNextSpin = true;
+
+		//	slam the reels
+		activeSpinTweens[0].timeScale = 2f;
+		activeSpinTweens[1].timeScale = 2f;
 	}
 
 	public void ApplySolution(List<SymbolDefinition> symbols)
@@ -107,7 +113,6 @@ public class GameReel : MonoBehaviour, IReel
 		}
 
 		symbols = newSymbols;
-
 
 		SpawnDummySymbols(nextReel);
 		SpawnDummySymbols(nextReel, false);
@@ -165,9 +170,8 @@ public class GameReel : MonoBehaviour, IReel
 		float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
 		float duration = definition.ReelSpinDuration;
 
-		symbolRoot.transform.DOLocalMoveY(fallDistance, duration - 0.01f).SetEase(Ease.Linear);
-		
-		nextSymbolsRoot.transform.DOLocalMoveY(0, duration).SetEase(Ease.Linear).OnComplete(() =>
+		activeSpinTweens[0] = symbolRoot.transform.DOLocalMoveY(fallDistance, duration - 0.01f).SetEase(Ease.Linear);
+		activeSpinTweens[1] = nextSymbolsRoot.transform.DOLocalMoveY(0, duration).SetEase(Ease.Linear).OnComplete(() =>
 		{
 			Destroy(symbolRoot.gameObject);
 			symbolRoot = nextSymbolsRoot;

@@ -18,14 +18,16 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 	void Start()
 	{
-		SpawnReels();
-
 		EventManager.Instance.RegisterEvent("SpinCompleted", OnSpinCompleted);
 		EventManager.Instance.RegisterEvent("ReelCompleted", OnReelCompleted);
-		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
 
+		EventManager.Instance.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
+		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
+		
 		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnSpinButtonPressed);
 		EventManager.Instance.RegisterEvent("StopButtonPressed", OnStopButtonPressed);
+
+		SpawnReels();
 
 		SlotConsoleController.Instance.InitializeConsole();
 
@@ -40,11 +42,16 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		}
 	}
 
+	private void OnSpinPurchased(object obj)
+	{
+		SpinAllReels();
+	}
+
 	private void PlayerInputPressed()
 	{
 		if (!spinInProgress && StateMachine.Instance.CurrentState == State.Idle)
 		{
-			SpinAllReels();
+			StateMachine.Instance.SetState(State.SpinPurchased);
 		}
 		else if (spinInProgress && StateMachine.Instance.CurrentState == State.Spinning)
 		{
@@ -101,7 +108,21 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		}
 
 		ReelDefinition reelDefinition = slotsDefinition.ReelDefinitions[0];
-		reelsGroup.transform.localPosition = new Vector3(-((slotsDefinition.ReelDefinitions.Length-1) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize))/2f, -((reelDefinition.SymbolCount-1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize))/2f, 0);
+
+		int count = reels.Count;
+		float childWidth = reelDefinition.SymbolSize;
+		float spacing = reelDefinition.SymbolSpacing;
+
+		float totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * spacing);
+		float offset = totalWidth / 2f;
+
+		float xPos = (-offset + (childWidth / 2f));
+		//float yPos = (-offset + (childWidth / 2f));
+
+		//float xPos = -((slotsDefinition.ReelDefinitions.Length) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize)) / 2f;
+		//float xPos = -((slotsDefinition.ReelDefinitions.Length) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize)) / 2f;
+		float yPos = -((reelDefinition.SymbolCount - 1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize)) / 2f;
+		reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
 	}
 
 	private void OnSpinButtonPressed(object obj)
@@ -142,13 +163,26 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		{
 			foreach (WinData w in winData)
 			{
-				Debug.LogWarning($"Won {w.WinValue} on line {w.LineIndex}!");
-
 				foreach (int index in w.WinningSymbolIndexes)
 				{
 					EventManager.Instance.BroadcastEvent("SymbolWin", GetCurrentSymbolGrid()[index]);
 				}
 			}
+
+			int totalWin = winData.Sum((x => x.WinValue));
+			SlotConsoleController.Instance.SetWinText(totalWin);
+
+			string winMessage = String.Empty;
+			if (winData.Count == 1)
+			{
+				winMessage = $"Won {winData[0].WinValue} on line {winData[0].LineIndex}!";
+			}
+			else
+			{
+				winMessage = $"Won {totalWin} on {winData.Count} lines!";
+			}
+
+			SlotConsoleController.Instance.SetConsoleMessage(winMessage);
 
 			DOTween.Sequence().AppendInterval(2f).AppendCallback(CompletePresentation);
 		}

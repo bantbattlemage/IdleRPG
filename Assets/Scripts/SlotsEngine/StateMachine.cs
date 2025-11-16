@@ -6,6 +6,7 @@ public enum State
 {
 	Init,
 	Idle,
+	SpinPurchased,
 	Spinning,
 	Presentation
 }
@@ -23,6 +24,7 @@ public class StateMachine : Singleton<StateMachine>
 
 		RegisterState(State.Init);
 		RegisterState(State.Idle);
+		RegisterState(State.SpinPurchased);
 		RegisterState(State.Spinning);
 		RegisterState(State.Presentation);
 
