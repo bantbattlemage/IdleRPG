@@ -30,7 +30,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 		if (AutoSpinToggle.isOn)
 		{
-			DOTween.Sequence().AppendInterval(0.1f).AppendCallback(OnSpinPressed);
+			DOTween.Sequence().AppendInterval(0.2f).AppendCallback(OnSpinPressed);
 		}
 	}
 

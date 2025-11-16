@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SymbolDefinition
   name: Symbol4
   sprite: {fileID: 21300000, guid: d3d369a783c191d48b667bb76f473e6d, type: 3}
+  baseValueMultiplier: 0000000000000000050000000600000007000000

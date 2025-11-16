@@ -8,6 +8,8 @@ public class GameSymbol : MonoBehaviour, ISymbol
 
 	public SymbolDefinition Definition => definition;
 
+	private Tweener activeTweener;
+
 	public void ApplySymbol(SymbolDefinition symbol)
 	{
 		definition = symbol;
@@ -16,15 +18,33 @@ public class GameSymbol : MonoBehaviour, ISymbol
 		r.sprite = symbol.Sprite;
 
 		EventManager.Instance.RegisterEvent("SymbolLanded", OnSymbolLanded);
+		EventManager.Instance.RegisterEvent("SymbolWin", OnSymbolWin);
+	}
+
+	private void OnSymbolWin(object obj)
+	{
+		GameSymbol symbol = (GameSymbol)obj;
+
+		if (symbol != this)
+		{
+			return;
+		}
+
+		if (activeTweener != null && activeTweener.IsPlaying())
+		{
+			return;
+		}
+
+		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
 	}
 
 	private void OnSymbolLanded(object obj)
 	{
 		GameSymbol symbol = (GameSymbol)obj;
 
-		if (symbol == this)
+		if (symbol != this)
 		{
-			transform.DOShakePosition(1, strength: 50);
+			return;
 		}
 	}
 

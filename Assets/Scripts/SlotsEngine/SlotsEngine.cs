@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using DG.Tweening;
+using NUnit.Framework;
 
 public class SlotsEngine : Singleton<SlotsEngine>
 {
 	[SerializeField] private Canvas gameCanvas;
 	[SerializeField] private GameObject reelPrefab;
-	[SerializeField] private ReelDefinition reelDefinition;
+	[SerializeField] private SlotsDefinition slotsDefinition;
+	public SlotsDefinition SlotsDefinition => slotsDefinition;
 
 	private List<GameReel> reels = new List<GameReel>();
 
@@ -87,16 +90,18 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		reelsGroup.parent = gameCanvas.transform;
 		reelsGroup.localScale = new Vector3(1, 1, 1);
 
-		for (int i = 0; i < reelDefinition.ReelCount; i++)
+		for (int i = 0; i < slotsDefinition.ReelDefinitions.Length; i++)
 		{
-			GameObject r = Instantiate(reelPrefab, reelsGroup.transform);
-			GameReel reel = r.GetComponent<GameReel>();
-			reel.InitializeReel(reelDefinition, i);
-			r.transform.localPosition = new Vector3((reelDefinition.ReelsSpacing + reelDefinition.SymbolSize) * i, 0, 0);
+			ReelDefinition reelDef = slotsDefinition.ReelDefinitions[i];
+			GameObject g = Instantiate(reelPrefab, reelsGroup.transform);
+			GameReel reel = g.GetComponent<GameReel>();
+			reel.InitializeReel(reelDef, i);
+			g.transform.localPosition = new Vector3((reelDef.SymbolSpacing + reelDef.SymbolSize) * i, 0, 0);
 			reels.Add(reel);
 		}
 
-		reelsGroup.transform.localPosition = new Vector3(-((reelDefinition.ReelCount-1) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize))/2f, -((reelDefinition.SymbolCount-1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize))/2f, 0);
+		ReelDefinition reelDefinition = slotsDefinition.ReelDefinitions[0];
+		reelsGroup.transform.localPosition = new Vector3(-((slotsDefinition.ReelDefinitions.Length-1) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize))/2f, -((reelDefinition.SymbolCount-1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize))/2f, 0);
 	}
 
 	private void OnSpinButtonPressed(object obj)
@@ -113,7 +118,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 	{
 		int value = (int)e;
 
-		Debug.Log($"Reel {value} Completed");
+		//Debug.Log($"Reel {value} Completed");
 
 		if (reels.TrueForAll(x => !x.Spinning))
 		{
@@ -124,18 +129,66 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 	void OnSpinCompleted(object e)
 	{
-		Debug.Log($"Spin Completed");
+		//Debug.Log($"Spin Completed");
 
 		StateMachine.Instance.SetState(State.Presentation);
 	}
 
 	private void OnPresentationEnter(object obj)
 	{
-		DOTween.Sequence().AppendInterval(1f).AppendCallback(CompletePresentation);
+		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(GetCurrentSymbolGrid().ToSymbolDefinitions(), slotsDefinition.WinlineDefinitions);
+
+		if (winData.Count > 0)
+		{
+			foreach (WinData w in winData)
+			{
+				Debug.LogWarning($"Won {w.WinValue} on line {w.LineIndex}!");
+
+				foreach (int index in w.WinningSymbolIndexes)
+				{
+					EventManager.Instance.BroadcastEvent("SymbolWin", GetCurrentSymbolGrid()[index]);
+				}
+			}
+
+			DOTween.Sequence().AppendInterval(2f).AppendCallback(CompletePresentation);
+		}
+		else
+		{
+			CompletePresentation();
+			//DOTween.Sequence().AppendInterval(0.2f).AppendCallback(CompletePresentation);
+		}
 	}
 
 	public void CompletePresentation()
 	{
 		StateMachine.Instance.SetState(State.Idle);
+	}
+
+	public GameSymbol[] GetCurrentSymbolGrid()
+	{
+		List<GameSymbol[]> reelSymbols = new List<GameSymbol[]>();
+		foreach (GameReel g in reels)
+		{
+			var newList = new GameSymbol[g.Symbols.Count];
+			for(int i = 0; i < g.Symbols.Count; i++)
+			{
+				newList[i] = g.Symbols[i];
+			}
+			reelSymbols.Add(newList);
+		}
+
+		return Helpers.CombineColumnsToGrid(reelSymbols);
+	}
+
+	public SymbolDefinition[] ToSymbolDefinitions(List<GameSymbol> symbols)
+	{
+		List<SymbolDefinition> definitions = new List<SymbolDefinition>();
+
+		foreach (GameSymbol s in symbols)
+		{
+			definitions.Add(s.Definition);
+		}
+
+		return definitions.ToArray();
 	}
 }

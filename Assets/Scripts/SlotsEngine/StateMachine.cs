@@ -19,6 +19,8 @@ public class StateMachine : Singleton<StateMachine>
 
 	void Awake()
 	{
+		Application.runInBackground = true;
+
 		RegisterState(State.Init);
 		RegisterState(State.Idle);
 		RegisterState(State.Spinning);
@@ -44,8 +46,8 @@ public class StateMachine : Singleton<StateMachine>
 	public void SetState(State state)
 	{
 		states[currentState].ExitState();
-		states[state].EnterState();
 		currentState = state;
+		states[state].EnterState();
 	}
 }
 

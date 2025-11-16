@@ -14,9 +14,10 @@ public class GameReel : MonoBehaviour, IReel
 	public bool Spinning => spinning;
 	private bool spinning = false;
 
+	public List<GameSymbol> Symbols => symbols;
+
 	private ReelDefinition definition;
 	private Transform symbolRoot;
-
 	private Transform nextSymbolsRoot;
 
 	private List<GameSymbol> symbols = new List<GameSymbol>();
@@ -107,28 +108,9 @@ public class GameReel : MonoBehaviour, IReel
 
 		symbols = newSymbols;
 
-		List<SymbolDefinition> topSyms = null;
-		//if (topDummySymbols is { Count: > 0 })
-		//{
-		//	topSyms = new List<SymbolDefinition>();
-		//	foreach (GameSymbol topSym in topDummySymbols)
-		//	{
-		//		topSyms.Add(topSym.Definition);
-		//	}
-		//}
 
-		List<SymbolDefinition> botSyms = null;
-		//if (bottomDummySymbols is { Count: > 0 })
-		//{
-		//	botSyms = new List<SymbolDefinition>();
-		//	foreach (GameSymbol botSym in bottomDummySymbols)
-		//	{
-		//		botSyms.Add(botSym.Definition);
-		//	}
-		//}
-
-		SpawnDummySymbols(nextReel, definitions: topSyms);
-		SpawnDummySymbols(nextReel, false, botSyms);
+		SpawnDummySymbols(nextReel);
+		SpawnDummySymbols(nextReel, false);
 
 		nextSymbolsRoot = nextReel;
 	}
