@@ -12,6 +12,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	public Button BetDownButton;
 
 	public Toggle AutoSpinToggle;
+	public Toggle AutoStopToggle;
 
 	public Text WinText;
 	public Text ConsoleMessageText;
@@ -102,6 +103,13 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 			{
 				if (AutoSpinToggle.isOn && StateMachine.Instance.CurrentState == State.Idle)
 				{
+					var currentWinData = WinlineEvaluator.Instance.CurrentSpinWinData;
+
+					if (AutoStopToggle.isOn && currentWinData is { Count: > 0 })
+					{
+						return;
+					}
+
 					OnSpinPressed();
 				}
 			});

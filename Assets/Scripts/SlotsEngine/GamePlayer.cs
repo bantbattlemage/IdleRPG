@@ -2,11 +2,11 @@ using UnityEngine;
 
 public class GamePlayer : Singleton<GamePlayer>
 {
-	[SerializeField] private PlayerDefinition definition;
-	public PlayerDefinition PlayerDefinition => definition;
+	[SerializeField] private PlayerData playerData;
+	public PlayerData PlayerData => playerData;
 
-	public BetLevelDefinition CurrentBet => definition.CurrentBet;
-	public int CurrentCredits => definition.Credits;
+	public BetLevelDefinition CurrentBet => playerData.CurrentBet;
+	public int CurrentCredits => playerData.Credits;
 
 	public void InitializePlayer()
 	{
@@ -16,13 +16,15 @@ public class GamePlayer : Singleton<GamePlayer>
 		EventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
 		EventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
-		if (definition.CurrentBet == null)
+		playerData = PlayerDataManager.Instance.GetPlayerData();
+
+		if (playerData.CurrentBet == null)
 		{
 			SetCurrentBet(SlotsEngine.Instance.SlotsDefinition.BetLevelDefinitions[0]);
 		}
 		else
 		{
-			SetCurrentBet(definition.CurrentBet);
+			SetCurrentBet(playerData.CurrentBet);
 		}
 
 		EventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
@@ -33,6 +35,12 @@ public class GamePlayer : Singleton<GamePlayer>
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
 			EventManager.Instance.BroadcastEvent("PlayerInputPressed");
+		}
+
+		if (Input.GetKeyDown(KeyCode.Alpha1))
+		{
+			Debug.LogWarning("Adding credits for testing.");
+			AddCredits(100);
 		}
 	}
 
@@ -62,7 +70,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void AddCredits(int value)
 	{
-		definition.SetCurrentCredits(CurrentCredits + value);
+		playerData.SetCurrentCredits(CurrentCredits + value);
 		EventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
@@ -73,7 +81,7 @@ public class GamePlayer : Singleton<GamePlayer>
 			return;
 		}
 
-		definition.SetCurrentBet(bet);
+		playerData.SetCurrentBet(bet);
 		EventManager.Instance.BroadcastEvent("BetChanged", bet);
 	}
 

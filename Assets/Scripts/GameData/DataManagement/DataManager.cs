@@ -35,7 +35,9 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
 
 	public void AddNewData(D newData)
 	{
-		LocalData.Add(GenerateUniqueAccessorId(LocalData.Keys.ToList()), newData);
+		int id = GenerateUniqueAccessorId(LocalData.Keys.ToList());
+		newData.AccessorId = id;
+		LocalData.Add(id, newData);
 	}
 
 	protected int GenerateUniqueAccessorId(List<int> existingIds)

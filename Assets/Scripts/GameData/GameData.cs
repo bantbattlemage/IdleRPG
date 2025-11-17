@@ -10,4 +10,8 @@ public class GameData
     public SerializableDictionary<int, EnemyData> CurrentEnemyData;
 
     public long lastUpdated;
+
+	//  NEW BELOW
+
+	public SerializableDictionary<int, PlayerData> CurrentPlayerData;
 }

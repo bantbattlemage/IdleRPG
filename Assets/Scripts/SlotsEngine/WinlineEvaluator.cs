@@ -3,6 +3,9 @@ using System.Linq;
 
 public class WinlineEvaluator : Singleton<WinlineEvaluator>
 {
+	private List<WinData> currentSpinWinData;
+	public List<WinData> CurrentSpinWinData => currentSpinWinData;
+
 	public List<WinData> EvaluateWins(SymbolDefinition[] grid, WinlineDefinition[] winlines)
 	{
 		List<WinData> winData = new List<WinData>();
@@ -30,11 +33,15 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 			{
 				int lineIndex = i;
 				int value = grid[winningIndexes[0]].BaseValueMultiplier[winningIndexes.Count - 1];
+				value *= winline.WinMultiplier;
 				value *= GamePlayer.Instance.CurrentBet.CreditCost;
+
 				WinData data = new WinData(lineIndex, value, winningIndexes.ToArray());
 				winData.Add(data);
 			}
 		}
+
+		currentSpinWinData = winData;
 
 		return winData;
 	}
