@@ -4,6 +4,7 @@ using UnityEngine;
 
 public enum State
 {
+	None = 0,
 	Init,
 	Idle,
 	SpinPurchased,
@@ -31,7 +32,7 @@ public class StateMachine : Singleton<StateMachine>
 		EventManager.Instance.RegisterEvent("InitEnter", OnInitEnter);
 	}
 
-	void Start()
+	public void BeginStateMachine()
 	{
 		currentState = State.Init;
 		states[currentState].EnterState();
@@ -55,6 +56,11 @@ public class StateMachine : Singleton<StateMachine>
 
 	public void SetState(State state)
 	{
+		if (currentState == State.None)
+		{
+			throw new Exception("StateMachine not yet initialized!");
+		}
+
 		states[currentState].ExitState();
 		currentState = state;
 		states[state].EnterState();

@@ -2,6 +2,7 @@ using DG.Tweening;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GameReel : MonoBehaviour
 {
@@ -165,6 +166,7 @@ public class GameReel : MonoBehaviour
 
 	public void FallOut(List<SymbolDefinition> solution = null)
 	{
+		ResetDimmedSymbols();
 		SpawnNextReel(solution);
 
 		float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
@@ -192,6 +194,36 @@ public class GameReel : MonoBehaviour
 				EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
 			}
 		});
+	}
+
+	public void DimDummySymbols()
+	{
+		foreach (GameSymbol g in topDummySymbols)
+		{
+			g.GetComponent<Image>().DOColor(new Color(0.5f, 0.5f, 0.5f), 0.1f);
+		}
+
+		foreach (GameSymbol g in bottomDummySymbols)
+		{
+			g.GetComponent<Image>().DOColor(new Color(0.5f, 0.5f, 0.5f), 0.1f);
+		}
+	}
+
+	public void ResetDimmedSymbols()
+	{
+		foreach (GameSymbol g in topDummySymbols)
+		{
+			var image = g.GetComponent<Image>();
+			image.DOKill();
+			image.color = Color.white;
+		}
+
+		foreach (GameSymbol g in bottomDummySymbols)
+		{
+			var image = g.GetComponent<Image>();
+			image.DOKill();
+			image.color = Color.white;
+		}
 	}
 
 	private void DestroyTopSymbols()

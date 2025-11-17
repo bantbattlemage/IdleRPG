@@ -42,8 +42,6 @@ public class DataPersistenceManager : MonoBehaviour
 		dataHandler = new FileDataHandler(Application.persistentDataPath, fileName, useEncryption);
 
 		InitializeSelectedProfileId();
-
-		LoadGame();
 	}
 
 	private void OnEnable()

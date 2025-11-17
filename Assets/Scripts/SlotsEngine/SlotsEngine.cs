@@ -130,6 +130,11 @@ public class SlotsEngine : Singleton<SlotsEngine>
 	{
 		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(GetCurrentSymbolGrid().ToSymbolDefinitions(), slotsDefinition.WinlineDefinitions);
 
+		foreach (GameReel gr in reels)
+		{
+			gr.DimDummySymbols();
+		}
+
 		if (winData.Count > 0)
 		{
 			foreach (WinData w in winData)
