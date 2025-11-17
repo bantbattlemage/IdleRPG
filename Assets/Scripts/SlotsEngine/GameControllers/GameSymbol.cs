@@ -16,9 +16,16 @@ public class GameSymbol : MonoBehaviour
 
 		Image r = gameObject.GetComponent<Image>();
 		r.sprite = symbol.Sprite;
+		r.color = Color.white;
 
 		EventManager.Instance.RegisterEvent("SymbolLanded", OnSymbolLanded);
 		EventManager.Instance.RegisterEvent("SymbolWin", OnSymbolWin);
+		EventManager.Instance.RegisterEvent("IdleExit", OnIdleExit);
+	}
+
+	private void OnIdleExit(object obj)
+	{
+		GetComponent<Image>().color = Color.white;
 	}
 
 	private void OnSymbolWin(object obj)
@@ -35,6 +42,7 @@ public class GameSymbol : MonoBehaviour
 			return;
 		}
 
+		GetComponent<Image>().color = Color.green;
 		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
 	}
 
@@ -51,5 +59,7 @@ public class GameSymbol : MonoBehaviour
 	private void OnDestroy()
 	{
 		EventManager.Instance?.UnregisterEvent("SymbolLanded", OnSymbolLanded);
+		EventManager.Instance?.UnregisterEvent("SymbolWin", OnSymbolWin);
+		EventManager.Instance?.UnregisterEvent("IdleExit", OnIdleExit);
 	}
 }

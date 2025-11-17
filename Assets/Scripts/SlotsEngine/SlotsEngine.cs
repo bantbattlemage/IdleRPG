@@ -91,18 +91,19 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		ReelDefinition reelDefinition = slotsDefinition.ReelDefinitions[0];
 
 		int count = reels.Count;
-		float childWidth = reelDefinition.SymbolSize;
-		float spacing = reelDefinition.SymbolSpacing;
-
-		float totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * spacing);
+		float totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * reelDefinition.SymbolSpacing);
 		float offset = totalWidth / 2f;
+		float xPos = (-offset + (reelDefinition.SymbolSize / 2f));
 
-		float xPos = (-offset + (childWidth / 2f));
-		//float yPos = (-offset + (childWidth / 2f));
+		count = slotsDefinition.ReelDefinitions.Max(x => x.SymbolCount);
+		totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * reelDefinition.SymbolSpacing);
+		offset = totalWidth / 2f;
+		float yPos = (-offset + (reelDefinition.SymbolSize / 2f));
 
 		//float xPos = -((slotsDefinition.ReelDefinitions.Length) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize)) / 2f;
 		//float xPos = -((slotsDefinition.ReelDefinitions.Length) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize)) / 2f;
-		float yPos = -((reelDefinition.SymbolCount - 1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize)) / 2f;
+		//float yPos = -((reelDefinition.SymbolCount - 1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize)) / 2f;
+		
 		reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
 	}
 

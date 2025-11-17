@@ -14,10 +14,10 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	public Toggle AutoSpinToggle;
 	public Toggle AutoStopToggle;
 
-	public Text WinText;
-	public Text ConsoleMessageText;
-	public Text BetText;
-	public Text CreditsText;
+	public TextMeshProUGUI WinText;
+	public TextMeshProUGUI ConsoleMessageText;
+	public TextMeshProUGUI BetText;
+	public TextMeshProUGUI CreditsText;
 
 	public void InitializeConsole()
 	{
