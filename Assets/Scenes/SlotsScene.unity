@@ -3620,11 +3620,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DataPersistenceManager
   disableDataPersistence: 0
   initializeDataIfNull: 1
-  overrideSelectedProfileId: 1
-  testSelectedProfileId: test
-  fileName: test
+  fileName: slotsgame
   useEncryption: 0
-  autoSaveTimeSeconds: 60
 --- !u!114 &1907970463
 MonoBehaviour:
   m_ObjectHideFlags: 0
