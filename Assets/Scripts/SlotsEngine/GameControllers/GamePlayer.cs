@@ -1,12 +1,14 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class GamePlayer : Singleton<GamePlayer>
 {
-	[SerializeField] private PlayerData playerData;
+	private PlayerData playerData;
 	public PlayerData PlayerData => playerData;
 
-	public BetLevelDefinition CurrentBet => playerData.CurrentBet;
+	[HideInInspector] public BetLevelDefinition CurrentBet => playerData.CurrentBet;
 	public int CurrentCredits => playerData.Credits;
 
 	private List<SlotsEngine> playerSlots = new List<SlotsEngine>();
@@ -23,14 +25,9 @@ public class GamePlayer : Singleton<GamePlayer>
 		playerSlots.ForEach(x => x.SetState(state));
 	}
 
-	public void InitializePlayer()
+	public void InitializePlayer(BetLevelDefinition defaultBetLevel)
 	{
-		int testSlots = 2;
-		for (int i = 0; i < testSlots; i++)
-		{
-			SlotsEngine slotsEngine = SlotsEngineController.Instance.CreateSlots();
-			playerSlots.Add(slotsEngine);
-		}
+		AddNewSlots();
 
 		GlobalEventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
 		GlobalEventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
@@ -39,27 +36,46 @@ public class GamePlayer : Singleton<GamePlayer>
 		GlobalEventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
+
+		if (playerData.CurrentBet == null)
+		{
+			playerData.SetCurrentBet(defaultBetLevel);
+		}
 	}
 
 	void Update()
 	{
+		//	Space input
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
 			GlobalEventManager.Instance.BroadcastEvent("PlayerInputPressed");
 		}
 
+		//	Testing add slots
+		if (Input.GetKeyDown(KeyCode.R))
+		{
+			AddNewSlots(true);
+		}
+
+		//	Testing kill slots
+		if (Input.GetKeyDown(KeyCode.X))
+		{
+			RemoveSlots(playerSlots.Last());
+		}
+
+		//	Testing add credits
 		if (Input.GetKeyDown(KeyCode.Alpha1))
 		{
 			Debug.LogWarning("Adding credits for testing.");
 			AddCredits(100);
 		}
 
+		//	Testing slow/speed game
 		if (Input.GetKeyDown(KeyCode.Minus))
 		{
 			Time.timeScale -= 0.1f;
 			Debug.LogWarning(Time.timeScale);
 		}
-
 		if (Input.GetKeyDown(KeyCode.Equals))
 		{
 			Time.timeScale += 0.1f;
@@ -76,6 +92,29 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		SetCurrentBet(playerData.CurrentBet);
 		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
+	}
+
+	private void AddNewSlots(bool beginSlots = false)
+	{
+		SlotsEngine newSlots = SlotsEngineController.Instance.CreateSlots();
+
+		if (beginSlots)
+		{
+			newSlots.BeginSlots();
+		}
+
+		playerSlots.Add(newSlots);
+	}
+
+	private void RemoveSlots(SlotsEngine slotsToRemove)
+	{
+		if (!playerSlots.Contains(slotsToRemove))
+		{
+			throw new Exception("Tried to remove slots that player doesn't have!");
+		}
+
+		playerSlots.Remove(slotsToRemove);
+		SlotsEngineController.Instance.DestroySlots(slotsToRemove);
 	}
 
 	public bool RequestSpinPurchase()

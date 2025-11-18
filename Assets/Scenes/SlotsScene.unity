@@ -4428,7 +4428,7 @@ GameObject:
   - component: {fileID: 909949889}
   - component: {fileID: 909949890}
   m_Layer: 0
-  m_Name: ReelsCanvasGroup
+  m_Name: SlotsCanvasGroup
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4661,6 +4661,66 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameInterfaceController
   overlayCanvas: {fileID: 63125905}
   overlayMessagePrefab: {fileID: 3279344386031351089, guid: 02d9d83cbdbcc39439d579db781eae5e, type: 3}
+--- !u!1 &1028428336
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1028428337}
+  - component: {fileID: 1028428338}
+  m_Layer: 0
+  m_Name: SlotsGridCanvasGroup
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1028428337
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1028428336}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1511131819}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 40}
+  m_SizeDelta: {x: 1920, y: 840}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1028428338
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1028428336}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GridLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 0
+  m_StartCorner: 0
+  m_StartAxis: 0
+  m_CellSize: {x: 960, y: 420}
+  m_Spacing: {x: 0, y: 0}
+  m_Constraint: 0
+  m_ConstraintCount: 2
 --- !u!1 &1067387681
 GameObject:
   m_ObjectHideFlags: 0
@@ -5338,8 +5398,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 494971602}
-  - {fileID: 1856924589}
   - {fileID: 996890139}
+  - {fileID: 1856924589}
   - {fileID: 1753989153}
   - {fileID: 1562314759}
   - {fileID: 655268350}
@@ -6075,6 +6135,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 909949889}
+  - {fileID: 1028428337}
   - {fileID: 1687865386}
   - {fileID: 851657919}
   m_Father: {fileID: 106035620}
@@ -6199,7 +6260,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: feb5109902f5b184e9f644a55622baf4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ReelsEngineController
-  reelsCanvasGroup: {fileID: 909949889}
+  slotsCanvasGroup: {fileID: 909949889}
+  slotsGridCanvasGroup: {fileID: 1028428337}
   slotsEnginePrefab: {fileID: 9160518992820270897, guid: 1236f9548098076409e4ecb32cf9cf33, type: 3}
   reelsGroupPrefab: {fileID: 2074254172925296075, guid: ba818b4d6d76ea84fa0e0bc74087b2bd, type: 3}
 --- !u!1 &1568926447
@@ -6790,11 +6852,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a460de8f89324b4294fb35a5122362d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GamePlayer
-  slotsEngine: {fileID: 0}
-  playerData:
-    AccessorId: 0
-    credits: 0
-    currentBet: {fileID: 0}
 --- !u!1 &1755886562
 GameObject:
   m_ObjectHideFlags: 0
@@ -6999,6 +7056,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameMaster
   player: {fileID: 1753989154}
+  defaultBetLevel: {fileID: 11400000, guid: 96bf0fc9e9c987b4ba91c2ebace1020d, type: 2}
 --- !u!1 &1907970460
 GameObject:
   m_ObjectHideFlags: 0

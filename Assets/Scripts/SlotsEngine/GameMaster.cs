@@ -5,6 +5,9 @@ public class GameMaster : Singleton<GameMaster>
 	[SerializeField] private GamePlayer player;
 	public GamePlayer Player => player;
 
+	[SerializeField] private BetLevelDefinition defaultBetLevel;
+	public BetLevelDefinition DefaultBetLevel => defaultBetLevel;
+
 	private StateMachine stateMachine;
 
 	void Awake()
@@ -25,7 +28,9 @@ public class GameMaster : Singleton<GameMaster>
 			DataPersistenceManager.Instance.LoadGame();
 		}
 
-		player.InitializePlayer();
+		SlotConsoleController.Instance.InitializeConsole();
+
+		player.InitializePlayer(defaultBetLevel);
 		player.BeginGame();
 	}
 }

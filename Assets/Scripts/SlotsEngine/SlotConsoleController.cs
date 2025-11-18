@@ -21,18 +21,12 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	private EventManager eventManager;
 
-	public void InitializeConsole(EventManager slotsEventManager)
+	public void InitializeConsole()
 	{
 		SpinButton.onClick.AddListener(OnSpinPressed);
 		StopButton.onClick.AddListener(OnStopPressed);
 		BetDownButton.onClick.AddListener(OnBetDownPressed);
 		BetUpButton.onClick.AddListener(OnBetUpPressed);
-
-		slotsEventManager.RegisterEvent("IdleEnter", OnIdleEnter);
-		slotsEventManager.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
-		slotsEventManager.RegisterEvent("SpinningEnter", OnSpinningEnter);
-		slotsEventManager.RegisterEvent("SpinningExit", OnSpinningExit);
-		slotsEventManager.RegisterEvent("StoppingReels", OnStoppingReels);
 
 		GlobalEventManager.Instance.RegisterEvent("BetChanged", OnBetChanged);
 		GlobalEventManager.Instance.RegisterEvent("CreditsChanged", OnCreditsChanged);
@@ -42,6 +36,15 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 		BetText.text = string.Empty;
 		CreditsText.text = string.Empty;
+	}
+
+	public void RegisterSlotsToConsole(EventManager slotsEventManager)
+	{
+		slotsEventManager.RegisterEvent("IdleEnter", OnIdleEnter);
+		slotsEventManager.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
+		slotsEventManager.RegisterEvent("SpinningEnter", OnSpinningEnter);
+		slotsEventManager.RegisterEvent("SpinningExit", OnSpinningExit);
+		slotsEventManager.RegisterEvent("StoppingReels", OnStoppingReels);
 	}
 
 	private void OnCreditsChanged(object obj)
@@ -60,6 +63,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	{
 		GlobalEventManager.Instance.BroadcastEvent("BetDownPressed");
 	}
+
 	private void OnBetChanged(object obj)
 	{
 		BetLevelDefinition definition = (BetLevelDefinition)obj;

@@ -25,7 +25,7 @@ public class SlotsStateMachine : StateMachine
 
 	private void OnInitEnter(object obj)
 	{
-		SlotConsoleController.Instance.InitializeConsole(eventManager);
+		SlotConsoleController.Instance.RegisterSlotsToConsole(eventManager);
 		PresentationController.Instance.AddSlotsToPresentation(eventManager, slotsEngine);
 
 		SetState(State.Idle);

@@ -10,6 +10,9 @@ public class SlotsEngine : MonoBehaviour
 	[SerializeField] private SlotsDefinition slotsDefinition;
 	public SlotsDefinition SlotsDefinition => slotsDefinition;
 
+	private Transform reelsRootTransform;
+	public Transform ReelsRootTransform => reelsRootTransform;
+
 	private List<GameReel> reels = new List<GameReel>();
 	private EventManager eventManager;
 	private SlotsStateMachine stateMachine;
@@ -38,6 +41,7 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.RegisterEvent("PresentationEnter", OnPresentationEnter);
 		eventManager.RegisterEvent("PresentationComplete", OnPresentationComplete);
 
+		reelsRootTransform = canvasTransform;
 		SpawnReels(canvasTransform);
 	}
 
