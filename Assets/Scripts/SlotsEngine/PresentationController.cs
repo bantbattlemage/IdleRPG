@@ -4,40 +4,51 @@ using System.Linq;
 
 public class PresentationController : Singleton<PresentationController>
 {
-	private EventManager eventManager;
-	private SlotsEngine slotsEngine;
+	private List<SlotsPresentationData> slots = new List<SlotsPresentationData>();
 
-	public void InitializeWinPresentation(EventManager slotsEventManager, SlotsEngine parentSlots)
+	public void AddSlotsToPresentation(EventManager eventManager, SlotsEngine parentSlots)
 	{
-		eventManager = slotsEventManager;
-		slotsEngine = parentSlots;
-		slotsEventManager.RegisterEvent("PresentationEnter", OnPresentation);
+		SlotsPresentationData newData = new SlotsPresentationData()
+		{
+			slotsEventManager = eventManager,
+			slotsEngine = parentSlots
+		};
+		slots.Add(newData);
+
+		eventManager.RegisterEvent("BeginSlotPresentation", OnBeginSlotPresentation);
 	}
 
-	private void OnPresentation(object obj)
+	private void OnBeginSlotPresentation(object obj)
 	{
-		var currentSymbolGrid = slotsEngine.GetCurrentSymbolGrid();
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDefinitions(), slotsEngine.SlotsDefinition.WinlineDefinitions);
+		SlotsEngine slotsToPresent = (SlotsEngine)obj;
+
+		var currentSymbolGrid = slotsToPresent.GetCurrentSymbolGrid();
+		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDefinitions(), slotsToPresent.SlotsDefinition.WinlineDefinitions);
+		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
+		slotsData.SetCurrentWinData(winData);
 
 		if (winData.Count > 0)
 		{
-			PlayWinlines(currentSymbolGrid, winData);
+			PlayWinlines(slotsToPresent, currentSymbolGrid, winData);
 
-			DOTween.Sequence().AppendInterval(1f).AppendCallback(CompletePresentation);
+			DOTween.Sequence().AppendInterval(1f).AppendCallback(() =>
+			{
+				CompletePresentation(slotsData);
+			});
 		}
 		else
 		{
-			CompletePresentation();
+			CompletePresentation(slotsData);
 		}
 	}
 
-	private void PlayWinlines(GameSymbol[] grid, List<WinData> winData)
+	private void PlayWinlines(SlotsEngine slotsToPresent, GameSymbol[] grid, List<WinData> winData)
 	{
 		foreach (WinData w in winData)
 		{
 			foreach (int index in w.WinningSymbolIndexes)
 			{
-				eventManager.BroadcastEvent("SymbolWin", grid[index]);
+				slotsToPresent.BroadcastSlotsEvent("SymbolWin", grid[index]);
 			}
 		}
 
@@ -58,8 +69,47 @@ public class PresentationController : Singleton<PresentationController>
 		SlotConsoleController.Instance.SetConsoleMessage(winMessage);
 	}
 
-	private void CompletePresentation()
+	private void ClearAllCurrentWinData()
 	{
-		eventManager.BroadcastEvent("PresentationComplete");
+		foreach (SlotsPresentationData slot in slots)
+		{
+			slot.SetPresentationCompleted(false);
+			slot.ClearCurrentWinData();
+		}
+	}
+
+	private void CompletePresentation(SlotsPresentationData slotsToComplete)
+	{
+		slotsToComplete.SetPresentationCompleted(true);
+		slotsToComplete.slotsEngine.BroadcastSlotsEvent("PresentationComplete");
+		slotsToComplete.ClearCurrentWinData();
+
+		if (slots.TrueForAll(x => x.presentationCompleted))
+		{
+
+		}
+	}
+}
+
+struct SlotsPresentationData
+{
+	public EventManager slotsEventManager;
+	public SlotsEngine slotsEngine;
+	public List<WinData> currentWinData;
+	public bool presentationCompleted;
+
+	public void SetCurrentWinData(List<WinData> newWinData)
+	{
+		currentWinData = newWinData;
+	}
+
+	public void ClearCurrentWinData()
+	{
+		currentWinData = null;
+	}
+
+	public void SetPresentationCompleted(bool complete)
+	{
+		presentationCompleted = complete;
 	}
 }

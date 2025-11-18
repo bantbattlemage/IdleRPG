@@ -12,7 +12,7 @@ public class SlotsEngine : MonoBehaviour
 
 	private List<GameReel> reels = new List<GameReel>();
 	private EventManager eventManager;
-	private StateMachine stateMachine;
+	private SlotsStateMachine stateMachine;
 
 	private bool spinInProgress = false;
 
@@ -29,7 +29,7 @@ public class SlotsEngine : MonoBehaviour
 	public void InitializeSlotsEngine(Transform canvasTransform)
 	{
 		eventManager = new EventManager();
-		stateMachine = new StateMachine();
+		stateMachine = new SlotsStateMachine();
 		stateMachine.InitializeStateMachine(this, eventManager);
 
 		eventManager.RegisterEvent("SpinCompleted", OnSpinCompleted);
@@ -100,7 +100,6 @@ public class SlotsEngine : MonoBehaviour
 
 	private void StopAllReels()
 	{
-		//	only call stop if all reels are spinning
 		if (!reels.TrueForAll(x => x.Spinning))
 		{
 			return;
@@ -144,19 +143,11 @@ public class SlotsEngine : MonoBehaviour
 		offset = totalWidth / 2f;
 		float yPos = (-offset + (reelDefinition.SymbolSize / 2f));
 
-		//float xPos = -((slotsDefinition.ReelDefinitions.Length) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize)) / 2f;
-		//float xPos = -((slotsDefinition.ReelDefinitions.Length) * (reelDefinition.ReelsSpacing + reelDefinition.SymbolSize)) / 2f;
-		//float yPos = -((reelDefinition.SymbolCount - 1) * (reelDefinition.SymbolSpacing + reelDefinition.SymbolSize)) / 2f;
-		
 		reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
 	}
 
 	void OnReelCompleted(object e)
 	{
-		//int value = (int)e;
-
-		//Debug.Log($"Reel {value} Completed");
-
 		if (reels.TrueForAll(x => !x.Spinning))
 		{
 			spinInProgress = false;
@@ -175,6 +166,8 @@ public class SlotsEngine : MonoBehaviour
 		{
 			gr.DimDummySymbols();
 		}
+
+		eventManager.BroadcastEvent("BeginSlotPresentation", this);
 	}
 
 	private void OnPresentationComplete(object obj)
@@ -196,5 +189,10 @@ public class SlotsEngine : MonoBehaviour
 		}
 
 		return Helpers.CombineColumnsToGrid(reelSymbols);
+	}
+
+	public void BroadcastSlotsEvent(string eventName, object value = null)
+	{
+		eventManager.BroadcastEvent(eventName, value);
 	}
 }

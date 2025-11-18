@@ -1,19 +1,36 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class GamePlayer : Singleton<GamePlayer>
 {
-	[SerializeField] private SlotsEngine slotsEngine;
-	public SlotsEngine SlotsEngine => slotsEngine;
-
 	[SerializeField] private PlayerData playerData;
 	public PlayerData PlayerData => playerData;
 
 	public BetLevelDefinition CurrentBet => playerData.CurrentBet;
 	public int CurrentCredits => playerData.Credits;
 
+	private List<SlotsEngine> playerSlots = new List<SlotsEngine>();
+
+	private SlotsEngine primarySlots => playerSlots[0];
+
+	public bool CheckAllSlotsState(State state)
+	{
+		return playerSlots.TrueForAll(x => x.CurrentState == state);
+	}
+
+	private void SetAllSlotsState(State state)
+	{
+		playerSlots.ForEach(x => x.SetState(state));
+	}
+
 	public void InitializePlayer()
 	{
-		slotsEngine = SlotsEngineController.Instance.CreateSlots();
+		int testSlots = 2;
+		for (int i = 0; i < testSlots; i++)
+		{
+			SlotsEngine slotsEngine = SlotsEngineController.Instance.CreateSlots();
+			playerSlots.Add(slotsEngine);
+		}
 
 		GlobalEventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
 		GlobalEventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
@@ -22,17 +39,6 @@ public class GamePlayer : Singleton<GamePlayer>
 		GlobalEventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
-
-		if (playerData.CurrentBet == null)
-		{
-			SetCurrentBet(slotsEngine.SlotsDefinition.BetLevelDefinitions[0]);
-		}
-		else
-		{
-			SetCurrentBet(playerData.CurrentBet);
-		}
-
-		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
 	void Update()
@@ -63,12 +69,18 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void BeginGame()
 	{
-		slotsEngine.BeginSlots();
+		foreach (SlotsEngine slots in playerSlots)
+		{
+			slots.BeginSlots();
+		}
+
+		SetCurrentBet(playerData.CurrentBet);
+		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
 	public bool RequestSpinPurchase()
 	{
-		if (slotsEngine.CurrentState != State.Idle)
+		if (!CheckAllSlotsState(State.Idle))
 		{
 			return false;
 		}
@@ -80,7 +92,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		AddCredits(-CurrentBet.CreditCost);
 
-		slotsEngine.SetState(State.SpinPurchased);
+		SetAllSlotsState(State.SpinPurchased);
 
 		return true;
 	}
@@ -93,7 +105,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void SetCurrentBet(BetLevelDefinition bet)
 	{
-		if (slotsEngine.CurrentState != State.Idle && slotsEngine.CurrentState != State.Init)
+		if (!CheckAllSlotsState(State.Idle))
 		{
 			return;
 		}
@@ -104,7 +116,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetDownPressed(object obj)
 	{
-		var betLevels = slotsEngine.SlotsDefinition.BetLevelDefinitions;
+		var betLevels = primarySlots.SlotsDefinition.BetLevelDefinitions;
 
 		int targetLevel = -1;
 		for (int i = 0; i < betLevels.Length; i++)
@@ -126,7 +138,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetUpPressed(object obj)
 	{
-		var betLevels = slotsEngine.SlotsDefinition.BetLevelDefinitions;
+		var betLevels = primarySlots.SlotsDefinition.BetLevelDefinitions;
 
 		int targetLevel = -1;
 		for (int i = 0; i < betLevels.Length; i++)
@@ -145,8 +157,14 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		SetCurrentBet(betLevels[targetLevel]);
 	}
+
 	private void OnPlayerInputPressed(object obj)
 	{
-		slotsEngine.SpinOrStopReels(RequestSpinPurchase());
+		bool spinPurchase = RequestSpinPurchase();
+
+		foreach (SlotsEngine slots in playerSlots)
+		{
+			slots.SpinOrStopReels(spinPurchase);
+		}
 	}
 }

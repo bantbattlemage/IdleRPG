@@ -104,7 +104,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		{
 			DOTween.Sequence().AppendInterval(0.2f).AppendCallback(() => 
 			{
-				if (AutoSpinToggle.isOn && GamePlayer.Instance.SlotsEngine.CurrentState == State.Idle)
+				if (AutoSpinToggle.isOn && GamePlayer.Instance.CheckAllSlotsState(State.Idle))
 				{
 					var currentWinData = WinlineEvaluator.Instance.CurrentSpinWinData;
 
