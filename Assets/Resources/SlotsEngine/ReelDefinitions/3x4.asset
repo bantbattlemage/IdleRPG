@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d3721aafd79ace94ea6a727ceeb82299, type: 3}
-  m_Name: 3x3
+  m_Name: 3x4
   m_EditorClassIdentifier: Assembly-CSharp::ReelDefinition
   reelSpinDuration: 1
-  symbolCount: 3
-  symbolSize: 150
-  symbolSpacing: 15
+  symbolCount: 6
+  symbolSize: 100
+  symbolSpacing: 25

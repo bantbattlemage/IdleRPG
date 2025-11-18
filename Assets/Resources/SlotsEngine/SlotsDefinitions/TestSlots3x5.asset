@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: TestSlots3x5
   m_EditorClassIdentifier: Assembly-CSharp::SlotsDefinition
   reelDefinitions:
-  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
-  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
-  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
-  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
-  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
   winlineDefinitions:
   - {fileID: 11400000, guid: 992277eef375b644ebb21c23a294af4a, type: 2}
   - {fileID: 11400000, guid: d5c93d8cd0781674f859e3ee67e7129c, type: 2}

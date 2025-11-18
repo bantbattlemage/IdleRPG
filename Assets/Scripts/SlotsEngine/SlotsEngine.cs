@@ -38,6 +38,11 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		else
 		{
 			Debug.Log("SpinOrStopReels called but no action could be taken.");
+
+			if (GamePlayer.Instance.CurrentCredits < GamePlayer.Instance.CurrentBet.CreditCost)
+			{
+				SlotConsoleController.Instance.SetConsoleMessage("Not enough credits! Switch to a lower bet or add credits.");
+			}
 		}
 	}
 
@@ -147,50 +152,10 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 	private void OnPresentationEnter(object obj)
 	{
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(GetCurrentSymbolGrid().ToSymbolDefinitions(), slotsDefinition.WinlineDefinitions);
-
 		foreach (GameReel gr in reels)
 		{
 			gr.DimDummySymbols();
 		}
-
-		if (winData.Count > 0)
-		{
-			foreach (WinData w in winData)
-			{
-				foreach (int index in w.WinningSymbolIndexes)
-				{
-					EventManager.Instance.BroadcastEvent("SymbolWin", GetCurrentSymbolGrid()[index]);
-				}
-			}
-
-			int totalWin = winData.Sum((x => x.WinValue));
-			GamePlayer.Instance.AddCredits(totalWin);
-			SlotConsoleController.Instance.SetWinText(totalWin);
-
-			string winMessage = string.Empty;
-			if (winData.Count == 1)
-			{
-				winMessage = $"Won {winData[0].WinValue} on line {winData[0].LineIndex}!";
-			}
-			else
-			{
-				winMessage = $"Won {totalWin} on {winData.Count} lines!";
-			}
-
-			SlotConsoleController.Instance.SetConsoleMessage(winMessage);
-
-			DOTween.Sequence().AppendInterval(1f).AppendCallback(CompletePresentation);
-		}
-		else
-		{
-			CompletePresentation();
-		}
-	}
-
-	public void CompletePresentation()
-	{
-		StateMachine.Instance.SetState(State.Idle);
 	}
 
 	public GameSymbol[] GetCurrentSymbolGrid()

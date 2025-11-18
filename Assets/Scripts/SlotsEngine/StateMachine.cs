@@ -43,6 +43,7 @@ public class StateMachine : Singleton<StateMachine>
 		SlotsEngine.Instance.InitializeSlotsEngine();
 		SlotConsoleController.Instance.InitializeConsole();
 		GamePlayer.Instance.InitializePlayer();
+		PresentationController.Instance.InitializeWinPresentation();
 
 		SetState(State.Idle);
 	}
