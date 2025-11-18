@@ -18,6 +18,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 	public void InitializeSlotsEngine()
 	{
 		EventManager.Instance.RegisterEvent("SpinCompleted", OnSpinCompleted);
+		EventManager.Instance.RegisterEvent("ReelSpinStarted", OnReelSpinStarted);
 		EventManager.Instance.RegisterEvent("ReelCompleted", OnReelCompleted);
 		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
 
@@ -47,6 +48,8 @@ public class SlotsEngine : Singleton<SlotsEngine>
 			throw new Exception("spin already in progress!");
 		}
 
+		float falloutDelay = 0.025f;
+
 		for (int i = 0; i < reels.Count; i++)
 		{
 			List<SymbolDefinition> testSolution = new List<SymbolDefinition>();
@@ -55,18 +58,33 @@ public class SlotsEngine : Singleton<SlotsEngine>
 				testSolution.Add(SymbolSpawner.Instance.GetRandomSymbol());
 			}
 
-			reels[i].BeginSpin(testSolution);
+			reels[i].BeginSpin(testSolution, falloutDelay);
+			falloutDelay += 0.025f;
 		}
+	}
 
-		spinInProgress = true;
-		StateMachine.Instance.SetState(State.Spinning);
+	private void OnReelSpinStarted(object obj)
+	{
+		if (reels.TrueForAll(x => x.Spinning))
+		{
+			spinInProgress = true;
+			StateMachine.Instance.SetState(State.Spinning);
+		}
 	}
 
 	private void StopAllReels()
 	{
+		//	only call stop if all reels are spinning
+		if (!reels.TrueForAll(x => x.Spinning))
+		{
+			return;
+		}
+
+		float stagger = 0.025f;
 		for (int i = 0; i < reels.Count; i++)
 		{
-			reels[i].CompleteSpin();
+			reels[i].StopReel(stagger);
+			stagger += 0.025f;
 		}
 
 		EventManager.Instance.BroadcastEvent("StoppingReels");
@@ -162,12 +180,11 @@ public class SlotsEngine : Singleton<SlotsEngine>
 
 			SlotConsoleController.Instance.SetConsoleMessage(winMessage);
 
-			DOTween.Sequence().AppendInterval(2f).AppendCallback(CompletePresentation);
+			DOTween.Sequence().AppendInterval(1f).AppendCallback(CompletePresentation);
 		}
 		else
 		{
 			CompletePresentation();
-			//DOTween.Sequence().AppendInterval(0.2f).AppendCallback(CompletePresentation);
 		}
 	}
 

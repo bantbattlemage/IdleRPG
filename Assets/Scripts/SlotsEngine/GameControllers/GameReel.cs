@@ -1,6 +1,6 @@
+using System;
 using DG.Tweening;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -59,21 +59,31 @@ public class GameReel : MonoBehaviour
 		SpawnDummySymbols(symbolRoot, false);
 	}
 
-	public void BeginSpin(List<SymbolDefinition> solution = null)
+	public void BeginSpin(List<SymbolDefinition> solution = null, float startDelay = 0f)
 	{
 		completeOnNextSpin = false;
-		spinning = true;
-
-		FallOut(solution);
+		
+		DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() =>
+		{
+			BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete:() =>
+			{
+				FallOut(solution, true);
+				spinning = true;
+				EventManager.Instance.BroadcastEvent("ReelSpinStarted", ID);
+			});
+		});
 	}
 
-	public void CompleteSpin()
+	public void StopReel(float delay = 0f)
 	{
-		completeOnNextSpin = true;
+		DOTween.Sequence().AppendInterval(delay).AppendCallback(() =>
+		{
+			completeOnNextSpin = true;
 
-		//	slam the reels
-		activeSpinTweens[0].timeScale = 4f;
-		activeSpinTweens[1].timeScale = 4f;
+			//	slam the reels
+			activeSpinTweens[0].timeScale = 4f;
+			activeSpinTweens[1].timeScale = 4f;
+		});
 	}
 
 	public void ApplySolution(List<SymbolDefinition> symbols)
@@ -164,36 +174,91 @@ public class GameReel : MonoBehaviour
 		}
 	}
 
-	public void FallOut(List<SymbolDefinition> solution = null)
+	private bool sequenceA = false;
+	private bool sequenceB = false;
+	public void FallOut(List<SymbolDefinition> solution = null, bool kickback = false)
 	{
 		ResetDimmedSymbols();
 		SpawnNextReel(solution);
 
+		sequenceA = false;
+		sequenceB = false;
+
 		float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
 		float duration = definition.ReelSpinDuration;
 
-		activeSpinTweens[0] = symbolRoot.transform.DOLocalMoveY(fallDistance, duration - 0.01f).SetEase(Ease.Linear);
-		activeSpinTweens[1] = nextSymbolsRoot.transform.DOLocalMoveY(0, duration).SetEase(Ease.Linear).OnComplete(() =>
+		activeSpinTweens[0] = symbolRoot.transform.DOLocalMoveY(fallDistance, duration).OnComplete(() =>
 		{
-			Destroy(symbolRoot.gameObject);
-			symbolRoot = nextSymbolsRoot;
+			sequenceA = true;
 
-			if (!completeOnNextSpin)
+			CheckBeginLandingBounce(solution);
+
+		}).SetEase(Ease.Linear);
+
+		activeSpinTweens[1] = nextSymbolsRoot.transform.DOLocalMoveY(0, duration).OnComplete(() =>
+		{
+			sequenceB = true;
+
+			CheckBeginLandingBounce(solution);
+
+		}).SetEase(Ease.Linear);
+	}
+
+	private void CheckBeginLandingBounce(List<SymbolDefinition> solution)
+	{
+		if (sequenceA && sequenceB)
+		{
+			sequenceA = false;
+			sequenceB = false;
+
+			if (completeOnNextSpin)
 			{
-				FallOut(solution);
+				BounceReel(Vector3.down, peak: 0.25f, duration: 0.25f, onComplete: () => CompleteReelSpin(solution));
 			}
 			else
 			{
-				spinning = false;
-
-				for (int i = 0; i < symbols.Count; i++)
-				{
-					EventManager.Instance.BroadcastEvent("SymbolLanded", symbols[i]);
-				}
-
-				EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
+				CompleteReelSpin(solution);
 			}
-		});
+		}
+	}
+
+	private void BounceReel(Vector3 direction, float strength = 100f, float duration = 0.5f, float sharpness = 0f, float peak = 0.4f, Action onComplete = null)
+	{
+		if (nextSymbolsRoot != null)
+		{
+			nextSymbolsRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear);
+		}
+
+		symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { if (onComplete != null) onComplete(); });
+
+		//if (nextSymbolsRoot != null)
+		//{
+		//	nextSymbolsRoot.DOEdgeBounceLinear(Vector3.up, 1000f, 0.5f).SetEase(Ease.Linear);
+		//}
+
+		//symbolRoot.DOEdgeBounceLinear(Vector3.up, 1000f, 0.5f).SetEase(Ease.Linear).OnComplete(() => { if (onComplete != null) onComplete(); });
+	}
+
+	private void CompleteReelSpin(List<SymbolDefinition> solution)
+	{
+		Destroy(symbolRoot.gameObject);
+		symbolRoot = nextSymbolsRoot;
+
+		if (!completeOnNextSpin)
+		{
+			FallOut(solution);
+		}
+		else
+		{
+			spinning = false;
+
+			for (int i = 0; i < symbols.Count; i++)
+			{
+				EventManager.Instance.BroadcastEvent("SymbolLanded", symbols[i]);
+			}
+
+			EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
+		}
 	}
 
 	public void DimDummySymbols()
@@ -224,25 +289,5 @@ public class GameReel : MonoBehaviour
 			image.DOKill();
 			image.color = Color.white;
 		}
-	}
-
-	private void DestroyTopSymbols()
-	{
-		foreach (GameSymbol g in topDummySymbols)
-		{
-			Destroy(g.gameObject);
-		}
-
-		topDummySymbols = new List<GameSymbol>();
-	}
-
-	private void DestroyBottomSymbols()
-	{
-		foreach (GameSymbol g in bottomDummySymbols)
-		{
-			Destroy(g.gameObject);
-		}
-
-		bottomDummySymbols = new List<GameSymbol>();
 	}
 }

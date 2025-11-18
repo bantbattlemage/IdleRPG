@@ -42,6 +42,18 @@ public class GamePlayer : Singleton<GamePlayer>
 			Debug.LogWarning("Adding credits for testing.");
 			AddCredits(100);
 		}
+
+		if (Input.GetKeyDown(KeyCode.Minus))
+		{
+			Time.timeScale -= 0.1f;
+			Debug.LogWarning(Time.timeScale);
+		}
+
+		if (Input.GetKeyDown(KeyCode.Equals))
+		{
+			Time.timeScale += 0.1f;
+			Debug.LogWarning(Time.timeScale);
+		}
 	}
 
 	private void OnPlayerInputPressed(object obj)
