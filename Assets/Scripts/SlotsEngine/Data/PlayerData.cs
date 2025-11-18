@@ -10,6 +10,15 @@ public class PlayerData : Data
 	[SerializeField] private BetLevelDefinition currentBet;
 	public BetLevelDefinition CurrentBet => currentBet;
 
+	[SerializeField] private SlotsEngine[] currentSlots;
+	public SlotsEngine[] CurrentSlots => currentSlots;
+
+	public PlayerData(int c = 0, BetLevelDefinition bet = null)
+	{
+		credits = c;
+		currentBet = bet;
+	}
+
 	public void SetCurrentBet(BetLevelDefinition bet)
 	{
 		currentBet = bet;

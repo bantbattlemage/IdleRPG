@@ -7,8 +7,10 @@ using UnityEngine.UI;
 public class GameReel : MonoBehaviour
 {
 	[SerializeField] private GameObject SymbolPrefab;
+	[SerializeField] private ReelStripDefinition Strip;
 
 	public ReelDefinition Definition => definition;
+
 	public int ID => id;
 	private int id;
 
@@ -40,6 +42,11 @@ public class GameReel : MonoBehaviour
 		SpawnReel();
 	}
 
+	public SymbolDefinition GetRandomSymbolFromStrip()
+	{
+		return Strip.GetWeightedSymbol();
+	}
+
 	private void SpawnReel()
 	{
 		symbolRoot = new GameObject("SymbolRoot").transform;
@@ -50,7 +57,7 @@ public class GameReel : MonoBehaviour
 		{
 			GameObject symbol = Instantiate(SymbolPrefab, symbolRoot);
 			GameSymbol sym = symbol.GetComponent<GameSymbol>();
-			sym.InitializeSymbol(SymbolSpawner.Instance.GetRandomSymbol(), eventManager);
+			sym.InitializeSymbol(Strip.GetWeightedSymbol(), eventManager);
 
 			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
 			symbol.transform.localPosition = new Vector3(0, (definition.SymbolSpacing + definition.SymbolSize) * i, 0);
@@ -157,7 +164,7 @@ public class GameReel : MonoBehaviour
 			}
 			else
 			{
-				def = SymbolSpawner.Instance.GetRandomSymbol();
+				def = Strip.GetWeightedSymbol();
 			}
 			sym.InitializeSymbol(def, eventManager);
 

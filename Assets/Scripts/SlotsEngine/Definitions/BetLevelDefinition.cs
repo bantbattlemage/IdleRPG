@@ -1,11 +1,13 @@
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/BetLevelDefinition")]
-public class BetLevelDefinition : ScriptableObject
+public class BetLevelDefinition : BaseDefinition<BetLevelData>
 {
 	[SerializeField] private int creditCost;
 	public int CreditCost => creditCost;
 
-	//[SerializeField] private WinlineDefinition[] winLines;
-	//public WinlineDefinition[] WinLines => winLines;
+	public override BetLevelData CreateInstance()
+	{
+		throw new System.NotImplementedException();
+	}
 }

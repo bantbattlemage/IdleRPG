@@ -85,7 +85,7 @@ public class SlotsEngine : MonoBehaviour
 			List<SymbolDefinition> testSolution = new List<SymbolDefinition>();
 			for (int k = 0; k < reels[i].Definition.SymbolCount; k++)
 			{
-				testSolution.Add(SymbolSpawner.Instance.GetRandomSymbol());
+				testSolution.Add(reels[i].GetRandomSymbolFromStrip());
 			}
 
 			reels[i].BeginSpin(testSolution, falloutDelay);

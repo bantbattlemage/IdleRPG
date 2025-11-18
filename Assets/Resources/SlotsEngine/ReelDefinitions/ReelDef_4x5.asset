@@ -16,3 +16,4 @@ MonoBehaviour:
   symbolCount: 4
   symbolSize: 170
   symbolSpacing: 15
+  defaultReelStrip: {fileID: 11400000, guid: 367f52360dfc12645a3647fcbe62540c, type: 2}

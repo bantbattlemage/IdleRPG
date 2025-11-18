@@ -1,7 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/SlotsDefinition", order = 1)]
-public class SlotsDefinition : ScriptableObject
+public class SlotsDefinition : BaseDefinition<SlotsData>
 {
 	[SerializeField] private ReelDefinition[] reelDefinitions;
 	public ReelDefinition[] ReelDefinitions => reelDefinitions;
@@ -11,4 +10,9 @@ public class SlotsDefinition : ScriptableObject
 
 	[SerializeField] private BetLevelDefinition[] betLevelDefinitions;
 	public BetLevelDefinition[] BetLevelDefinitions => betLevelDefinitions;
+
+	public override SlotsData CreateInstance()
+	{
+		throw new System.NotImplementedException();
+	}
 }

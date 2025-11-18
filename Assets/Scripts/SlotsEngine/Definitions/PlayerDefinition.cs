@@ -1,7 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/PlayerDefinition")]
-public class PlayerDefinition : ScriptableObject
+public class PlayerDefinition : BaseDefinition<PlayerData>
 {
 	[SerializeField] private int credits;
 	public int Credits => credits;
@@ -17,5 +16,11 @@ public class PlayerDefinition : ScriptableObject
 	public void SetCurrentCredits(int c)
 	{
 		credits = c;
+	}
+
+	public override PlayerData CreateInstance()
+	{
+		PlayerData newPlayerData = new PlayerData(credits, currentBet);
+		return newPlayerData;
 	}
 }

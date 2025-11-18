@@ -1,12 +1,12 @@
 using UnityEngine;
-using System.Linq;
 
 [CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/SymbolDefinition")]
-public class SymbolDefinition : ScriptableObject
+public class SymbolDefinition : BaseDefinition<SymbolData>
 {
 	[SerializeField] private new string name;
 	[SerializeField] private Sprite sprite;
 	[SerializeField] private int[] baseValueMultiplier;
+	[SerializeField] private float weight = 1;
 
 	public string Name => name;
 	public Sprite Sprite => sprite;
@@ -23,4 +23,10 @@ public class SymbolDefinition : ScriptableObject
 		}
 	}
 	public int[] BaseValueMultiplier => baseValueMultiplier;
+	public float Weight => weight;
+
+	public override SymbolData CreateInstance()
+	{
+		throw new System.NotImplementedException();
+	}
 }
