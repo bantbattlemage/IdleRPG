@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class EventManager : Singleton<EventManager>
+public class EventManager
 {
 	private Dictionary<string, List<Action<object>>> events = new Dictionary<string, List<Action<object>>>();
 

@@ -10,6 +10,19 @@ public class GameSymbol : MonoBehaviour
 
 	private Tweener activeTweener;
 
+	private EventManager eventManager;
+
+	public void InitializeSymbol(SymbolDefinition symbol, EventManager slotsEventManager)
+	{
+		eventManager = slotsEventManager;
+
+		slotsEventManager.RegisterEvent("SymbolLanded", OnSymbolLanded);
+		slotsEventManager.RegisterEvent("SymbolWin", OnSymbolWin);
+		slotsEventManager.RegisterEvent("IdleExit", OnIdleExit);
+
+		ApplySymbol(symbol);
+	}
+
 	public void ApplySymbol(SymbolDefinition symbol)
 	{
 		definition = symbol;
@@ -17,10 +30,6 @@ public class GameSymbol : MonoBehaviour
 		Image r = gameObject.GetComponent<Image>();
 		r.sprite = symbol.Sprite;
 		r.color = Color.white;
-
-		EventManager.Instance.RegisterEvent("SymbolLanded", OnSymbolLanded);
-		EventManager.Instance.RegisterEvent("SymbolWin", OnSymbolWin);
-		EventManager.Instance.RegisterEvent("IdleExit", OnIdleExit);
 	}
 
 	private void OnIdleExit(object obj)
@@ -58,8 +67,8 @@ public class GameSymbol : MonoBehaviour
 
 	private void OnDestroy()
 	{
-		EventManager.Instance?.UnregisterEvent("SymbolLanded", OnSymbolLanded);
-		EventManager.Instance?.UnregisterEvent("SymbolWin", OnSymbolWin);
-		EventManager.Instance?.UnregisterEvent("IdleExit", OnIdleExit);
+		eventManager?.UnregisterEvent("SymbolLanded", OnSymbolLanded);
+		eventManager?.UnregisterEvent("SymbolWin", OnSymbolWin);
+		eventManager?.UnregisterEvent("IdleExit", OnIdleExit);
 	}
 }

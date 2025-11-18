@@ -19,20 +19,23 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	public TextMeshProUGUI BetText;
 	public TextMeshProUGUI CreditsText;
 
-	public void InitializeConsole()
+	private EventManager eventManager;
+
+	public void InitializeConsole(EventManager slotsEventManager)
 	{
 		SpinButton.onClick.AddListener(OnSpinPressed);
 		StopButton.onClick.AddListener(OnStopPressed);
 		BetDownButton.onClick.AddListener(OnBetDownPressed);
 		BetUpButton.onClick.AddListener(OnBetUpPressed);
 
-		EventManager.Instance.RegisterEvent("IdleEnter", OnIdleEnter);
-		EventManager.Instance.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
-		EventManager.Instance.RegisterEvent("SpinningEnter", OnSpinningEnter);
-		EventManager.Instance.RegisterEvent("SpinningExit", OnSpinningExit);
-		EventManager.Instance.RegisterEvent("StoppingReels", OnStoppingReels);
-		EventManager.Instance.RegisterEvent("BetChanged", OnBetChanged);
-		EventManager.Instance.RegisterEvent("CreditsChanged", OnCreditsChanged);
+		slotsEventManager.RegisterEvent("IdleEnter", OnIdleEnter);
+		slotsEventManager.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
+		slotsEventManager.RegisterEvent("SpinningEnter", OnSpinningEnter);
+		slotsEventManager.RegisterEvent("SpinningExit", OnSpinningExit);
+		slotsEventManager.RegisterEvent("StoppingReels", OnStoppingReels);
+
+		GlobalEventManager.Instance.RegisterEvent("BetChanged", OnBetChanged);
+		GlobalEventManager.Instance.RegisterEvent("CreditsChanged", OnCreditsChanged);
 
 		WinText.text = string.Empty;
 		SetConsoleMessage(string.Empty);
@@ -50,12 +53,12 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	private void OnBetUpPressed()
 	{
-		EventManager.Instance.BroadcastEvent("BetUpPressed");
+		GlobalEventManager.Instance.BroadcastEvent("BetUpPressed");
 	}
 
 	private void OnBetDownPressed()
 	{
-		EventManager.Instance.BroadcastEvent("BetDownPressed");
+		GlobalEventManager.Instance.BroadcastEvent("BetDownPressed");
 	}
 	private void OnBetChanged(object obj)
 	{
@@ -101,7 +104,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		{
 			DOTween.Sequence().AppendInterval(0.2f).AppendCallback(() => 
 			{
-				if (AutoSpinToggle.isOn && StateMachine.Instance.CurrentState == State.Idle)
+				if (AutoSpinToggle.isOn && GamePlayer.Instance.SlotsEngine.CurrentState == State.Idle)
 				{
 					var currentWinData = WinlineEvaluator.Instance.CurrentSpinWinData;
 
@@ -142,17 +145,20 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 		if (AutoSpinToggle.isOn)
 		{
-			DOTween.Sequence().AppendInterval(1f).AppendCallback(OnStopPressed);
+			DOTween.Sequence().AppendInterval(1f).AppendCallback(() =>
+			{
+				GlobalEventManager.Instance.BroadcastEvent("SpinButtonPressed");
+			});
 		}
 	}
 
 	void OnSpinPressed()
 	{
-		EventManager.Instance.BroadcastEvent("SpinButtonPressed");
+		GlobalEventManager.Instance.BroadcastEvent("SpinButtonPressed");
 	}
 
 	void OnStopPressed()
 	{
-		EventManager.Instance.BroadcastEvent("StopButtonPressed");
+		GlobalEventManager.Instance.BroadcastEvent("StopButtonPressed");
 	}
 }

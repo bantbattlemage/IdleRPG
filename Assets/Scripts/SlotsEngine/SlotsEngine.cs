@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 using DG.Tweening;
 
-public class SlotsEngine : Singleton<SlotsEngine>
+public class SlotsEngine : MonoBehaviour
 {
 	[SerializeField] private Canvas gameCanvas;
 	[SerializeField] private GameObject reelPrefab;
@@ -12,17 +12,36 @@ public class SlotsEngine : Singleton<SlotsEngine>
 	public SlotsDefinition SlotsDefinition => slotsDefinition;
 
 	private List<GameReel> reels = new List<GameReel>();
+	private EventManager eventManager;
+	private StateMachine stateMachine;
 
 	private bool spinInProgress = false;
 
+	public State CurrentState
+	{
+		get => stateMachine.CurrentState;
+	}
+
+	public void SetState(State state)
+	{
+		stateMachine.SetState(state);
+	}
+
 	public void InitializeSlotsEngine()
 	{
-		EventManager.Instance.RegisterEvent("SpinCompleted", OnSpinCompleted);
-		EventManager.Instance.RegisterEvent("ReelSpinStarted", OnReelSpinStarted);
-		EventManager.Instance.RegisterEvent("ReelCompleted", OnReelCompleted);
-		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentationEnter);
+		eventManager = new EventManager();
+		stateMachine = new StateMachine();
+		stateMachine.InitializeStateMachine(this, eventManager);
+
+		eventManager.RegisterEvent("SpinCompleted", OnSpinCompleted);
+		eventManager.RegisterEvent("ReelSpinStarted", OnReelSpinStarted);
+		eventManager.RegisterEvent("ReelCompleted", OnReelCompleted);
+		eventManager.RegisterEvent("PresentationEnter", OnPresentationEnter);
+		eventManager.RegisterEvent("PresentationComplete", OnPresentationComplete);
 
 		SpawnReels();
+
+		stateMachine.BeginStateMachine();
 	}
 
 	public void SpinOrStopReels(bool spin)
@@ -31,7 +50,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		{
 			SpinAllReels();
 		}
-		else if (spinInProgress && !spin && StateMachine.Instance.CurrentState == State.Spinning)
+		else if (spinInProgress && !spin && stateMachine.CurrentState == State.Spinning)
 		{
 			StopAllReels();
 		}
@@ -73,7 +92,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		if (reels.TrueForAll(x => x.Spinning))
 		{
 			spinInProgress = true;
-			StateMachine.Instance.SetState(State.Spinning);
+			stateMachine.SetState(State.Spinning);
 		}
 	}
 
@@ -92,7 +111,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 			stagger += 0.025f;
 		}
 
-		EventManager.Instance.BroadcastEvent("StoppingReels");
+		eventManager.BroadcastEvent("StoppingReels");
 	}
 
 	private void SpawnReels()
@@ -106,7 +125,7 @@ public class SlotsEngine : Singleton<SlotsEngine>
 			ReelDefinition reelDef = slotsDefinition.ReelDefinitions[i];
 			GameObject g = Instantiate(reelPrefab, reelsGroup.transform);
 			GameReel reel = g.GetComponent<GameReel>();
-			reel.InitializeReel(reelDef, i);
+			reel.InitializeReel(reelDef, i, eventManager);
 			g.transform.localPosition = new Vector3((reelDef.SymbolSpacing + reelDef.SymbolSize) * i, 0, 0);
 			reels.Add(reel);
 		}
@@ -139,15 +158,13 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		if (reels.TrueForAll(x => !x.Spinning))
 		{
 			spinInProgress = false;
-			EventManager.Instance.BroadcastEvent("SpinCompleted");
+			eventManager.BroadcastEvent("SpinCompleted");
 		}
 	}
 
 	void OnSpinCompleted(object e)
 	{
-		//Debug.Log($"Spin Completed");
-
-		StateMachine.Instance.SetState(State.Presentation);
+		stateMachine.SetState(State.Presentation);
 	}
 
 	private void OnPresentationEnter(object obj)
@@ -156,6 +173,11 @@ public class SlotsEngine : Singleton<SlotsEngine>
 		{
 			gr.DimDummySymbols();
 		}
+	}
+
+	private void OnPresentationComplete(object obj)
+	{
+		stateMachine.SetState(State.Idle);
 	}
 
 	public GameSymbol[] GetCurrentSymbolGrid()

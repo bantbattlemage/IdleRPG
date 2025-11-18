@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class GamePlayer : Singleton<GamePlayer>
 {
+	[SerializeField] private SlotsEngine slotsEngine;
+	public SlotsEngine SlotsEngine => slotsEngine;
+
 	[SerializeField] private PlayerData playerData;
 	public PlayerData PlayerData => playerData;
 
@@ -10,31 +13,31 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void InitializePlayer()
 	{
-		EventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
-		EventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
-		EventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
-		EventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
-		EventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
+		GlobalEventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
+		GlobalEventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
+		GlobalEventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
+		GlobalEventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
+		GlobalEventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
 
 		if (playerData.CurrentBet == null)
 		{
-			SetCurrentBet(SlotsEngine.Instance.SlotsDefinition.BetLevelDefinitions[0]);
+			SetCurrentBet(slotsEngine.SlotsDefinition.BetLevelDefinitions[0]);
 		}
 		else
 		{
 			SetCurrentBet(playerData.CurrentBet);
 		}
 
-		EventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
+		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
 	void Update()
 	{
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
-			EventManager.Instance.BroadcastEvent("PlayerInputPressed");
+			GlobalEventManager.Instance.BroadcastEvent("PlayerInputPressed");
 		}
 
 		if (Input.GetKeyDown(KeyCode.Alpha1))
@@ -56,14 +59,14 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 	}
 
-	private void OnPlayerInputPressed(object obj)
+	public void BeginGame()
 	{
-		SlotsEngine.Instance.SpinOrStopReels(RequestSpinPurchase());
+		slotsEngine.InitializeSlotsEngine();
 	}
 
 	public bool RequestSpinPurchase()
 	{
-		if (StateMachine.Instance.CurrentState != State.Idle)
+		if (slotsEngine.CurrentState != State.Idle)
 		{
 			return false;
 		}
@@ -75,7 +78,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		AddCredits(-CurrentBet.CreditCost);
 
-		StateMachine.Instance.SetState(State.SpinPurchased);
+		slotsEngine.SetState(State.SpinPurchased);
 
 		return true;
 	}
@@ -83,23 +86,23 @@ public class GamePlayer : Singleton<GamePlayer>
 	public void AddCredits(int value)
 	{
 		playerData.SetCurrentCredits(CurrentCredits + value);
-		EventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
+		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
 	public void SetCurrentBet(BetLevelDefinition bet)
 	{
-		if (StateMachine.Instance.CurrentState != State.Idle && StateMachine.Instance.CurrentState != State.Init)
+		if (slotsEngine.CurrentState != State.Idle && slotsEngine.CurrentState != State.Init)
 		{
 			return;
 		}
 
 		playerData.SetCurrentBet(bet);
-		EventManager.Instance.BroadcastEvent("BetChanged", bet);
+		GlobalEventManager.Instance.BroadcastEvent("BetChanged", bet);
 	}
 
 	private void OnBetDownPressed(object obj)
 	{
-		var betLevels = SlotsEngine.Instance.SlotsDefinition.BetLevelDefinitions;
+		var betLevels = slotsEngine.SlotsDefinition.BetLevelDefinitions;
 
 		int targetLevel = -1;
 		for (int i = 0; i < betLevels.Length; i++)
@@ -121,7 +124,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetUpPressed(object obj)
 	{
-		var betLevels = SlotsEngine.Instance.SlotsDefinition.BetLevelDefinitions;
+		var betLevels = slotsEngine.SlotsDefinition.BetLevelDefinitions;
 
 		int targetLevel = -1;
 		for (int i = 0; i < betLevels.Length; i++)
@@ -139,5 +142,9 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 
 		SetCurrentBet(betLevels[targetLevel]);
+	}
+	private void OnPlayerInputPressed(object obj)
+	{
+		slotsEngine.SpinOrStopReels(RequestSpinPurchase());
 	}
 }

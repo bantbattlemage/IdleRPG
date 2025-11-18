@@ -21,15 +21,13 @@ public class MainMenuController : MonoBehaviour
 
 	private void OnContinuePressed()
 	{
-		DataPersistenceManager.Instance.LoadGame();
-		StateMachine.Instance.BeginStateMachine();
+		GameMaster.Instance.BeginGame(false);
 		MainMenuGroup.SetActive(false);
 	}
 
 	private void OnNewGamePressed()
 	{
-		DataPersistenceManager.Instance.NewGame();
-		StateMachine.Instance.BeginStateMachine();
+		GameMaster.Instance.BeginGame();
 		MainMenuGroup.SetActive(false);
 	}
 

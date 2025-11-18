@@ -12,45 +12,52 @@ public enum State
 	Presentation
 }
 
-public class StateMachine : Singleton<StateMachine>
+public class StateMachine
 {
 	public State CurrentState => currentState;
 	private State currentState;
 
 	private Dictionary<State, GameState> states = new Dictionary<State, GameState>();
+	private EventManager eventManager;
+	private SlotsEngine slotsEngine;
 
 	void Awake()
 	{
 		Application.runInBackground = true;
+	}
 
+	public void InitializeStateMachine(SlotsEngine parentSlots, EventManager slotsEventManager)
+	{
+		eventManager = slotsEventManager;
+		slotsEngine = parentSlots;
+	}
+
+	public void BeginStateMachine()
+	{
 		RegisterState(State.Init);
 		RegisterState(State.Idle);
 		RegisterState(State.SpinPurchased);
 		RegisterState(State.Spinning);
 		RegisterState(State.Presentation);
 
-		EventManager.Instance.RegisterEvent("InitEnter", OnInitEnter);
-	}
+		eventManager.RegisterEvent("InitEnter", OnInitEnter);
 
-	public void BeginStateMachine()
-	{
 		currentState = State.Init;
 		states[currentState].EnterState();
 	}
 
 	private void OnInitEnter(object obj)
 	{
-		SlotsEngine.Instance.InitializeSlotsEngine();
-		SlotConsoleController.Instance.InitializeConsole();
+		SlotConsoleController.Instance.InitializeConsole(eventManager);
 		GamePlayer.Instance.InitializePlayer();
-		PresentationController.Instance.InitializeWinPresentation();
+		PresentationController.Instance.InitializeWinPresentation(eventManager, slotsEngine);
 
 		SetState(State.Idle);
 	}
 
 	private void RegisterState(State state, Action enterAction = null, Action exitAction = null)
 	{
-		GameState newState = new GameState(state, enterAction, exitAction);
+		GameState newState = new GameState(state, eventManager, enterAction, exitAction);
 
 		states.Add(state, newState);
 	}
@@ -74,22 +81,25 @@ public class GameState
 	private Action enterAction;
 	private Action exitAction;
 
-	public GameState(State s, Action enter, Action exit)
+	private EventManager eventManager;
+
+	public GameState(State s, EventManager slotsEventManager, Action enter, Action exit)
 	{
 		state = s;
 		enterAction = enter;
 		exitAction = exit;
+		eventManager = slotsEventManager;
 	}
 
 	public void EnterState()
 	{
-		EventManager.Instance.BroadcastEvent($"{state.ToString()}Enter");
+		eventManager.BroadcastEvent($"{state.ToString()}Enter");
 		if (enterAction != null) enterAction();
 	}
 
 	public void ExitState()
 	{
-		EventManager.Instance.BroadcastEvent($"{state.ToString()}Exit");
+		eventManager.BroadcastEvent($"{state.ToString()}Exit");
 		if (exitAction != null) exitAction();
 	}
 }

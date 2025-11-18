@@ -29,10 +29,13 @@ public class GameReel : MonoBehaviour
 
 	private Tweener[] activeSpinTweens = new Tweener[2];
 
-	public void InitializeReel(ReelDefinition reelDefinition, int reelID)
+	private EventManager eventManager;
+
+	public void InitializeReel(ReelDefinition reelDefinition, int reelID, EventManager slotsEventManager)
 	{
 		definition = reelDefinition;
 		id = reelID;
+		eventManager = slotsEventManager;
 
 		SpawnReel();
 	}
@@ -47,7 +50,7 @@ public class GameReel : MonoBehaviour
 		{
 			GameObject symbol = Instantiate(SymbolPrefab, symbolRoot);
 			GameSymbol sym = symbol.GetComponent<GameSymbol>();
-			sym.ApplySymbol(SymbolSpawner.Instance.GetRandomSymbol());
+			sym.InitializeSymbol(SymbolSpawner.Instance.GetRandomSymbol(), eventManager);
 
 			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
 			symbol.transform.localPosition = new Vector3(0, (definition.SymbolSpacing + definition.SymbolSize) * i, 0);
@@ -69,7 +72,7 @@ public class GameReel : MonoBehaviour
 			{
 				FallOut(solution, true);
 				spinning = true;
-				EventManager.Instance.BroadcastEvent("ReelSpinStarted", ID);
+				eventManager.BroadcastEvent("ReelSpinStarted", ID);
 			});
 		});
 	}
@@ -115,7 +118,7 @@ public class GameReel : MonoBehaviour
 				def = symbols[i].Definition;
 			}
 
-			sym.ApplySymbol(def);
+			sym.InitializeSymbol(def, eventManager);
 
 			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
 			symbol.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * i), 0);
@@ -156,7 +159,7 @@ public class GameReel : MonoBehaviour
 			{
 				def = SymbolSpawner.Instance.GetRandomSymbol();
 			}
-			sym.ApplySymbol(def);
+			sym.InitializeSymbol(def, eventManager);
 
 			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
 			symbol.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * (i + startIndex)) * flip, 0);
@@ -254,10 +257,10 @@ public class GameReel : MonoBehaviour
 
 			for (int i = 0; i < symbols.Count; i++)
 			{
-				EventManager.Instance.BroadcastEvent("SymbolLanded", symbols[i]);
+				eventManager.BroadcastEvent("SymbolLanded", symbols[i]);
 			}
 
-			EventManager.Instance.BroadcastEvent("ReelCompleted", ID);
+			eventManager.BroadcastEvent("ReelCompleted", ID);
 		}
 	}
 

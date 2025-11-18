@@ -1,20 +1,23 @@
 using DG.Tweening;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
-using static UnityEngine.Analytics.IAnalytic;
 
 public class PresentationController : Singleton<PresentationController>
 {
-	public void InitializeWinPresentation()
+	private EventManager eventManager;
+	private SlotsEngine slotsEngine;
+
+	public void InitializeWinPresentation(EventManager slotsEventManager, SlotsEngine parentSlots)
 	{
-		EventManager.Instance.RegisterEvent("PresentationEnter", OnPresentation);
+		eventManager = slotsEventManager;
+		slotsEngine = parentSlots;
+		slotsEventManager.RegisterEvent("PresentationEnter", OnPresentation);
 	}
 
 	private void OnPresentation(object obj)
 	{
-		var currentSymbolGrid = SlotsEngine.Instance.GetCurrentSymbolGrid();
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDefinitions(), SlotsEngine.Instance.SlotsDefinition.WinlineDefinitions);
+		var currentSymbolGrid = slotsEngine.GetCurrentSymbolGrid();
+		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDefinitions(), slotsEngine.SlotsDefinition.WinlineDefinitions);
 
 		if (winData.Count > 0)
 		{
@@ -34,7 +37,7 @@ public class PresentationController : Singleton<PresentationController>
 		{
 			foreach (int index in w.WinningSymbolIndexes)
 			{
-				EventManager.Instance.BroadcastEvent("SymbolWin", grid[index]);
+				eventManager.BroadcastEvent("SymbolWin", grid[index]);
 			}
 		}
 
@@ -57,6 +60,6 @@ public class PresentationController : Singleton<PresentationController>
 
 	private void CompletePresentation()
 	{
-		StateMachine.Instance.SetState(State.Idle);
+		eventManager.BroadcastEvent("PresentationComplete");
 	}
 }

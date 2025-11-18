@@ -10,16 +10,20 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dcdccfe3193ee7e4284cb42f01a9f193, type: 3}
-  m_Name: TestSlotsStar
+  m_Name: SlotsDef_4x5
   m_EditorClassIdentifier: Assembly-CSharp::SlotsDefinition
   reelDefinitions:
-  - {fileID: 11400000, guid: d68874b0e4c36ca46add2322a49c250a, type: 2}
-  - {fileID: 11400000, guid: 7d4fb17d02e507742948e9cd1e0e95d3, type: 2}
-  - {fileID: 11400000, guid: 03159224b9be09041bb6a6f80d0936ca, type: 2}
-  - {fileID: 11400000, guid: 158e14eb99b186841a16189f3e5b8077, type: 2}
-  - {fileID: 11400000, guid: 3f6088edf7ff65f4fa1893f5fd82b2da, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
+  - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
   winlineDefinitions:
-  - {fileID: 11400000, guid: e566fff81f313b0488d84530071f28d7, type: 2}
+  - {fileID: 11400000, guid: 992277eef375b644ebb21c23a294af4a, type: 2}
+  - {fileID: 11400000, guid: d5c93d8cd0781674f859e3ee67e7129c, type: 2}
+  - {fileID: 11400000, guid: 51636b4085105af4d822efa1cfb1c634, type: 2}
+  - {fileID: 11400000, guid: 6c9439699903e7a4488bc538b9bbca24, type: 2}
+  - {fileID: 11400000, guid: f8b50063c7ad9424e9548025e464dab8, type: 2}
   betLevelDefinitions:
   - {fileID: 11400000, guid: 96bf0fc9e9c987b4ba91c2ebace1020d, type: 2}
   - {fileID: 11400000, guid: fafe5611c7f04494caa24ba0e909b721, type: 2}
