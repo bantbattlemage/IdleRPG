@@ -13,6 +13,8 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void InitializePlayer()
 	{
+		slotsEngine = SlotsEngineController.Instance.CreateSlots();
+
 		GlobalEventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
 		GlobalEventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
 		GlobalEventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
@@ -61,7 +63,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void BeginGame()
 	{
-		slotsEngine.InitializeSlotsEngine();
+		slotsEngine.BeginSlots();
 	}
 
 	public bool RequestSpinPurchase()

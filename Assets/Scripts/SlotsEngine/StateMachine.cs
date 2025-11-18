@@ -49,7 +49,6 @@ public class StateMachine
 	private void OnInitEnter(object obj)
 	{
 		SlotConsoleController.Instance.InitializeConsole(eventManager);
-		GamePlayer.Instance.InitializePlayer();
 		PresentationController.Instance.InitializeWinPresentation(eventManager, slotsEngine);
 
 		SetState(State.Idle);

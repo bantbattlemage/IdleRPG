@@ -26,5 +26,11 @@ public class OverlayButtonGroup : MonoBehaviour
 		{
 			button.gameObject.SetActive(false);
 		}
+
+		if (settings.ButtonColor != null)
+		{
+			button.image.color = settings.ButtonColor;
+			buttonLabel.color = Color.black;
+		}
 	}
 }

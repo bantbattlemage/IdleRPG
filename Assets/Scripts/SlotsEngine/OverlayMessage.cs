@@ -12,20 +12,23 @@ public class OverlayMessage : MonoBehaviour
 	[SerializeField] private OverlayPanelGroup basePanelGroup;
 	[SerializeField] private OverlayButtonGroup baseButtonGroup;
 
-	private List<OverlayPanelGroup> overlayPanels = new List<OverlayPanelGroup>();
-	private List<OverlayButtonGroup> overlayButtons = new List<OverlayButtonGroup>();
+	private List<OverlayPanelGroup> overlayPanels;
+	private List<OverlayButtonGroup> overlayButtons;
 
 	void Start()
 	{
-		GenerateTestPanel();
+		CreateConfirmCancelPanel("here are two choices", () => { DestroyMessage(); Debug.Log("Confirm"); }, () => { DestroyMessage(); Debug.Log("Cancel"); });
 	}
 
-	public void InitializeMessage(string header = "", List<OverlayPanelSettings> panels = null, List<OverlayButtonSettings> buttons = null)
+	public void InitializeMessage(List<OverlayPanelSettings> panels = null, List<OverlayButtonSettings> buttons = null, string header = "")
 	{
 		basePanelGroup.gameObject.SetActive(false);
 		baseButtonGroup.gameObject.SetActive(false);
 
 		headerText.text = header;
+
+		overlayPanels = new();
+		overlayButtons = new();
 
 		foreach (OverlayPanelSettings panel in panels)
 		{
@@ -42,6 +45,18 @@ public class OverlayMessage : MonoBehaviour
 			newButton.Initialize(button);
 			overlayButtons.Add(newButton);
 		}
+	}
+
+	public void CreateConfirmCancelPanel(string message, UnityAction confirmAction, UnityAction cancelAction)
+	{
+		OverlayPanelSettings panel = new OverlayPanelSettings() { Message = message };
+		List<OverlayPanelSettings> panelGroups = new List<OverlayPanelSettings>() { panel };
+
+		OverlayButtonSettings confirmButton = new OverlayButtonSettings() { ButtonLabel = "Confirm", ButtonCallback = confirmAction, ButtonColor = Color.green };
+		OverlayButtonSettings cancelButton = new OverlayButtonSettings() { ButtonLabel = "Cancel", ButtonCallback = cancelAction, ButtonColor = Color.red };
+		List<OverlayButtonSettings> buttonGroups = new List<OverlayButtonSettings>() { confirmButton, cancelButton };
+
+		InitializeMessage(panelGroups, buttonGroups);
 	}
 
 	private void GenerateTestPanel()
@@ -62,7 +77,7 @@ public class OverlayMessage : MonoBehaviour
 			buttonGroups.Add(new OverlayButtonSettings(){ ButtonCallback = buttonCallback , ButtonLabel = label });
 		}
 
-		InitializeMessage("test", panelGroups, buttonGroups);
+		InitializeMessage(panelGroups, buttonGroups, "test");
 	}
 
 	private void DestroyMessage()
@@ -82,4 +97,5 @@ public struct OverlayButtonSettings
 {
 	public string ButtonLabel;
 	public UnityAction ButtonCallback;
+	public Color ButtonColor;
 }

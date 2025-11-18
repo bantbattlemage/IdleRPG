@@ -16,6 +16,7 @@ public class GameMaster : Singleton<GameMaster>
 			DataPersistenceManager.Instance.LoadGame();
 		}
 
+		player.InitializePlayer();
 		player.BeginGame();
 	}
 }

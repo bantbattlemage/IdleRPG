@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d3721aafd79ace94ea6a727ceeb82299, type: 3}
   m_Name: 3x3
   m_EditorClassIdentifier: Assembly-CSharp::ReelDefinition
-  reelSpinDuration: 1
+  reelSpinDuration: 0.5
   symbolCount: 3
-  symbolSize: 150
+  symbolSize: 170
   symbolSpacing: 15

@@ -6,7 +6,6 @@ using DG.Tweening;
 
 public class SlotsEngine : MonoBehaviour
 {
-	[SerializeField] private Canvas gameCanvas;
 	[SerializeField] private GameObject reelPrefab;
 	[SerializeField] private SlotsDefinition slotsDefinition;
 	public SlotsDefinition SlotsDefinition => slotsDefinition;
@@ -27,7 +26,7 @@ public class SlotsEngine : MonoBehaviour
 		stateMachine.SetState(state);
 	}
 
-	public void InitializeSlotsEngine()
+	public void InitializeSlotsEngine(Transform canvasTransform)
 	{
 		eventManager = new EventManager();
 		stateMachine = new StateMachine();
@@ -39,8 +38,11 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.RegisterEvent("PresentationEnter", OnPresentationEnter);
 		eventManager.RegisterEvent("PresentationComplete", OnPresentationComplete);
 
-		SpawnReels();
+		SpawnReels(canvasTransform);
+	}
 
+	public void BeginSlots()
+	{
 		stateMachine.BeginStateMachine();
 	}
 
@@ -114,7 +116,7 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.BroadcastEvent("StoppingReels");
 	}
 
-	private void SpawnReels()
+	private void SpawnReels(Transform gameCanvas)
 	{
 		Transform reelsGroup = new GameObject("ReelsGroup").transform;
 		reelsGroup.parent = gameCanvas.transform;

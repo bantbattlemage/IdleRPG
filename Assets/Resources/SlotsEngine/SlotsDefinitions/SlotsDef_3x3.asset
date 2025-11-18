@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dcdccfe3193ee7e4284cb42f01a9f193, type: 3}
+  m_Name: SlotsDef_3x3
+  m_EditorClassIdentifier: Assembly-CSharp::SlotsDefinition
+  reelDefinitions:
+  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
+  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
+  - {fileID: 11400000, guid: f0a12ee7b618b154d8ee4df129812c57, type: 2}
+  winlineDefinitions:
+  - {fileID: 11400000, guid: e566fff81f313b0488d84530071f28d7, type: 2}
+  - {fileID: 11400000, guid: d41bb1a7c5e9f7d4bbacadf6bf79a339, type: 2}
+  - {fileID: 11400000, guid: be50c54153a0a6e47b08f4644923b649, type: 2}
+  - {fileID: 11400000, guid: 27ec6d50001685e44b7d80164aba96e2, type: 2}
+  - {fileID: 11400000, guid: 0644ea3428a0dfe4a9753a9e868aa970, type: 2}
+  - {fileID: 11400000, guid: 5de2ba19ca0a36842983f4c72faf0063, type: 2}
+  - {fileID: 11400000, guid: 23b096fc17c052048bffc6615c5b9926, type: 2}
+  betLevelDefinitions:
+  - {fileID: 11400000, guid: 96bf0fc9e9c987b4ba91c2ebace1020d, type: 2}
+  - {fileID: 11400000, guid: fafe5611c7f04494caa24ba0e909b721, type: 2}
+  - {fileID: 11400000, guid: 7478cfc5d2311ce4ca22a9b4cd374c2b, type: 2}
+  - {fileID: 11400000, guid: 45d953bc559c52a4c8353ab303571a49, type: 2}
