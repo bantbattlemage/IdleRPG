@@ -119,7 +119,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void SpawnSlots(SlotsData existingData = null, bool beginSlots = false)
 	{
-		SlotsEngine newSlots = SlotsEngineController.Instance.CreateSlots(existingData);
+		SlotsEngine newSlots = SlotsEngineManager.Instance.CreateSlots(existingData);
 
 		if (beginSlots)
 		{
@@ -133,7 +133,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		playerSlots.Add(newSlots);
 
-		SlotsEngineController.Instance.AdjustSlotsCanvases();
+		SlotsEngineManager.Instance.AdjustSlotsCanvases();
 	}
 
 	private void RemoveSlots(SlotsEngine slotsToRemove)
@@ -145,7 +145,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
 		playerSlots.Remove(slotsToRemove);
-		SlotsEngineController.Instance.DestroySlots(slotsToRemove);
+		SlotsEngineManager.Instance.DestroySlots(slotsToRemove);
 	}
 
 	public bool RequestSpinPurchase()

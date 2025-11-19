@@ -5,7 +5,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class SlotsEngineController : Singleton<SlotsEngineController>
+public class SlotsEngineManager : Singleton<SlotsEngineManager>
 {
 	[SerializeField] private Transform slotsPagesRoot;
 	[SerializeField] private GameObject slotsPagePrefab;
@@ -27,8 +27,7 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 	{
 		nextPageButton.onClick.AddListener(OnNextPageButtonPressed);
 		prevPageButton.onClick.AddListener(OnPrevPageButtonPressed);
-		//GlobalEventManager.Instance.RegisterEvent("SlotsPageButtonPressed", OnSlotsPageButtonPressed);
-
+		
 		nextPageButton.gameObject.SetActive(false);
 		prevPageButton.gameObject.SetActive(false);
 	}
@@ -46,9 +45,6 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 	private void OnSlotsPageButtonPressed(object obj)
 	{
 		int adjust = (int)obj;
-
-		Debug.Log($"Pressed {adjust}");
-
 		currentSlotPageIndex += adjust;
 
 		currentSlotsDisplayPage.transform.SetAsLastSibling();
