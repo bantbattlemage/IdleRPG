@@ -2,7 +2,6 @@ using DG.Tweening;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class GameReel : MonoBehaviour
 {
@@ -92,6 +91,8 @@ public class GameReel : MonoBehaviour
 		topDummySymbols.Clear();
 		bottomDummySymbols.Clear();
 
+		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+
 		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
 			GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot);
@@ -109,8 +110,8 @@ public class GameReel : MonoBehaviour
 
 			sym.InitializeSymbol(newSymbol, eventManager);
 
-			sym.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
-			sym.transform.localPosition = new Vector3(0, (currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i, 0);
+			// Use cached component helper to avoid GetComponent each spin
+			sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 
 			symbols.Add(sym);
 		}
@@ -161,6 +162,8 @@ public class GameReel : MonoBehaviour
 		ReleaseAllSymbolsInRoot(nextSymbolsRoot);
 
 		List<GameSymbol> newSymbols = new List<GameSymbol>();
+		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+
 		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
 			GameSymbol symbol = GameSymbolPool.Instance.Get(nextSymbolsRoot);
@@ -177,8 +180,9 @@ public class GameReel : MonoBehaviour
 			}
 
 			symbol.InitializeSymbol(def, eventManager);
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i), 0);
+
+			// Use cached setter to avoid GetComponent allocations
+			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 
 			newSymbols.Add(symbol);
 		}
@@ -197,13 +201,12 @@ public class GameReel : MonoBehaviour
 
 		int startIndex = !bottom ? currentReelData.SymbolCount : 1;
 		int flip = bottom ? -1 : 1;
-		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount;
-		string name = bottom ? "bot" : "top";
+		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount;		
+		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
 
 		for (int i = 0; i < total; i++)
 		{
 			GameSymbol symbol = GameSymbolPool.Instance.Get(root);
-			symbol.name = name;
 
 			SymbolData def;
 			if (symbolData != null)
@@ -216,8 +219,11 @@ public class GameReel : MonoBehaviour
 			}
 
 			symbol.InitializeSymbol(def, eventManager);
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * (i + startIndex)) * flip, 0);
+
+			// Use helper to set size and Y in one call
+			float y = (step * (i + startIndex)) * flip;
+			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, y);
+
 			dummies.Add(symbol);
 		}
 
@@ -313,6 +319,7 @@ public class GameReel : MonoBehaviour
 
 			for (int i = 0; i < symbols.Count; i++)
 			{
+				// batch-friendly: broadcast reel-level event instead of per-symbol if desired later
 				eventManager.BroadcastEvent("SymbolLanded", symbols[i]);
 			}
 
@@ -322,14 +329,18 @@ public class GameReel : MonoBehaviour
 
 	public void DimDummySymbols()
 	{
+		Color dim = new Color(0.5f, 0.5f, 0.5f);
+
 		foreach (GameSymbol g in topDummySymbols)
 		{
-			g.GetComponent<Image>().DOColor(new Color(0.5f, 0.5f, 0.5f), 0.1f);
+			var img = g.CachedImage;
+			if (img != null) img.DOColor(dim, 0.1f);
 		}
 
 		foreach (GameSymbol g in bottomDummySymbols)
 		{
-			g.GetComponent<Image>().DOColor(new Color(0.5f, 0.5f, 0.5f), 0.1f);
+			var img = g.CachedImage;
+			if (img != null) img.DOColor(dim, 0.1f);
 		}
 	}
 
@@ -337,14 +348,16 @@ public class GameReel : MonoBehaviour
 	{
 		foreach (GameSymbol g in topDummySymbols)
 		{
-			var image = g.GetComponent<Image>();
+			var image = g.CachedImage;
+			if (image == null) continue;
 			image.DOKill();
 			image.color = Color.white;
 		}
 
 		foreach (GameSymbol g in bottomDummySymbols)
 		{
-			var image = g.GetComponent<Image>();
+			var image = g.CachedImage;
+			if (image == null) continue;
 			image.DOKill();
 			image.color = Color.white;
 		}
@@ -357,19 +370,128 @@ public class GameReel : MonoBehaviour
 	{
 		if (root == null) return;
 
-		var children = new List<GameSymbol>(root.childCount);
-		foreach (Transform child in root)
+		// Release children until none remain — avoids allocating collections each spin.
+		// We always take child at index 0 because Release() will reparent the child under the pool root,
+		// which reduces root.childCount and lets us loop without extra allocations.
+		while (root.childCount > 0)
 		{
-			if (child == null) continue;
-			var gs = child.GetComponent<GameSymbol>();
-			if (gs != null) children.Add(gs);
+			var child = root.GetChild(0);
+			if (child == null)
+			{
+				// Shouldn't happen but guard anyway
+				continue;
+			}
+
+			if (child.TryGetComponent<GameSymbol>(out var symbol))
+			{
+				GameSymbolPool.Instance.Release(symbol);
+			}
+			else
+			{
+				// Fallback: if a non-symbol slipped in, destroy it (rare)
+				GameObject.Destroy(child.gameObject);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Adjust symbol sizes and positions in-place to match a new symbol size/spacing.
+	/// This updates children under both persistent roots and the next buffer offset without
+	/// destroying or recreating any objects.
+	/// </summary>
+	public void UpdateSymbolLayout(float newSymbolSize, float newSpacing)
+	{
+		if (currentReelData == null) return;
+
+		// Read old values from data model (these reflect the layout currently applied).
+		float oldSymbolSize = currentReelData.SymbolSize;
+		float oldSpacing = currentReelData.SymbolSpacing;
+		float oldStep = oldSymbolSize + oldSpacing;
+		if (oldStep <= 0f) oldStep = 1f; // guard
+
+		float newStep = newSymbolSize + newSpacing;
+		float ratio = newStep / oldStep;
+
+		// Update the data model with new values
+		currentReelData.SetSymbolSize(newSymbolSize, newSpacing);
+
+		// Helper to update all GameSymbol children under a root: scale position by ratio and set sizeDelta.
+		void UpdateRootChildren(Transform root)
+		{
+			if (root == null) return;
+
+			for (int ci = 0; ci < root.childCount; ci++)
+			{
+				Transform child = root.GetChild(ci);
+				if (child == null) continue;
+
+				if (child.TryGetComponent<GameSymbol>(out var gs))
+				{
+					var rt = gs.CachedRect;
+					if (rt != null)
+					{
+						// scale Y position relative to previous spacing/size to preserve ordering & signs
+						Vector3 lp = rt.localPosition;
+						lp.y = lp.y * ratio;
+						rt.localPosition = lp;
+
+						rt.sizeDelta = new Vector2(newSymbolSize, newSymbolSize);
+					}
+				}
+			}
 		}
 
-		// Release collected symbols back to the pool.
-		foreach (var s in children)
+		// Update both active and buffer roots
+		UpdateRootChildren(symbolRoot);
+		UpdateRootChildren(nextSymbolsRoot);
+
+		// Recompute buffer offset for nextSymbolsRoot so future spawns are positioned correctly.
+		if (nextSymbolsRoot != null)
 		{
-			// When releasing, the pool will set inactive and reparent under the pool root.
-			GameSymbolPool.Instance.Release(s);
+			float offsetY = ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount - 1) * 3));
+			nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+		}
+
+		// Update tracked symbol lists' transforms as well (they reference the same GameSymbol objects, but tweak just in case)
+		float newStepLocal = newSymbolSize + newSpacing;
+		for (int i = 0; i < symbols.Count; i++)
+		{
+			var gs = symbols[i];
+			if (gs == null) continue;
+			var rt = gs.CachedRect;
+			if (rt != null)
+			{
+				rt.sizeDelta = new Vector2(newSymbolSize, newSymbolSize);
+				rt.localPosition = new Vector3(rt.localPosition.x, newStepLocal * i, 0f);
+			}
+		}
+
+		for (int i = 0; i < bottomDummySymbols.Count; i++)
+		{
+			var gs = bottomDummySymbols[i];
+			if (gs == null) continue;
+			var rt = gs.CachedRect;
+			if (rt != null)
+			{
+				rt.sizeDelta = new Vector2(newSymbolSize, newSymbolSize);
+				// bottom dummies start at index 1 and flip -1
+				float y = (newStepLocal * (i + 1)) * -1f;
+				rt.localPosition = new Vector3(rt.localPosition.x, y, 0f);
+			}
+		}
+
+		for (int i = 0; i < topDummySymbols.Count; i++)
+		{
+			var gs = topDummySymbols[i];
+			if (gs == null) continue;
+			var rt = gs.CachedRect;
+			if (rt != null)
+			{
+				rt.sizeDelta = new Vector2(newSymbolSize, newSymbolSize);
+				// top dummies start at index SymbolCount and flip +1
+				float y = (newStepLocal * (i + currentReelData.SymbolCount)) * 1f;
+				rt.localPosition = new Vector3(rt.localPosition.x, y, 0f);
+			}
 		}
 	}
 }

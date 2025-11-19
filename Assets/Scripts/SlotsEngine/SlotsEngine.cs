@@ -6,7 +6,7 @@ using UnityEngine;
 public class SlotsEngine : MonoBehaviour
 {
 	[SerializeField] private GameObject reelPrefab;
-	
+
 	private SlotsData currentSlotsData;
 	public SlotsData CurrentSlotsData => currentSlotsData;
 
@@ -62,11 +62,11 @@ public class SlotsEngine : MonoBehaviour
 
 		SpawnReels(reelsRootTransform);
 
-		foreach(GameReel r in reels)
+		foreach (GameReel r in reels)
 		{
 			int count;
 
-			if(r.CurrentReelData != null)
+			if (r.CurrentReelData != null)
 			{
 				count = r.CurrentReelData.SymbolCount * 4;
 			}
@@ -170,7 +170,7 @@ public class SlotsEngine : MonoBehaviour
 			GameObject g = Instantiate(reelPrefab, reelsGroup.transform);
 			GameReel reel = g.GetComponent<GameReel>();
 
-			if(data.CurrentReelStrip != null)
+			if (data.CurrentReelStrip != null)
 			{
 				reel.InitializeReel(data, i, eventManager, data.CurrentReelStrip);
 			}
@@ -201,28 +201,80 @@ public class SlotsEngine : MonoBehaviour
 
 	public void AdjustReelSize(float totalHeight)
 	{
+		// Do not allow layout changes while reels are actively spinning
 		if (stateMachine.CurrentState == State.Spinning)
 		{
 			throw new Exception("should not adjust reels while they are spinning!");
 		}
 
-		foreach (GameReel r in reels)
+		// If reels haven't been created yet - create them using the usual path.
+		if (reels == null || reels.Count == 0)
 		{
-			Destroy(r.gameObject);
+			int maxSymbolsPre = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+			float availableHeightPre = (totalHeight / maxSymbolsPre) * 0.8f;
+			float spacingPre = (availableHeightPre / maxSymbolsPre) * 0.25f;
+
+			foreach (ReelData r in currentSlotsData.CurrentReelData)
+			{
+				r.SetSymbolSize(availableHeightPre, spacingPre);
+			}
+
+			SpawnReels(reelsRootTransform);
+			return;
 		}
 
-		reels = new List<GameReel>();
-
+		// Compute desired sizes
 		int maxSymbols = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
 		float availableHeight = (totalHeight / maxSymbols) * 0.8f;
 		float spacing = (availableHeight / maxSymbols) * 0.25f;
 
+		// Quick exit: if the first reel data already matches desired sizes, assume no change needed.
+		// (This avoids expensive per-symbol work if AdjustReelSize is called frequently.)
+		ReelData firstDef = currentSlotsData.CurrentReelData[0];
+		bool sizeMatches = Mathf.Approximately(firstDef.SymbolSize, availableHeight) && Mathf.Approximately(firstDef.SymbolSpacing, spacing);
+		bool reelsCountMatches = reels.Count == currentSlotsData.CurrentReelData.Count;
+		if (sizeMatches && reelsCountMatches)
+		{
+			return;
+		}
+
+		// Apply new symbol size values to the data model
 		foreach (ReelData r in currentSlotsData.CurrentReelData)
 		{
 			r.SetSymbolSize(availableHeight, spacing);
 		}
 
-		SpawnReels(reelsRootTransform);
+		// Adjust existing reel GameObjects and their symbols in-place (no Destroy/Instantiate)
+		for (int i = 0; i < reels.Count; i++)
+		{
+			var reel = reels[i];
+			if (reel == null) continue;
+
+			// Update the reel's internal layout (resizes symbols, repositions children and buffer offset)
+			reel.UpdateSymbolLayout(availableHeight, spacing);
+
+			// Reposition the reel X based on new symbol size + spacing
+			float x = (spacing + availableHeight) * i;
+			reel.transform.localPosition = new Vector3(x, 0f, 0f);
+		}
+
+		// Recompute group offsets and set currentReelsGroup position like SpawnReels did
+		ReelData reelDefinition = currentSlotsData.CurrentReelData[0];
+
+		int count = reels.Count;
+		float totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * reelDefinition.SymbolSpacing);
+		float offset = totalWidth / 2f;
+		float xPos = (-offset + (reelDefinition.SymbolSize / 2f));
+
+		count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * reelDefinition.SymbolSpacing);
+		offset = totalWidth / 2f;
+		float yPos = (-offset + (reelDefinition.SymbolSize / 2f));
+
+		if (currentReelsGroup != null)
+		{
+			currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
+		}
 	}
 
 	void OnReelCompleted(object obj)
@@ -260,7 +312,7 @@ public class SlotsEngine : MonoBehaviour
 		foreach (GameReel gameReel in reels)
 		{
 			var newList = new GameSymbol[gameReel.Symbols.Count];
-			for(int i = 0; i < gameReel.Symbols.Count; i++)
+			for (int i = 0; i < gameReel.Symbols.Count; i++)
 			{
 				newList[i] = gameReel.Symbols[i];
 			}

@@ -13,10 +13,12 @@ public class GameSymbol : MonoBehaviour
 	private EventManager eventManager;
 
 	private Image cachedImage;
+	private RectTransform cachedRect;
 
 	private void Awake()
 	{
 		cachedImage = GetComponent<Image>();
+		cachedRect = GetComponent<RectTransform>();
 	}
 
 	public void InitializeSymbol(SymbolData symbol, EventManager slotsEventManager)
@@ -103,5 +105,36 @@ public class GameSymbol : MonoBehaviour
 	{
 		UnregisterFromEventManager();
 		StopAndClearTweens();
+	}
+
+	// --- Performance helpers added ---
+	// Expose cached components for callers that need direct access (avoids GetComponent calls).
+	public Image CachedImage
+	{
+		get
+		{
+			if (cachedImage == null) cachedImage = GetComponent<Image>();
+			return cachedImage;
+		}
+	}
+
+	public RectTransform CachedRect
+	{
+		get
+		{
+			if (cachedRect == null) cachedRect = GetComponent<RectTransform>();
+			return cachedRect;
+		}
+	}
+
+	// Set size (sizeDelta) and Y local position in a single call to avoid multiple GetComponent/struct ops.
+	public void SetSizeAndLocalY(float size, float localY)
+	{
+		var rt = CachedRect;
+		if (rt == null) return;
+		rt.sizeDelta = new Vector2(size, size);
+		var lp = rt.localPosition;
+		lp.y = localY;
+		rt.localPosition = lp;
 	}
 }
