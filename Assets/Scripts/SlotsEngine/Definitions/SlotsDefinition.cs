@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class SlotsDefinition : BaseDefinition<SlotsData>
@@ -13,6 +15,6 @@ public class SlotsDefinition : BaseDefinition<SlotsData>
 
 	public override SlotsData CreateInstance()
 	{
-		throw new System.NotImplementedException();
+		return new SlotsData(0, winlineDefinitions.ToList(), betLevelDefinitions.ToList());
 	}
 }

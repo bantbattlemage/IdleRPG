@@ -1,6 +1,5 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/SymbolDefinition")]
 public class SymbolDefinition : BaseDefinition<SymbolData>
 {
 	[SerializeField] private new string name;
@@ -27,6 +26,6 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 
 	public override SymbolData CreateInstance()
 	{
-		throw new System.NotImplementedException();
+		return new SymbolData(name, sprite, baseValueMultiplier, weight);
 	}
 }

@@ -12,6 +12,8 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 	[SerializeField] private GameObject slotsEnginePrefab;
 	[SerializeField] private GameObject reelsGroupPrefab;
 
+	[SerializeField] private SlotsDefinition testDefinition;
+
 	private List<SlotsEngine> slotsEngines = new();
 
 	public SlotsEngine CreateSlots(bool useGrid = false)
@@ -24,7 +26,7 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 
 		SlotsEngine newSlots = Instantiate(slotsEnginePrefab, transform).GetComponent<SlotsEngine>();
 		GameObject newReelsGroup = Instantiate(reelsGroupPrefab, targetTransform);
-		newSlots.InitializeSlotsEngine(newReelsGroup.transform);
+		newSlots.InitializeSlotsEngine(newReelsGroup.transform, testDefinition);
 
 		slotsEngines.Add(newSlots);
 

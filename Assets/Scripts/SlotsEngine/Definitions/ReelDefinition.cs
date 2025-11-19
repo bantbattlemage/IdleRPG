@@ -15,6 +15,6 @@ public class ReelDefinition : BaseDefinition<ReelData>
 
 	public override ReelData CreateInstance()
 	{
-		throw new System.NotImplementedException();
+		return new ReelData(reelSpinDuration, symbolCount, symbolSize, symbolSpacing, defaultReelStrip, this);
 	}
 }

@@ -155,10 +155,10 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetDownPressed(object obj)
 	{
-		var betLevels = primarySlots.SlotsDefinition.BetLevelDefinitions;
+		var betLevels = primarySlots.CurrentSlotsData.BetLevelDefinitions;
 
 		int targetLevel = -1;
-		for (int i = 0; i < betLevels.Length; i++)
+		for (int i = 0; i < betLevels.Count; i++)
 		{
 			if (CurrentBet == betLevels[i] && i - 1 >= 0)
 			{
@@ -177,12 +177,12 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetUpPressed(object obj)
 	{
-		var betLevels = primarySlots.SlotsDefinition.BetLevelDefinitions;
+		var betLevels = primarySlots.CurrentSlotsData.BetLevelDefinitions;
 
 		int targetLevel = -1;
-		for (int i = 0; i < betLevels.Length; i++)
+		for (int i = 0; i < betLevels.Count; i++)
 		{
-			if (CurrentBet == betLevels[i] && i + 1 < betLevels.Length)
+			if (CurrentBet == betLevels[i] && i + 1 < betLevels.Count)
 			{
 				targetLevel = i + 1;
 				break;

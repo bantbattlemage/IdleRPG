@@ -6,11 +6,11 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 	private List<WinData> currentSpinWinData;
 	public List<WinData> CurrentSpinWinData => currentSpinWinData;
 
-	public List<WinData> EvaluateWins(SymbolDefinition[] grid, WinlineDefinition[] winlines)
+	public List<WinData> EvaluateWins(SymbolData[] grid, List<WinlineDefinition> winlines)
 	{
 		List<WinData> winData = new List<WinData>();
 
-		for(int i = 0; i < winlines.Length; i++)
+		for(int i = 0; i < winlines.Count; i++)
 		{
 			WinlineDefinition winline = winlines[i];
 

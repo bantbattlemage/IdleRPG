@@ -7,9 +7,12 @@ using UnityEngine.UI;
 public class GameReel : MonoBehaviour
 {
 	[SerializeField] private GameObject SymbolPrefab;
-	[SerializeField] private ReelStripDefinition Strip;
 
-	public ReelDefinition Definition => definition;
+	private ReelData currentReelData;
+	public ReelData CurrentReelData => currentReelData;
+
+	private ReelStripData reelStrip;
+	public ReelStripData ReelStrip => reelStrip;
 
 	public int ID => id;
 	private int id;
@@ -19,7 +22,7 @@ public class GameReel : MonoBehaviour
 
 	public List<GameSymbol> Symbols => symbols;
 
-	private ReelDefinition definition;
+
 	private Transform symbolRoot;
 	private Transform nextSymbolsRoot;
 
@@ -33,18 +36,19 @@ public class GameReel : MonoBehaviour
 
 	private EventManager eventManager;
 
-	public void InitializeReel(ReelDefinition reelDefinition, int reelID, EventManager slotsEventManager)
+	public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition)
 	{
-		definition = reelDefinition;
+		currentReelData = data;
 		id = reelID;
 		eventManager = slotsEventManager;
+		reelStrip = stripDefinition.CreateInstance();
 
 		SpawnReel();
 	}
 
-	public SymbolDefinition GetRandomSymbolFromStrip()
+	public SymbolData GetRandomSymbolFromStrip()
 	{
-		return Strip.GetWeightedSymbol();
+		return reelStrip.GetWeightedSymbol();
 	}
 
 	private void SpawnReel()
@@ -53,14 +57,14 @@ public class GameReel : MonoBehaviour
 		symbolRoot.parent = transform;
 		symbolRoot.localScale = new Vector3(1, 1, 1);
 
-		for (int i = 0; i < definition.SymbolCount; i++)
+		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
 			GameObject symbol = Instantiate(SymbolPrefab, symbolRoot);
 			GameSymbol sym = symbol.GetComponent<GameSymbol>();
-			sym.InitializeSymbol(Strip.GetWeightedSymbol(), eventManager);
+			sym.InitializeSymbol(GetRandomSymbolFromStrip(), eventManager);
 
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, (definition.SymbolSpacing + definition.SymbolSize) * i, 0);
+			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
+			symbol.transform.localPosition = new Vector3(0, (currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i, 0);
 
 			symbols.Add(sym);
 		}
@@ -69,7 +73,7 @@ public class GameReel : MonoBehaviour
 		SpawnDummySymbols(symbolRoot, false);
 	}
 
-	public void BeginSpin(List<SymbolDefinition> solution = null, float startDelay = 0f)
+	public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
 	{
 		completeOnNextSpin = false;
 		
@@ -101,20 +105,19 @@ public class GameReel : MonoBehaviour
 
 	}
 
-	private void SpawnNextReel(List<SymbolDefinition> solution = null)
+	private void SpawnNextReel(List<SymbolData> solution = null)
 	{
 		Transform nextReel = new GameObject("Next").transform;
 		nextReel.parent = transform;
 		nextReel.localScale = new Vector3(1, 1, 1);
-		nextReel.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * ((definition.SymbolCount-1) * 3)), 0);
+		nextReel.transform.localPosition = new Vector3(0, ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount-1) * 3)), 0);
 
 		List<GameSymbol> newSymbols = new List<GameSymbol>();
-		for (int i = 0; i < definition.SymbolCount; i++)
+		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
-			GameObject symbol = Instantiate(SymbolPrefab, nextReel);
-			GameSymbol sym = symbol.GetComponent<GameSymbol>();
+			GameSymbol symbol = Instantiate(SymbolPrefab, nextReel).GetComponent<GameSymbol>();
 
-			SymbolDefinition def;
+			SymbolData def;
 
 			if (solution != null)
 			{
@@ -122,15 +125,14 @@ public class GameReel : MonoBehaviour
 			}
 			else
 			{
-				def = symbols[i].Definition;
+				def = reelStrip.GetWeightedSymbol();
 			}
 
-			sym.InitializeSymbol(def, eventManager);
+			symbol.InitializeSymbol(def, eventManager);
+			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
+			symbol.transform.localPosition = new Vector3(0, ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i), 0);
 
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * i), 0);
-
-			newSymbols.Add(sym);
+			newSymbols.Add(symbol);
 		}
 
 		symbols = newSymbols;
@@ -141,37 +143,34 @@ public class GameReel : MonoBehaviour
 		nextSymbolsRoot = nextReel;
 	}
 
-	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolDefinition> definitions = null)
+	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
 
-		int startIndex = !bottom ? definition.SymbolCount : 1;
+		int startIndex = !bottom ? currentReelData.SymbolCount : 1;
 		int flip = bottom ? -1 : 1;
-		int total = bottom ? definition.SymbolCount - 1 : definition.SymbolCount;
+		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount;
 		string name = bottom ? "bot" : "top";
 
 		for (int i = 0; i < total; i++)
 		{
-			GameObject symbol = Instantiate(SymbolPrefab, root);
+			GameSymbol symbol = Instantiate(SymbolPrefab, root).GetComponent<GameSymbol>();
 			symbol.name = name;
 
-			GameSymbol sym = symbol.GetComponent<GameSymbol>();
-
-			SymbolDefinition def;
-			if (definitions != null)
+			SymbolData def;
+			if (symbolData != null)
 			{
-				def = definitions[i];
+				def = symbolData[i];
 			}
 			else
 			{
-				def = Strip.GetWeightedSymbol();
+				def = reelStrip.GetWeightedSymbol();
 			}
-			sym.InitializeSymbol(def, eventManager);
 
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(definition.SymbolSize, definition.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, ((definition.SymbolSpacing + definition.SymbolSize) * (i + startIndex)) * flip, 0);
-
-			dummies.Add(sym);
+			symbol.InitializeSymbol(def, eventManager);
+			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
+			symbol.transform.localPosition = new Vector3(0, ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * (i + startIndex)) * flip, 0);
+			dummies.Add(symbol);
 		}
 
 		if (bottom)
@@ -186,7 +185,7 @@ public class GameReel : MonoBehaviour
 
 	private bool sequenceA = false;
 	private bool sequenceB = false;
-	public void FallOut(List<SymbolDefinition> solution = null, bool kickback = false)
+	public void FallOut(List<SymbolData> solution = null, bool kickback = false)
 	{
 		ResetDimmedSymbols();
 		SpawnNextReel(solution);
@@ -195,7 +194,7 @@ public class GameReel : MonoBehaviour
 		sequenceB = false;
 
 		float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
-		float duration = definition.ReelSpinDuration;
+		float duration = currentReelData.ReelSpinDuration;
 
 		activeSpinTweens[0] = symbolRoot.transform.DOLocalMoveY(fallDistance, duration).OnComplete(() =>
 		{
@@ -214,7 +213,7 @@ public class GameReel : MonoBehaviour
 		}).SetEase(Ease.Linear);
 	}
 
-	private void CheckBeginLandingBounce(List<SymbolDefinition> solution)
+	private void CheckBeginLandingBounce(List<SymbolData> solution)
 	{
 		if (sequenceA && sequenceB)
 		{
@@ -249,7 +248,7 @@ public class GameReel : MonoBehaviour
 		//symbolRoot.DOEdgeBounceLinear(Vector3.up, 1000f, 0.5f).SetEase(Ease.Linear).OnComplete(() => { if (onComplete != null) onComplete(); });
 	}
 
-	private void CompleteReelSpin(List<SymbolDefinition> solution)
+	private void CompleteReelSpin(List<SymbolData> solution)
 	{
 		Destroy(symbolRoot.gameObject);
 		symbolRoot = nextSymbolsRoot;

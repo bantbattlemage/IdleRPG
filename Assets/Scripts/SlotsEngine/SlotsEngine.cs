@@ -7,8 +7,9 @@ using DG.Tweening;
 public class SlotsEngine : MonoBehaviour
 {
 	[SerializeField] private GameObject reelPrefab;
-	[SerializeField] private SlotsDefinition slotsDefinition;
-	public SlotsDefinition SlotsDefinition => slotsDefinition;
+	
+	private SlotsData currentSlotsData;
+	public SlotsData CurrentSlotsData => currentSlotsData;
 
 	private Transform reelsRootTransform;
 	public Transform ReelsRootTransform => reelsRootTransform;
@@ -29,8 +30,16 @@ public class SlotsEngine : MonoBehaviour
 		stateMachine.SetState(state);
 	}
 
-	public void InitializeSlotsEngine(Transform canvasTransform)
+	public void InitializeSlotsEngine(Transform canvasTransform, SlotsDefinition definition)
 	{
+		currentSlotsData = definition.CreateInstance();
+
+		for (int i = 0; i < definition.ReelDefinitions.Length; i++)
+		{
+			ReelData newData = definition.ReelDefinitions[i].CreateInstance();
+			currentSlotsData.AddNewReel(newData);
+		}
+
 		eventManager = new EventManager();
 		stateMachine = new SlotsStateMachine();
 		stateMachine.InitializeStateMachine(this, eventManager);
@@ -42,6 +51,7 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.RegisterEvent("PresentationComplete", OnPresentationComplete);
 
 		reelsRootTransform = canvasTransform;
+
 		SpawnReels(canvasTransform);
 	}
 
@@ -82,8 +92,8 @@ public class SlotsEngine : MonoBehaviour
 
 		for (int i = 0; i < reels.Count; i++)
 		{
-			List<SymbolDefinition> testSolution = new List<SymbolDefinition>();
-			for (int k = 0; k < reels[i].Definition.SymbolCount; k++)
+			List<SymbolData> testSolution = new List<SymbolData>();
+			for (int k = 0; k < reels[i].CurrentReelData.SymbolCount; k++)
 			{
 				testSolution.Add(reels[i].GetRandomSymbolFromStrip());
 			}
@@ -125,24 +135,24 @@ public class SlotsEngine : MonoBehaviour
 		reelsGroup.parent = gameCanvas.transform;
 		reelsGroup.localScale = new Vector3(1, 1, 1);
 
-		for (int i = 0; i < slotsDefinition.ReelDefinitions.Length; i++)
+		for (int i = 0; i < currentSlotsData.CurrentReelData.Count; i++)
 		{
-			ReelDefinition reelDef = slotsDefinition.ReelDefinitions[i];
+			ReelData data = currentSlotsData.CurrentReelData[i];
 			GameObject g = Instantiate(reelPrefab, reelsGroup.transform);
 			GameReel reel = g.GetComponent<GameReel>();
-			reel.InitializeReel(reelDef, i, eventManager);
-			g.transform.localPosition = new Vector3((reelDef.SymbolSpacing + reelDef.SymbolSize) * i, 0, 0);
+			reel.InitializeReel(data, i, eventManager, data.DefaultReelStrip);
+			g.transform.localPosition = new Vector3((data.SymbolSpacing + data.SymbolSize) * i, 0, 0);
 			reels.Add(reel);
 		}
 
-		ReelDefinition reelDefinition = slotsDefinition.ReelDefinitions[0];
+		ReelData reelDefinition = currentSlotsData.CurrentReelData[0];
 
 		int count = reels.Count;
 		float totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * reelDefinition.SymbolSpacing);
 		float offset = totalWidth / 2f;
 		float xPos = (-offset + (reelDefinition.SymbolSize / 2f));
 
-		count = slotsDefinition.ReelDefinitions.Max(x => x.SymbolCount);
+		count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
 		totalWidth = (count * (reelDefinition.SymbolSize)) + ((count - 1) * reelDefinition.SymbolSpacing);
 		offset = totalWidth / 2f;
 		float yPos = (-offset + (reelDefinition.SymbolSize / 2f));

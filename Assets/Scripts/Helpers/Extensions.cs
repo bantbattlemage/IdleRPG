@@ -9,17 +9,17 @@ public static class Extensions
 		return list.ElementAt(randomIndex);
 	}
 
-	public static SymbolDefinition[] ToSymbolDefinitions(this GameSymbol[] symbols)
+	public static SymbolData[] ToSymbolDatas(this GameSymbol[] symbols)
 	{
-		List<SymbolDefinition> definitions = new List<SymbolDefinition>();
+		List<SymbolData> symbolData = new List<SymbolData>();
 
 		foreach (GameSymbol s in symbols)
 		{
 			if(s == null) continue;
 
-			definitions.Add(s.Definition);
+			symbolData.Add(s.CurrentSymbolData);
 		}
 
-		return definitions.ToArray();
+		return symbolData.ToArray();
 	}
 }

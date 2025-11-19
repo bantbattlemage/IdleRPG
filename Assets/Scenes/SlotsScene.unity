@@ -6263,6 +6263,7 @@ MonoBehaviour:
   slotsGridCanvasGroup: {fileID: 1028428337}
   slotsEnginePrefab: {fileID: 9160518992820270897, guid: 1236f9548098076409e4ecb32cf9cf33, type: 3}
   reelsGroupPrefab: {fileID: 2074254172925296075, guid: ba818b4d6d76ea84fa0e0bc74087b2bd, type: 3}
+  testDefinition: {fileID: 11400000, guid: fb446478731521f4dbfd4283c2935a95, type: 2}
 --- !u!1 &1568926447
 GameObject:
   m_ObjectHideFlags: 0
@@ -7069,7 +7070,9 @@ GameObject:
   - component: {fileID: 1907970463}
   - component: {fileID: 1907970466}
   - component: {fileID: 1907970465}
+  - component: {fileID: 1907970468}
   - component: {fileID: 1907970464}
+  - component: {fileID: 1907970467}
   m_Layer: 0
   m_Name: DataPersistanceManager
   m_TagString: Untagged
@@ -7156,6 +7159,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2cdf8908f9856a942b7e2bc91dcc5f3b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlotsDataManager
+--- !u!114 &1907970467
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1907970460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20f59793742bbd9468e7748173c734d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BetLevelDataManager
+--- !u!114 &1907970468
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1907970460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 721901058101d3246bce474197f62fcc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ReelStripDataManager
 --- !u!1 &1982556823
 GameObject:
   m_ObjectHideFlags: 0

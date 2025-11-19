@@ -4,15 +4,15 @@ using UnityEngine.UI;
 
 public class GameSymbol : MonoBehaviour
 {
-	SymbolDefinition definition;
+	SymbolData currentSymbolData;
 
-	public SymbolDefinition Definition => definition;
+	public SymbolData CurrentSymbolData => currentSymbolData;
 
 	private Tweener activeTweener;
 
 	private EventManager eventManager;
 
-	public void InitializeSymbol(SymbolDefinition symbol, EventManager slotsEventManager)
+	public void InitializeSymbol(SymbolData symbol, EventManager slotsEventManager)
 	{
 		eventManager = slotsEventManager;
 
@@ -23,9 +23,9 @@ public class GameSymbol : MonoBehaviour
 		ApplySymbol(symbol);
 	}
 
-	public void ApplySymbol(SymbolDefinition symbol)
+	public void ApplySymbol(SymbolData symbol)
 	{
-		definition = symbol;
+		currentSymbolData = symbol;
 
 		Image r = gameObject.GetComponent<Image>();
 		r.sprite = symbol.Sprite;

@@ -11,18 +11,4 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 	{
 		persistantData.CurrentReelData = LocalData;
 	}
-
-	public ReelData GetPlayerData()
-	{
-		DataPersistenceManager.Instance.LoadGame();
-
-		if (LocalData.Count == 0)
-		{
-			return null;
-		}
-		else
-		{
-			return LocalData.Values.First();
-		}
-	}
 }
