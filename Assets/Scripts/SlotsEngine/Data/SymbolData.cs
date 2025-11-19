@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 
+[Serializable]
 public class SymbolData : Data
 {
 	[SerializeField] private string name;

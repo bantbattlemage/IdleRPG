@@ -12,17 +12,13 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		persistantData.CurrentSlotsData = LocalData;
 	}
 
-	public SlotsData GetPlayerData()
+	public override void AddNewData(SlotsData newData)
 	{
-		DataPersistenceManager.Instance.LoadGame();
+		base.AddNewData(newData);
 
-		if (LocalData.Count == 0)
+		for (int i = 0; i < newData.CurrentReelData.Count; i++)
 		{
-			return null;
-		}
-		else
-		{
-			return LocalData.Values.First();
+			ReelDataManager.Instance.AddNewData(newData.CurrentReelData[i]);
 		}
 	}
 }

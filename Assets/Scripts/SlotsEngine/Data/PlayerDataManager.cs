@@ -1,7 +1,4 @@
 using System.Linq;
-using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.SocialPlatforms;
 
 public class PlayerDataManager : DataManager<PlayerDataManager, PlayerData>
 {
@@ -29,7 +26,7 @@ public class PlayerDataManager : DataManager<PlayerDataManager, PlayerData>
 		}
 	}
 
-	public PlayerData CreateNewPlayerData()
+	private PlayerData CreateNewPlayerData()
 	{
 		DataPersistenceManager.Instance.LoadGame();
 

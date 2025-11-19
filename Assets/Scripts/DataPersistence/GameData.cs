@@ -1,7 +1,7 @@
 [System.Serializable]
 public class GameData
 {
-    public long lastUpdated;
+	public long lastUpdated;
 
 	public SerializableDictionary<int, PlayerData> CurrentPlayerData;
 	public SerializableDictionary<int, SlotsData> CurrentSlotsData;

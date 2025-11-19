@@ -11,18 +11,4 @@ public class SymbolDataManager : DataManager<SymbolDataManager, SymbolData>
 	{
 		persistantData.CurrentSymbolData = LocalData;
 	}
-
-	public SymbolData GetPlayerData()
-	{
-		DataPersistenceManager.Instance.LoadGame();
-
-		if (LocalData.Count == 0)
-		{
-			return null;
-		}
-		else
-		{
-			return LocalData.Values.First();
-		}
-	}
 }

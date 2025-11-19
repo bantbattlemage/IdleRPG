@@ -11,4 +11,16 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 	{
 		persistantData.CurrentReelData = LocalData;
 	}
+
+	public override void AddNewData(ReelData newData)
+	{
+		base.AddNewData(newData);
+
+		for (int i = 0; i < newData.CurrentSymbolData.Count; i++)
+		{
+			SymbolDataManager.Instance.AddNewData(newData.CurrentSymbolData[i]);
+		}
+
+		DataPersistenceManager.Instance.SaveGame();
+	}
 }

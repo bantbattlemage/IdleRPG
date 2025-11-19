@@ -98,6 +98,8 @@ public class SlotsEngine : MonoBehaviour
 				testSolution.Add(reels[i].GetRandomSymbolFromStrip());
 			}
 
+			reels[i].CurrentReelData.SetCurrentSymbolData(testSolution);
+
 			reels[i].BeginSpin(testSolution, falloutDelay);
 			falloutDelay += 0.025f;
 		}
@@ -208,5 +210,11 @@ public class SlotsEngine : MonoBehaviour
 	public void BroadcastSlotsEvent(string eventName, object value = null)
 	{
 		eventManager.BroadcastEvent(eventName, value);
+	}
+
+	public void SaveSlotsData()
+	{
+		SlotsDataManager.Instance.AddNewData(currentSlotsData);
+		DataPersistenceManager.Instance.SaveGame();
 	}
 }

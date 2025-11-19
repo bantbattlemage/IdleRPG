@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class ReelStripData : Data
 {
-	private int stripSize;
+	[SerializeField] private int stripSize;
 	public int StripSize => stripSize;
 
-	private SymbolDefinition[] symbols;
+	[SerializeField] private SymbolDefinition[] symbols;
 	public SymbolDefinition[] Symbols => symbols;
 
-	private ReelStripDefinition definition;
+	[SerializeField] private ReelStripDefinition definition;
 	public ReelStripDefinition Definition => definition;
 
 	public ReelStripData(ReelStripDefinition def, int size, SymbolDefinition[] syms)

@@ -51,6 +51,17 @@ public class GamePlayer : Singleton<GamePlayer>
 			GlobalEventManager.Instance.BroadcastEvent("PlayerInputPressed");
 		}
 
+		//	testing save data
+		if (Input.GetKeyDown(KeyCode.F1))
+		{
+			foreach (SlotsEngine slots in playerSlots)
+			{
+				slots.SaveSlotsData();
+			}
+
+			Debug.LogWarning("Saving slot data");
+		}
+
 		//	Testing add slots
 		if (Input.GetKeyDown(KeyCode.R))
 		{

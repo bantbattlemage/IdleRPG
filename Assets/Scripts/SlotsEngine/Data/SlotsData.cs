@@ -1,21 +1,23 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+[Serializable]
 public class SlotsData : Data
 {
-	private int index;
+	[SerializeField] private int index;
 	public int Index => index;
 
-	private List<ReelData> currentReelData;
+	[SerializeField] private List<ReelData> currentReelData;
 	public List<ReelData> CurrentReelData => currentReelData;
 
-	private List<WinlineDefinition> winlineDefinitions;
+	[SerializeField] private List<WinlineDefinition> winlineDefinitions;
 	public List<WinlineDefinition> WinlineDefinitions => winlineDefinitions;
 
-	private List<BetLevelDefinition> betLevelDefinitions;
+	[SerializeField] private List<BetLevelDefinition> betLevelDefinitions;
 	public List<BetLevelDefinition> BetLevelDefinitions => betLevelDefinitions;
 
-	private SlotsDefinition baseDefinition;
+	[SerializeField] private SlotsDefinition baseDefinition;
 
 	public SlotsData(int id, List<WinlineDefinition> winlines, List<BetLevelDefinition> bets)
 	{
