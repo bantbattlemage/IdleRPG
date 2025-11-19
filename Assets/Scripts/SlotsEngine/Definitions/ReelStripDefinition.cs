@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class ReelStripDefinition : BaseDefinition<ReelStripData>

@@ -36,4 +36,10 @@ public class ReelData : Data
 	{
 		currentSymbolData = symbolDatas;
 	}
+
+	public void AdjustSymbolSize(float size, float spacing)
+	{
+		symbolSize = (int)size;
+		symbolSpacing = (int)spacing;
+	}
 }

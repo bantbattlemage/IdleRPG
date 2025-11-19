@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class SlotsEngineController : Singleton<SlotsEngineController>
 {
@@ -38,8 +39,6 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 
 		slotsEngines.Add(newSlots);
 
-		AdjustSlotsCanvases();
-
 		return newSlots;
 	}
 
@@ -57,19 +56,29 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 		AdjustSlotsCanvases();
 	}
 
-	private void AdjustSlotsCanvases()
+	public void AdjustSlotsCanvases()
 	{
-		if (slotsEngines.Count >= 4)
+		if (slotsEngines.Count >= 3)
 		{
 			slotsGridCanvasGroup.gameObject.SetActive(true);
 			MoveAllSlotsToGrid();
 			slotsCanvasGroup.gameObject.SetActive(false);
+
+			foreach (SlotsEngine s in slotsEngines)
+			{
+				s.AdjustReelSize(slotsGridCanvasGroup.GetComponent<GridLayoutGroup>().cellSize.y);
+			}
 		}
 		else
 		{
 			slotsCanvasGroup.gameObject.SetActive(true);
 			MoveAllSlotsToDefaultCanvas();
 			slotsGridCanvasGroup.gameObject.SetActive(false);
+
+			foreach (SlotsEngine s in slotsEngines)
+			{
+				s.AdjustReelSize(slotsCanvasGroup.sizeDelta.y);
+			}
 		}
 	}
 

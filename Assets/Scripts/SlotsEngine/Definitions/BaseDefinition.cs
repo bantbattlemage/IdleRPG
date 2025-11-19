@@ -1,9 +1,11 @@
+using System;
 using UnityEngine;
 
 /// <summary>
 /// Generic base for ScriptableObject definitions that can produce runtime data instances.
 /// Subclasses should override CreateInstance() and optionally override InitializeDefaults() to populate default asset data.
 /// </summary>
+[Serializable]
 public abstract class BaseDefinition<TData> : ScriptableObject
 {
 	/// <summary>

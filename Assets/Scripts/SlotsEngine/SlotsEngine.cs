@@ -20,6 +20,8 @@ public class SlotsEngine : MonoBehaviour
 
 	private bool spinInProgress = false;
 
+	private Transform currentReelsGroup;
+
 	public State CurrentState
 	{
 		get => stateMachine.CurrentState;
@@ -59,7 +61,7 @@ public class SlotsEngine : MonoBehaviour
 
 		reelsRootTransform = canvasTransform;
 
-		SpawnReels(canvasTransform);
+		SpawnReels(reelsRootTransform);
 	}
 
 	public void BeginSlots()
@@ -140,6 +142,11 @@ public class SlotsEngine : MonoBehaviour
 
 	private void SpawnReels(Transform gameCanvas)
 	{
+		if (currentReelsGroup != null)
+		{
+			Destroy(currentReelsGroup.gameObject);
+		}
+
 		Transform reelsGroup = new GameObject("ReelsGroup").transform;
 		reelsGroup.parent = gameCanvas.transform;
 		reelsGroup.localScale = new Vector3(1, 1, 1);
@@ -167,6 +174,57 @@ public class SlotsEngine : MonoBehaviour
 		float yPos = (-offset + (reelDefinition.SymbolSize / 2f));
 
 		reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
+		currentReelsGroup = reelsGroup;
+	}
+
+	public void AdjustReelSize(float totalHeight)
+	{
+		foreach (GameReel r in reels)
+		{
+			Destroy(r.gameObject);
+		}
+
+		reels = new List<GameReel>();
+
+		int maxSymbols = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		float availableHeight = (totalHeight / maxSymbols) * 0.8f;
+		float spacing = (availableHeight / maxSymbols) * 0.25f;
+
+		foreach (ReelData r in currentSlotsData.CurrentReelData)
+		{
+			r.AdjustSymbolSize(availableHeight, spacing);
+		}
+
+		SpawnReels(reelsRootTransform);
+	}
+
+	public void AdjustReelSize(bool up)
+	{
+		if (stateMachine.CurrentState != State.Idle)
+		{
+			return;
+		}
+
+		foreach (GameReel r in reels)
+		{
+			Destroy(r.gameObject);
+		}
+
+		reels = new List<GameReel>();
+
+		foreach (ReelData r in currentSlotsData.CurrentReelData)
+		{
+			if (up)
+			{
+				r.AdjustSymbolSize(r.SymbolSize * 2, r.SymbolSpacing * 2);
+			}
+			else
+			{
+				r.AdjustSymbolSize(r.SymbolSize / 2, r.SymbolSpacing / 2);
+			}
+		}
+
+		SpawnReels(reelsRootTransform);
 	}
 
 	void OnReelCompleted(object e)
