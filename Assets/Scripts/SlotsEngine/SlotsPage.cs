@@ -29,4 +29,9 @@ public class SlotsDisplayPage : MonoBehaviour
 		placeHolderGroup.gameObject.SetActive(slotsToDisplay.Count == 3);
 		placeHolderGroup.SetAsLastSibling();
 	}
+
+	public void ToggleRenderers(bool shouldEnable)
+	{
+		transform.GetComponentsInChildren<Canvas>().ToList().ForEach(x => { x.enabled = shouldEnable; });
+	}
 }

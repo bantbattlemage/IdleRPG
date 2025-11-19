@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using DG.Tweening;
 
 public class SlotsEngine : MonoBehaviour
 {
@@ -62,6 +61,20 @@ public class SlotsEngine : MonoBehaviour
 		reelsRootTransform = canvasTransform;
 
 		SpawnReels(reelsRootTransform);
+
+		foreach(GameReel r in reels)
+		{
+			int count;
+
+			if(r.CurrentReelData != null)
+			{
+				count = r.CurrentReelData.SymbolCount * 4;
+			}
+			else
+			{
+				count = 20;
+			}
+		}
 	}
 
 	public void BeginSlots()
@@ -156,7 +169,16 @@ public class SlotsEngine : MonoBehaviour
 			ReelData data = currentSlotsData.CurrentReelData[i];
 			GameObject g = Instantiate(reelPrefab, reelsGroup.transform);
 			GameReel reel = g.GetComponent<GameReel>();
-			reel.InitializeReel(data, i, eventManager, data.DefaultReelStrip);
+
+			if(data.CurrentReelStrip != null)
+			{
+				reel.InitializeReel(data, i, eventManager, data.CurrentReelStrip);
+			}
+			else
+			{
+				reel.InitializeReel(data, i, eventManager, data.DefaultReelStrip);
+			}
+
 			g.transform.localPosition = new Vector3((data.SymbolSpacing + data.SymbolSize) * i, 0, 0);
 			reels.Add(reel);
 		}

@@ -1,13 +1,11 @@
-using System;
 using DG.Tweening;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class GameReel : MonoBehaviour
 {
-	[SerializeField] private GameObject SymbolPrefab;
-
 	private ReelData currentReelData;
 	public ReelData CurrentReelData => currentReelData;
 
@@ -23,6 +21,7 @@ public class GameReel : MonoBehaviour
 	public List<GameSymbol> Symbols => symbols;
 
 
+	// Persistent roots (no longer created/destroyed each spin)
 	private Transform symbolRoot;
 	private Transform nextSymbolsRoot;
 
@@ -43,6 +42,7 @@ public class GameReel : MonoBehaviour
 		eventManager = slotsEventManager;
 		reelStrip = stripDefinition.CreateInstance();
 
+		EnsureRootsCreated();
 		SpawnReel(currentReelData.CurrentSymbolData);
 	}
 
@@ -53,6 +53,7 @@ public class GameReel : MonoBehaviour
 		eventManager = slotsEventManager;
 		reelStrip = stripData;
 
+		EnsureRootsCreated();
 		SpawnReel(currentReelData.CurrentSymbolData);
 	}
 
@@ -61,16 +62,39 @@ public class GameReel : MonoBehaviour
 		return reelStrip.GetWeightedSymbol();
 	}
 
+	private void EnsureRootsCreated()
+	{
+		// Create two persistent roots if missing. They will be reused each spin.
+		if (symbolRoot == null)
+		{
+			symbolRoot = new GameObject("SymbolRoot").transform;
+			symbolRoot.parent = transform;
+			symbolRoot.localScale = Vector3.one;
+			symbolRoot.localPosition = Vector3.zero;
+		}
+
+		if (nextSymbolsRoot == null)
+		{
+			nextSymbolsRoot = new GameObject("NextSymbolsRoot").transform;
+			nextSymbolsRoot.parent = transform;
+			nextSymbolsRoot.localScale = Vector3.one;
+
+			// initial offscreen position; will be set properly when SpawnNextReel is called
+			nextSymbolsRoot.localPosition = Vector3.zero;
+		}
+	}
+
 	private void SpawnReel(List<SymbolData> existingSymbolData)
 	{
-		symbolRoot = new GameObject("SymbolRoot").transform;
-		symbolRoot.parent = transform;
-		symbolRoot.localScale = new Vector3(1, 1, 1);
+		// Clear any previous symbols on the active root and lists
+		ReleaseAllSymbolsInRoot(symbolRoot);
+		symbols.Clear();
+		topDummySymbols.Clear();
+		bottomDummySymbols.Clear();
 
 		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
-			GameObject symbol = Instantiate(SymbolPrefab, symbolRoot);
-			GameSymbol sym = symbol.GetComponent<GameSymbol>();
+			GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot);
 
 			SymbolData newSymbol;
 
@@ -85,8 +109,8 @@ public class GameReel : MonoBehaviour
 
 			sym.InitializeSymbol(newSymbol, eventManager);
 
-			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
-			symbol.transform.localPosition = new Vector3(0, (currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i, 0);
+			sym.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
+			sym.transform.localPosition = new Vector3(0, (currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i, 0);
 
 			symbols.Add(sym);
 		}
@@ -98,10 +122,10 @@ public class GameReel : MonoBehaviour
 	public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
 	{
 		completeOnNextSpin = false;
-		
+
 		DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() =>
 		{
-			BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete:() =>
+			BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () =>
 			{
 				FallOut(solution, true);
 				spinning = true;
@@ -129,15 +153,17 @@ public class GameReel : MonoBehaviour
 
 	private void SpawnNextReel(List<SymbolData> solution = null)
 	{
-		Transform nextReel = new GameObject("Next").transform;
-		nextReel.parent = transform;
-		nextReel.localScale = new Vector3(1, 1, 1);
-		nextReel.transform.localPosition = new Vector3(0, ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount-1) * 3)), 0);
+		// Position the buffer root offscreen (top). This mirrors the previous Create+position.
+		float offsetY = ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount - 1) * 3));
+		nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+
+		// Ensure buffer is cleared and ready
+		ReleaseAllSymbolsInRoot(nextSymbolsRoot);
 
 		List<GameSymbol> newSymbols = new List<GameSymbol>();
 		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
-			GameSymbol symbol = Instantiate(SymbolPrefab, nextReel).GetComponent<GameSymbol>();
+			GameSymbol symbol = GameSymbolPool.Instance.Get(nextSymbolsRoot);
 
 			SymbolData def;
 
@@ -159,10 +185,10 @@ public class GameReel : MonoBehaviour
 
 		symbols = newSymbols;
 
-		SpawnDummySymbols(nextReel);
-		SpawnDummySymbols(nextReel, false);
+		SpawnDummySymbols(nextSymbolsRoot);
+		SpawnDummySymbols(nextSymbolsRoot, false);
 
-		nextSymbolsRoot = nextReel;
+		// nextSymbolsRoot is already the buffer root
 	}
 
 	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null)
@@ -176,7 +202,7 @@ public class GameReel : MonoBehaviour
 
 		for (int i = 0; i < total; i++)
 		{
-			GameSymbol symbol = Instantiate(SymbolPrefab, root).GetComponent<GameSymbol>();
+			GameSymbol symbol = GameSymbolPool.Instance.Get(root);
 			symbol.name = name;
 
 			SymbolData def;
@@ -261,19 +287,21 @@ public class GameReel : MonoBehaviour
 		}
 
 		symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { if (onComplete != null) onComplete(); });
-
-		//if (nextSymbolsRoot != null)
-		//{
-		//	nextSymbolsRoot.DOEdgeBounceLinear(Vector3.up, 1000f, 0.5f).SetEase(Ease.Linear);
-		//}
-
-		//symbolRoot.DOEdgeBounceLinear(Vector3.up, 1000f, 0.5f).SetEase(Ease.Linear).OnComplete(() => { if (onComplete != null) onComplete(); });
 	}
 
 	private void CompleteReelSpin(List<SymbolData> solution)
 	{
-		Destroy(symbolRoot.gameObject);
+		// Release symbols from the old active root back to the pool
+		ReleaseAllSymbolsInRoot(symbolRoot);
+
+		// swap roots (old root becomes buffer for next spawn)
+		var old = symbolRoot;
 		symbolRoot = nextSymbolsRoot;
+		nextSymbolsRoot = old;
+
+		// position the buffer (nextSymbolsRoot) offscreen ready for future spawn
+		float offsetY = ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount - 1) * 3));
+		nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
 
 		if (!completeOnNextSpin)
 		{
@@ -319,6 +347,29 @@ public class GameReel : MonoBehaviour
 			var image = g.GetComponent<Image>();
 			image.DOKill();
 			image.color = Color.white;
+		}
+	}
+
+	/// <summary>
+	/// Helper: release all GameSymbol instances parented under <paramref name="root"/> back to the pool.
+	/// </summary>
+	private void ReleaseAllSymbolsInRoot(Transform root)
+	{
+		if (root == null) return;
+
+		var children = new List<GameSymbol>(root.childCount);
+		foreach (Transform child in root)
+		{
+			if (child == null) continue;
+			var gs = child.GetComponent<GameSymbol>();
+			if (gs != null) children.Add(gs);
+		}
+
+		// Release collected symbols back to the pool.
+		foreach (var s in children)
+		{
+			// When releasing, the pool will set inactive and reparent under the pool root.
+			GameSymbolPool.Instance.Release(s);
 		}
 	}
 }

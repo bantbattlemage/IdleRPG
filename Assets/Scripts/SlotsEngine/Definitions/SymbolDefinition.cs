@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class SymbolDefinition : BaseDefinition<SymbolData>
 {
-	[SerializeField] private new string symbolName;
+	[SerializeField] private string symbolName;
 	[SerializeField] private Sprite symbolSprite;
 	[SerializeField] private int[] baseValueMultiplier;
 	[SerializeField] private float weight = 1;

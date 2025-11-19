@@ -66,6 +66,18 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		{
 			prevPageButton.gameObject.SetActive(true);
 		}
+
+		foreach (SlotsDisplayPage page in slotsDisplayPages)
+		{
+			if (page == currentSlotsDisplayPage)
+			{
+				page.ToggleRenderers(true);
+			}
+			else
+			{
+				page.ToggleRenderers(false);
+			}
+		}
 	}
 
 	public SlotsEngine CreateSlots(SlotsData existingData = null, bool useGrid = false)

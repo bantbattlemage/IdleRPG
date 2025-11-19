@@ -21,6 +21,7 @@ public class ReelData : Data
 	public ReelStripDefinition DefaultReelStrip => defaultReelStrip;
 	public ReelDefinition BaseDefinition => baseDefinition;
 	public List<SymbolData> CurrentSymbolData => currentSymbolData;
+	public ReelStripData CurrentReelStrip => currentReelStrip;
 
 	public ReelData(float duration, int count, int size, int spacing, ReelStripDefinition defaultStrip, ReelDefinition def, ReelStripData existingStripData = null)
 	{

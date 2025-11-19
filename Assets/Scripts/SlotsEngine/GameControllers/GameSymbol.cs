@@ -12,13 +12,21 @@ public class GameSymbol : MonoBehaviour
 
 	private EventManager eventManager;
 
+	private Image cachedImage;
+
+	private void Awake()
+	{
+		cachedImage = GetComponent<Image>();
+	}
+
 	public void InitializeSymbol(SymbolData symbol, EventManager slotsEventManager)
 	{
 		eventManager = slotsEventManager;
 
-		slotsEventManager.RegisterEvent("SymbolLanded", OnSymbolLanded);
-		slotsEventManager.RegisterEvent("SymbolWin", OnSymbolWin);
-		slotsEventManager.RegisterEvent("IdleExit", OnIdleExit);
+		// register to slot events
+		eventManager.RegisterEvent("SymbolLanded", OnSymbolLanded);
+		eventManager.RegisterEvent("SymbolWin", OnSymbolWin);
+		eventManager.RegisterEvent("IdleExit", OnIdleExit);
 
 		ApplySymbol(symbol);
 	}
@@ -27,14 +35,15 @@ public class GameSymbol : MonoBehaviour
 	{
 		currentSymbolData = symbol;
 
-		Image r = gameObject.GetComponent<Image>();
-		r.sprite = symbol.Sprite;
-		r.color = Color.white;
+		if (cachedImage == null) cachedImage = GetComponent<Image>();
+		cachedImage.sprite = symbol.Sprite;
+		cachedImage.color = Color.white;
 	}
 
 	private void OnIdleExit(object obj)
 	{
-		GetComponent<Image>().color = Color.white;
+		if (cachedImage == null) cachedImage = GetComponent<Image>();
+		cachedImage.color = Color.white;
 	}
 
 	private void OnSymbolWin(object obj)
@@ -51,7 +60,8 @@ public class GameSymbol : MonoBehaviour
 			return;
 		}
 
-		GetComponent<Image>().color = Color.green;
+		if (cachedImage == null) cachedImage = GetComponent<Image>();
+		cachedImage.color = Color.green;
 		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
 	}
 
@@ -65,10 +75,33 @@ public class GameSymbol : MonoBehaviour
 		}
 	}
 
+	public void UnregisterFromEventManager()
+	{
+		if (eventManager == null) return;
+
+		eventManager.UnregisterEvent("SymbolLanded", OnSymbolLanded);
+		eventManager.UnregisterEvent("SymbolWin", OnSymbolWin);
+		eventManager.UnregisterEvent("IdleExit", OnIdleExit);
+
+		eventManager = null;
+	}
+
+	public void StopAndClearTweens()
+	{
+		if (activeTweener != null)
+		{
+			activeTweener.Kill();
+			activeTweener = null;
+		}
+
+		// kill DOTween tweens targeting the image/gameObject as well
+		if (cachedImage != null) cachedImage.DOKill();
+		transform.DOKill();
+	}
+
 	private void OnDestroy()
 	{
-		eventManager?.UnregisterEvent("SymbolLanded", OnSymbolLanded);
-		eventManager?.UnregisterEvent("SymbolWin", OnSymbolWin);
-		eventManager?.UnregisterEvent("IdleExit", OnIdleExit);
+		UnregisterFromEventManager();
+		StopAndClearTweens();
 	}
 }
