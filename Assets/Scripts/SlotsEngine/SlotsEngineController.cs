@@ -7,8 +7,11 @@ using UnityEngine.UI;
 
 public class SlotsEngineController : Singleton<SlotsEngineController>
 {
-	[SerializeField] private RectTransform slotsCanvasGroup;
-	[SerializeField] private RectTransform slotsGridCanvasGroup;
+	[SerializeField] private Transform slotsPagesRoot;
+	[SerializeField] private GameObject slotsPagePrefab;
+
+	[SerializeField] private Button nextPageButton;
+	[SerializeField] private Button prevPageButton;
 
 	[SerializeField] private GameObject slotsEnginePrefab;
 	[SerializeField] private GameObject reelsGroupPrefab;
@@ -16,13 +19,79 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 	[SerializeField] private SlotsDefinition testDefinition;
 
 	private List<SlotsEngine> slotsEngines = new();
+	private List<SlotsDisplayPage> slotsDisplayPages = new();
+	private int currentSlotPageIndex;
+	private SlotsDisplayPage currentSlotsDisplayPage => slotsDisplayPages[currentSlotPageIndex];
+
+	void Start()
+	{
+		nextPageButton.onClick.AddListener(OnNextPageButtonPressed);
+		prevPageButton.onClick.AddListener(OnPrevPageButtonPressed);
+		//GlobalEventManager.Instance.RegisterEvent("SlotsPageButtonPressed", OnSlotsPageButtonPressed);
+
+		nextPageButton.gameObject.SetActive(false);
+		prevPageButton.gameObject.SetActive(false);
+	}
+
+	private void OnNextPageButtonPressed()
+	{
+		OnSlotsPageButtonPressed(1);
+	}
+
+	private void OnPrevPageButtonPressed()
+	{
+		OnSlotsPageButtonPressed(-1);
+	}
+
+	private void OnSlotsPageButtonPressed(object obj)
+	{
+		int adjust = (int)obj;
+
+		Debug.Log($"Pressed {adjust}");
+
+		currentSlotPageIndex += adjust;
+
+		currentSlotsDisplayPage.transform.SetAsLastSibling();
+
+		if (currentSlotPageIndex != slotsDisplayPages.Count - 1)
+		{
+			nextPageButton.gameObject.SetActive(true);
+		}
+		else
+		{
+			nextPageButton.gameObject.SetActive(false);
+		}
+		
+		if (currentSlotPageIndex == 0)
+		{
+			prevPageButton.gameObject.SetActive(false);
+		}
+		else
+		{
+			prevPageButton.gameObject.SetActive(true);
+		}
+	}
 
 	public SlotsEngine CreateSlots(SlotsData existingData = null, bool useGrid = false)
 	{
-		RectTransform targetTransform = slotsCanvasGroup;
+		SlotsDisplayPage pageToUse;
+
+		if ((slotsDisplayPages == null || !slotsDisplayPages.Any() || slotsDisplayPages.Last().slotsToDisplay.Count >= 4))
+		{
+			pageToUse = Instantiate(slotsPagePrefab, slotsPagesRoot).GetComponent<SlotsDisplayPage>();
+			slotsDisplayPages.Add(pageToUse);
+		}
+		else
+		{
+			pageToUse = slotsDisplayPages.Last();
+		}
+
+		currentSlotPageIndex = slotsDisplayPages.Count - 1;
+
+		RectTransform targetTransform = pageToUse.standardGroup;
 		if (useGrid)
 		{
-			targetTransform = slotsGridCanvasGroup;
+			targetTransform = pageToUse.gridGroup;
 		}
 
 		SlotsEngine newSlots = Instantiate(slotsEnginePrefab, transform).GetComponent<SlotsEngine>();
@@ -38,6 +107,12 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 		}
 
 		slotsEngines.Add(newSlots);
+		pageToUse.AddSlotsToPage(newSlots);
+
+		if (slotsDisplayPages.Count > 1)
+		{
+			prevPageButton.gameObject.SetActive(true);
+		}
 
 		return newSlots;
 	}
@@ -58,43 +133,45 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 
 	public void AdjustSlotsCanvases()
 	{
-		if (slotsEngines.Count >= 3)
+		if (currentSlotsDisplayPage.slotsToDisplay.Count >= 3)
 		{
-			slotsGridCanvasGroup.gameObject.SetActive(true);
-			MoveAllSlotsToGrid();
-			slotsCanvasGroup.gameObject.SetActive(false);
+			currentSlotsDisplayPage.gridGroup.gameObject.SetActive(true);
+			MovePageSlotsToGrid();
+			currentSlotsDisplayPage.standardGroup.gameObject.SetActive(false);
 
-			foreach (SlotsEngine s in slotsEngines)
+			foreach (SlotsEngine s in currentSlotsDisplayPage.slotsToDisplay)
 			{
-				s.AdjustReelSize(slotsGridCanvasGroup.GetComponent<GridLayoutGroup>().cellSize.y);
+				s.AdjustReelSize(currentSlotsDisplayPage.gridGroup.GetComponent<GridLayoutGroup>().cellSize.y);
 			}
+
+			currentSlotsDisplayPage.AdjustPlaceholderGroup();
 		}
 		else
 		{
-			slotsCanvasGroup.gameObject.SetActive(true);
-			MoveAllSlotsToDefaultCanvas();
-			slotsGridCanvasGroup.gameObject.SetActive(false);
+			currentSlotsDisplayPage.standardGroup.gameObject.SetActive(true);
+			MovePageSlotsToDefaultCanvas();
+			currentSlotsDisplayPage.gridGroup.gameObject.SetActive(false);
 
-			foreach (SlotsEngine s in slotsEngines)
+			foreach (SlotsEngine s in currentSlotsDisplayPage.slotsToDisplay)
 			{
-				s.AdjustReelSize(slotsCanvasGroup.sizeDelta.y);
+				s.AdjustReelSize(currentSlotsDisplayPage.standardGroup.sizeDelta.y);
 			}
 		}
 	}
 
-	public void MoveAllSlotsToGrid()
+	public void MovePageSlotsToGrid()
 	{
-		foreach (SlotsEngine slot in slotsEngines)
+		foreach (SlotsEngine slot in currentSlotsDisplayPage.slotsToDisplay)
 		{
-			slot.ReelsRootTransform.SetParent(slotsGridCanvasGroup);
+			slot.ReelsRootTransform.SetParent(currentSlotsDisplayPage.gridGroup);
 		}
 	}
 
-	public void MoveAllSlotsToDefaultCanvas()
+	public void MovePageSlotsToDefaultCanvas()
 	{
-		foreach (SlotsEngine slot in slotsEngines)
+		foreach (SlotsEngine slot in currentSlotsDisplayPage.slotsToDisplay)
 		{
-			slot.ReelsRootTransform.SetParent(slotsCanvasGroup);
+			slot.ReelsRootTransform.SetParent(currentSlotsDisplayPage.standardGroup);
 		}
 	}
 }

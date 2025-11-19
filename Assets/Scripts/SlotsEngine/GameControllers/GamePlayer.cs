@@ -74,22 +74,6 @@ public class GamePlayer : Singleton<GamePlayer>
 			Debug.LogWarning("Saving slot data");
 		}
 
-		//	testing reel scaling
-		if (Input.GetKeyDown(KeyCode.UpArrow))
-		{
-			foreach (SlotsEngine slots in playerSlots)
-			{
-				slots.AdjustReelSize(true);
-			}
-		}
-		if (Input.GetKeyDown(KeyCode.DownArrow))
-		{
-			foreach (SlotsEngine slots in playerSlots)
-			{
-				slots.AdjustReelSize(false);
-			}
-		}
-
 		//	Testing add slots
 		if (Input.GetKeyDown(KeyCode.R))
 		{

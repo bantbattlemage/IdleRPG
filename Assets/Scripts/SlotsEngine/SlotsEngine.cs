@@ -179,6 +179,11 @@ public class SlotsEngine : MonoBehaviour
 
 	public void AdjustReelSize(float totalHeight)
 	{
+		if (stateMachine.CurrentState == State.Spinning)
+		{
+			throw new Exception("should not adjust reels while they are spinning!");
+		}
+
 		foreach (GameReel r in reels)
 		{
 			Destroy(r.gameObject);
@@ -200,9 +205,9 @@ public class SlotsEngine : MonoBehaviour
 
 	public void AdjustReelSize(bool up)
 	{
-		if (stateMachine.CurrentState != State.Idle)
+		if (stateMachine.CurrentState == State.Spinning)
 		{
-			return;
+			throw new Exception("should not adjust reels while they are spinning!");
 		}
 
 		foreach (GameReel r in reels)
