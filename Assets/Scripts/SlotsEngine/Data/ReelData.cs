@@ -10,6 +10,7 @@ public class ReelData : Data
 	[SerializeField] private int symbolSize = 170;
 	[SerializeField] private int symbolSpacing = 15;
 	[SerializeField] private ReelStripDefinition defaultReelStrip;
+	[SerializeField] private ReelStripData currentReelStrip;
 	[SerializeField] private ReelDefinition baseDefinition;
 	[SerializeField] private List<SymbolData> currentSymbolData;
 
@@ -21,7 +22,7 @@ public class ReelData : Data
 	public ReelDefinition BaseDefinition => baseDefinition;
 	public List<SymbolData> CurrentSymbolData => currentSymbolData;
 
-	public ReelData(float duration, int count, int size, int spacing, ReelStripDefinition defaultStrip, ReelDefinition def)
+	public ReelData(float duration, int count, int size, int spacing, ReelStripDefinition defaultStrip, ReelDefinition def, ReelStripData existingStripData = null)
 	{
 		reelSpinDuration = duration;
 		symbolCount = count;
@@ -30,6 +31,20 @@ public class ReelData : Data
 		defaultReelStrip = defaultStrip;
 		baseDefinition = def;
 		currentSymbolData = new List<SymbolData>();
+
+		if (existingStripData != null)
+		{
+			SetReelStrip(existingStripData);
+		}
+		else
+		{
+			SetReelStrip(defaultReelStrip.CreateInstance());
+		}
+	}
+
+	public void SetReelStrip(ReelStripData reelStrip)
+	{
+		currentReelStrip = reelStrip;
 	}
 
 	public void SetCurrentSymbolData(List<SymbolData> symbolDatas)
@@ -37,7 +52,7 @@ public class ReelData : Data
 		currentSymbolData = symbolDatas;
 	}
 
-	public void AdjustSymbolSize(float size, float spacing)
+	public void SetSymbolSize(float size, float spacing)
 	{
 		symbolSize = (int)size;
 		symbolSpacing = (int)spacing;

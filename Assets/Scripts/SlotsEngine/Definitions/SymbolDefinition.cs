@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class SymbolDefinition : BaseDefinition<SymbolData>
 {
-	[SerializeField] private new string name;
-	[SerializeField] private Sprite sprite;
+	[SerializeField] private new string symbolName;
+	[SerializeField] private Sprite symbolSprite;
 	[SerializeField] private int[] baseValueMultiplier;
 	[SerializeField] private float weight = 1;
 
-	public string Name => name;
-	public Sprite Sprite => sprite;
+	public string SymbolName => symbolName;
+	public Sprite SymbolSprite => symbolSprite;
 	public int MinWinDepth
 	{
 		get
@@ -26,6 +26,6 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 
 	public override SymbolData CreateInstance()
 	{
-		return new SymbolData(name, sprite, baseValueMultiplier, weight);
+		return new SymbolData(symbolName, symbolSprite, baseValueMultiplier, weight);
 	}
 }

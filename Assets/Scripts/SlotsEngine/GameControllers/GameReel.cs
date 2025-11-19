@@ -46,6 +46,16 @@ public class GameReel : MonoBehaviour
 		SpawnReel(currentReelData.CurrentSymbolData);
 	}
 
+	public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripData stripData)
+	{
+		currentReelData = data;
+		id = reelID;
+		eventManager = slotsEventManager;
+		reelStrip = stripData;
+
+		SpawnReel(currentReelData.CurrentSymbolData);
+	}
+
 	public SymbolData GetRandomSymbolFromStrip()
 	{
 		return reelStrip.GetWeightedSymbol();

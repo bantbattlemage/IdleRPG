@@ -197,42 +197,13 @@ public class SlotsEngine : MonoBehaviour
 
 		foreach (ReelData r in currentSlotsData.CurrentReelData)
 		{
-			r.AdjustSymbolSize(availableHeight, spacing);
+			r.SetSymbolSize(availableHeight, spacing);
 		}
 
 		SpawnReels(reelsRootTransform);
 	}
 
-	public void AdjustReelSize(bool up)
-	{
-		if (stateMachine.CurrentState == State.Spinning)
-		{
-			throw new Exception("should not adjust reels while they are spinning!");
-		}
-
-		foreach (GameReel r in reels)
-		{
-			Destroy(r.gameObject);
-		}
-
-		reels = new List<GameReel>();
-
-		foreach (ReelData r in currentSlotsData.CurrentReelData)
-		{
-			if (up)
-			{
-				r.AdjustSymbolSize(r.SymbolSize * 2, r.SymbolSpacing * 2);
-			}
-			else
-			{
-				r.AdjustSymbolSize(r.SymbolSize / 2, r.SymbolSpacing / 2);
-			}
-		}
-
-		SpawnReels(reelsRootTransform);
-	}
-
-	void OnReelCompleted(object e)
+	void OnReelCompleted(object obj)
 	{
 		if (reels.TrueForAll(x => !x.Spinning))
 		{
@@ -241,7 +212,7 @@ public class SlotsEngine : MonoBehaviour
 		}
 	}
 
-	void OnSpinCompleted(object e)
+	void OnSpinCompleted(object obj)
 	{
 		stateMachine.SetState(State.Presentation);
 	}
