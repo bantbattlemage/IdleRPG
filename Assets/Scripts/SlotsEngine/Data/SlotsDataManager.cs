@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 
 public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
@@ -20,5 +21,13 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		{
 			ReelDataManager.Instance.AddNewData(newData.CurrentReelData[i]);
 		}
+	}
+
+	public void ClearSlotsData()
+	{
+		ClearData();
+		ReelDataManager.Instance.ClearData();
+		SymbolDataManager.Instance.ClearData();
+		DataPersistenceManager.Instance.SaveGame();
 	}
 }

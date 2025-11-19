@@ -16,7 +16,7 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 
 	private List<SlotsEngine> slotsEngines = new();
 
-	public SlotsEngine CreateSlots(bool useGrid = false)
+	public SlotsEngine CreateSlots(SlotsData existingData = null, bool useGrid = false)
 	{
 		RectTransform targetTransform = slotsCanvasGroup;
 		if (useGrid)
@@ -26,7 +26,15 @@ public class SlotsEngineController : Singleton<SlotsEngineController>
 
 		SlotsEngine newSlots = Instantiate(slotsEnginePrefab, transform).GetComponent<SlotsEngine>();
 		GameObject newReelsGroup = Instantiate(reelsGroupPrefab, targetTransform);
-		newSlots.InitializeSlotsEngine(newReelsGroup.transform, testDefinition);
+
+		if (existingData != null)
+		{
+			newSlots.InitializeSlotsEngine(newReelsGroup.transform, existingData);
+		}
+		else
+		{
+			newSlots.InitializeSlotsEngine(newReelsGroup.transform, testDefinition);
+		}
 
 		slotsEngines.Add(newSlots);
 

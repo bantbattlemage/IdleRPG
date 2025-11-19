@@ -43,7 +43,7 @@ public class GameReel : MonoBehaviour
 		eventManager = slotsEventManager;
 		reelStrip = stripDefinition.CreateInstance();
 
-		SpawnReel();
+		SpawnReel(currentReelData.CurrentSymbolData);
 	}
 
 	public SymbolData GetRandomSymbolFromStrip()
@@ -51,7 +51,7 @@ public class GameReel : MonoBehaviour
 		return reelStrip.GetWeightedSymbol();
 	}
 
-	private void SpawnReel()
+	private void SpawnReel(List<SymbolData> existingSymbolData)
 	{
 		symbolRoot = new GameObject("SymbolRoot").transform;
 		symbolRoot.parent = transform;
@@ -61,7 +61,19 @@ public class GameReel : MonoBehaviour
 		{
 			GameObject symbol = Instantiate(SymbolPrefab, symbolRoot);
 			GameSymbol sym = symbol.GetComponent<GameSymbol>();
-			sym.InitializeSymbol(GetRandomSymbolFromStrip(), eventManager);
+
+			SymbolData newSymbol;
+
+			if (existingSymbolData is { Count: > 0 })
+			{
+				newSymbol = existingSymbolData[i];
+			}
+			else
+			{
+				newSymbol = GetRandomSymbolFromStrip();
+			}
+
+			sym.InitializeSymbol(newSymbol, eventManager);
 
 			symbol.GetComponent<RectTransform>().sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
 			symbol.transform.localPosition = new Vector3(0, (currentReelData.SymbolSpacing + currentReelData.SymbolSize) * i, 0);

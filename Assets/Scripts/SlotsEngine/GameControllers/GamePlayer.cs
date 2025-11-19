@@ -27,8 +27,6 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void InitializePlayer(BetLevelDefinition defaultBetLevel)
 	{
-		AddNewSlots();
-
 		GlobalEventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
 		GlobalEventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
 		GlobalEventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
@@ -36,6 +34,18 @@ public class GamePlayer : Singleton<GamePlayer>
 		GlobalEventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
+
+		if (playerData.CurrentSlots == null || playerData.CurrentSlots.Count == 0)
+		{
+			SpawnSlots();
+		}
+		else
+		{
+			foreach (SlotsData data in playerData.CurrentSlots)
+			{
+				SpawnSlots(data);
+			}
+		}
 
 		if (playerData.CurrentBet == null)
 		{
@@ -54,6 +64,8 @@ public class GamePlayer : Singleton<GamePlayer>
 		//	testing save data
 		if (Input.GetKeyDown(KeyCode.F1))
 		{
+			SlotsDataManager.Instance.ClearSlotsData();
+
 			foreach (SlotsEngine slots in playerSlots)
 			{
 				slots.SaveSlotsData();
@@ -65,7 +77,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		//	Testing add slots
 		if (Input.GetKeyDown(KeyCode.R))
 		{
-			AddNewSlots(true);
+			SpawnSlots(null, true);
 		}
 
 		//	Testing kill slots
@@ -105,13 +117,18 @@ public class GamePlayer : Singleton<GamePlayer>
 		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
 	}
 
-	private void AddNewSlots(bool beginSlots = false)
+	private void SpawnSlots(SlotsData existingData = null, bool beginSlots = false)
 	{
-		SlotsEngine newSlots = SlotsEngineController.Instance.CreateSlots();
+		SlotsEngine newSlots = SlotsEngineController.Instance.CreateSlots(existingData);
 
 		if (beginSlots)
 		{
 			newSlots.BeginSlots();
+		}
+
+		if (existingData == null)
+		{
+			playerData.AddSlots(newSlots.CurrentSlotsData);
 		}
 
 		playerSlots.Add(newSlots);
@@ -124,6 +141,7 @@ public class GamePlayer : Singleton<GamePlayer>
 			throw new Exception("Tried to remove slots that player doesn't have!");
 		}
 
+		playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
 		playerSlots.Remove(slotsToRemove);
 		SlotsEngineController.Instance.DestroySlots(slotsToRemove);
 	}

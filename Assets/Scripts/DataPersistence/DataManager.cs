@@ -33,6 +33,11 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
 		return LocalData.Values.ToList();
 	}
 
+	public void ClearData()
+	{
+		LocalData = new SerializableDictionary<int, D>();
+	}
+
 	public virtual void AddNewData(D newData)
 	{
 		int id = GenerateUniqueAccessorId(LocalData.Keys.ToList());

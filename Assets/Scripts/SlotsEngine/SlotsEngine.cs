@@ -40,6 +40,13 @@ public class SlotsEngine : MonoBehaviour
 			currentSlotsData.AddNewReel(newData);
 		}
 
+		InitializeSlotsEngine(canvasTransform, currentSlotsData);
+	}
+
+	public void InitializeSlotsEngine(Transform canvasTransform, SlotsData data)
+	{
+		currentSlotsData = data;
+
 		eventManager = new EventManager();
 		stateMachine = new SlotsStateMachine();
 		stateMachine.InitializeStateMachine(this, eventManager);
