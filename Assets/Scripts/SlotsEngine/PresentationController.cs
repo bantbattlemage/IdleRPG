@@ -1,6 +1,8 @@
 using DG.Tweening;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
+using System.Reflection;
 
 public class PresentationController : Singleton<PresentationController>
 {
@@ -22,23 +24,104 @@ public class PresentationController : Singleton<PresentationController>
 	{
 		SlotsEngine slotsToPresent = (SlotsEngine)obj;
 
-		var currentSymbolGrid = slotsToPresent.GetCurrentSymbolGrid();
-		// Derive grid dimensions explicitly for the evaluator
-		int columns = slotsToPresent.CurrentReels?.Count ?? slotsToPresent.CurrentSlotsData.CurrentReelData.Count;
+		// Build per-column visual arrays from the runtime reels
+		var reels = slotsToPresent.CurrentReels;
+		if (reels == null || reels.Count == 0)
+		{
+			return;
+		}
+
+		List<GameSymbol[]> visualColumns = new List<GameSymbol[]>();
+		for (int c = 0; c < reels.Count; c++)
+		{
+			var symbolsList = reels[c].Symbols;
+			visualColumns.Add(symbolsList != null ? symbolsList.ToArray() : new GameSymbol[0]);
+		}
+
+		int columns = visualColumns.Count;
 		int[] rowsPerColumn = new int[columns];
+		for (int c = 0; c < columns; c++) rowsPerColumn[c] = visualColumns[c]?.Length ?? 0;
+
+		// If visual/model counts differ, throw an error as requested
 		for (int c = 0; c < columns; c++)
 		{
+			int modelCount = 0;
 			if (c < slotsToPresent.CurrentSlotsData.CurrentReelData.Count)
 			{
-				rowsPerColumn[c] = slotsToPresent.CurrentSlotsData.CurrentReelData[c].SymbolCount;
+				modelCount = slotsToPresent.CurrentSlotsData.CurrentReelData[c].SymbolCount;
 			}
-			else
+			if (modelCount != rowsPerColumn[c])
 			{
-				rowsPerColumn[c] = 0;
+				throw new System.InvalidOperationException($"Visual rows ({rowsPerColumn[c]}) differ from model rows ({modelCount}) for column {c}.");
 			}
 		}
 
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDatas(), columns, rowsPerColumn, slotsToPresent.CurrentSlotsData.WinlineDefinitions);
+		// Build a combined grid for debug logging
+		GameSymbol[] currentSymbolGrid = Helpers.CombineColumnsToGrid(visualColumns);
+
+		// Debug logging to help diagnose presentation-time mismatches
+		if (Application.isEditor || Debug.isDebugBuild)
+		{
+			Debug.Log($"Presentation: columns={columns}, rowsPerColumn=[{string.Join(",", rowsPerColumn)}]");
+
+			// print grid contents with indexes and symbol info
+			for (int i = 0; i < currentSymbolGrid.Length; i++)
+			{
+				var gs = currentSymbolGrid[i];
+				if (gs == null)
+				{
+					Debug.Log($"Grid idx={i}: null");
+					continue;
+				}
+				var sd = gs.CurrentSymbolData;
+				string name = sd != null ? sd.Name : "(null)";
+				int min = sd != null ? sd.MinWinDepth : -999;
+				int[] mults = sd != null ? sd.BaseValueMultiplier ?? new int[0] : new int[0];
+				Debug.Log($"Grid idx={i}: name={name} minWin={min} multipliers=[{string.Join(",", mults)}] isWild={(sd!=null?sd.IsWild:false)} allowWild={(sd!=null?sd.AllowWildMatch:false)}");
+			}
+
+			// print each winline concrete indexes and corresponding grid names from assets
+			var winlinesAsset = slotsToPresent.CurrentSlotsData.WinlineDefinitions;
+			if (winlinesAsset != null)
+			{
+				for (int wi = 0; wi < winlinesAsset.Count; wi++)
+				{
+					var wl = winlinesAsset[wi];
+					int[] concrete = wl.GenerateIndexes(columns, rowsPerColumn);
+					if (concrete == null) concrete = new int[0];
+					var names = concrete.Select(idx => (idx >= 0 && idx < currentSymbolGrid.Length && currentSymbolGrid[idx] != null) ? currentSymbolGrid[idx].CurrentSymbolData?.Name ?? "(null)" : "null").ToArray();
+					Debug.Log($"Winline[{wi}] '{wl.name}' concrete=[{string.Join(",", concrete)}] names=[{string.Join(",", names)}]");
+				}
+			}
+		}
+
+		// Prepare evaluation winlines: include asset winlines and add temporary StraightAcross winlines for each visual row if missing
+		List<WinlineDefinition> evalWinlines = new List<WinlineDefinition>();
+		if (slotsToPresent.CurrentSlotsData.WinlineDefinitions != null)
+			evalWinlines.AddRange(slotsToPresent.CurrentSlotsData.WinlineDefinitions);
+
+		int maxRows = rowsPerColumn.Max();
+		for (int r = 0; r < maxRows; r++)
+		{
+			bool exists = evalWinlines.Any(w => w.Pattern == WinlineDefinition.PatternType.StraightAcross && w.RowIndex == r);
+			if (!exists)
+			{
+				var temp = ScriptableObject.CreateInstance<WinlineDefinition>();
+				var t = typeof(WinlineDefinition);
+				var patternField = t.GetField("pattern", BindingFlags.Instance | BindingFlags.NonPublic);
+				var rowField = t.GetField("rowIndex", BindingFlags.Instance | BindingFlags.NonPublic);
+				var multField = t.GetField("winMultiplier", BindingFlags.Instance | BindingFlags.NonPublic);
+				if (patternField != null) patternField.SetValue(temp, WinlineDefinition.PatternType.StraightAcross);
+				if (rowField != null) rowField.SetValue(temp, r);
+				if (multField != null) multField.SetValue(temp, 1);
+				temp.name = $"__auto_Straight_row_{r}";
+				evalWinlines.Add(temp);
+				if (Application.isEditor || Debug.isDebugBuild) Debug.Log($"Added temporary StraightAcross winline for row {r}");
+			}
+		}
+
+		// Evaluate using the per-column visual arrays (handles varying column lengths)
+		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWinsFromColumns(visualColumns, evalWinlines);
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
 		slotsData.SetCurrentWinData(winData);
 

@@ -41,8 +41,9 @@ public class WinlineDefinition : ScriptableObject
     /// <summary>
     /// Generate concrete symbol indexes for a grid with given columns (reels) and per-column rows.
     /// Grid indexing is column-major with bottom-left origin: index = row * columns + column.
-    /// This method produces an index sequence that always begins with the first column (column 0)
-    /// and anchors the pattern relative to column 0 so it doesn't start in a later column.
+    /// This method produces an index array with one entry per column. If a column does not contain
+    /// a valid cell for the pattern the corresponding entry will be -1. This makes missing/truncated
+    /// columns explicit for the evaluator.
     /// </summary>
     public int[] GenerateIndexes(int columns, int[] rowsPerColumn)
     {
@@ -53,7 +54,9 @@ public class WinlineDefinition : ScriptableObject
         for (int i = 0; i < rowsPerColumn.Length; i++) if (rowsPerColumn[i] > maxRows) maxRows = rowsPerColumn[i];
         if (maxRows <= 0) return System.Array.Empty<int>();
 
-        var list = new System.Collections.Generic.List<int>(columns);
+        // Initialize result with -1 placeholders (one slot per column)
+        var result = new int[columns];
+        for (int i = 0; i < columns; i++) result[i] = -1;
 
         switch (pattern)
         {
@@ -62,22 +65,25 @@ public class WinlineDefinition : ScriptableObject
                 int r = rowIndex;
                 // anchor base to column 0 available rows
                 int base0 = Mathf.Clamp(r, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-                list.Add(base0 * columns + 0);
+                // column 0 always anchored
+                if (base0 >= 0 && base0 < rowsPerColumn[0]) result[0] = base0 * columns + 0;
 
                 for (int c = 1; c < columns; c++)
                 {
                     if (r >= 0 && r < rowsPerColumn[c])
                     {
-                        list.Add(r * columns + c);
+                        result[c] = r * columns + c;
+                    }
+                    else
+                    {
+                        result[c] = -1; // explicit missing
                     }
                 }
-                return list.ToArray();
+                return result;
             }
             case PatternType.DiagonalDown:
             {
-                // desired base (uncinched) using maxRows
                 int desiredBase = (maxRows - 1 - rowOffset);
-                // anchor to column0 available rows
                 int base0 = Mathf.Clamp(desiredBase, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
 
                 for (int c = 0; c < columns; c++)
@@ -85,10 +91,14 @@ public class WinlineDefinition : ScriptableObject
                     int row = base0 - c; // step down to the right
                     if (row >= 0 && row < rowsPerColumn[c])
                     {
-                        list.Add(row * columns + c);
+                        result[c] = row * columns + c;
+                    }
+                    else
+                    {
+                        result[c] = -1;
                     }
                 }
-                return list.ToArray();
+                return result;
             }
             case PatternType.DiagonalUp:
             {
@@ -100,10 +110,14 @@ public class WinlineDefinition : ScriptableObject
                     int rowUp = base0 + c; // step up to the right
                     if (rowUp >= 0 && rowUp < rowsPerColumn[c])
                     {
-                        list.Add(rowUp * columns + c);
+                        result[c] = rowUp * columns + c;
+                    }
+                    else
+                    {
+                        result[c] = -1;
                     }
                 }
-                return list.ToArray();
+                return result;
             }
             case PatternType.Custom:
             {
@@ -111,28 +125,37 @@ public class WinlineDefinition : ScriptableObject
                 {
                     int base0 = Mathf.Clamp(customRowOffsets[0], 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
                     // include column0 anchored
-                    list.Add(base0 * columns + 0);
+                    if (base0 >= 0 && base0 < rowsPerColumn[0]) result[0] = base0 * columns + 0;
+                    else result[0] = -1;
 
                     for (int c = 1; c < columns; c++)
                     {
                         int rc = customRowOffsets[c];
                         if (rc >= 0 && rc < rowsPerColumn[c])
                         {
-                            list.Add(rc * columns + c);
+                            result[c] = rc * columns + c;
+                        }
+                        else
+                        {
+                            result[c] = -1;
                         }
                     }
-                    return list.ToArray();
+                    return result;
                 }
 
                 int mid = maxRows / 2;
                 int baseMid = Mathf.Clamp(mid, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-                list.Add(baseMid * columns + 0);
+                if (baseMid >= 0 && baseMid < rowsPerColumn[0]) result[0] = baseMid * columns + 0;
+                else result[0] = -1;
+
                 for (int c2 = 1; c2 < columns; c2++)
                 {
                     if (mid < rowsPerColumn[c2])
-                        list.Add(mid * columns + c2);
+                        result[c2] = mid * columns + c2;
+                    else
+                        result[c2] = -1;
                 }
-                return list.ToArray();
+                return result;
             }
             default:
                 return System.Array.Empty<int>();

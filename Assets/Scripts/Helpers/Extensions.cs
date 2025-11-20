@@ -11,15 +11,15 @@ public static class Extensions
 
 	public static SymbolData[] ToSymbolDatas(this GameSymbol[] symbols)
 	{
-		List<SymbolData> symbolData = new List<SymbolData>();
+		if (symbols == null) return new SymbolData[0];
 
-		foreach (GameSymbol s in symbols)
+		SymbolData[] result = new SymbolData[symbols.Length];
+		for (int i = 0; i < symbols.Length; i++)
 		{
-			if(s == null) continue;
-
-			symbolData.Add(s.CurrentSymbolData);
+			var s = symbols[i];
+			result[i] = s != null ? s.CurrentSymbolData : null;
 		}
 
-		return symbolData.ToArray();
+		return result;
 	}
 }

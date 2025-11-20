@@ -2,16 +2,15 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-using System;
-using System.Collections.Generic;
-using UnityEngine;
-
 /// <summary>
 /// Lightweight event manager that supports enum-based event channels with optional string suffixes.
 /// Internally it maps composed string keys to lists of handlers.
 /// </summary>
 public class EventManager
 {
+	// Global toggle to control whether this class emits Debug logging. Default off to avoid noisy logs.
+	public static bool LoggingEnabled = false;
+
 	// internal string-keyed channels
 	private Dictionary<string, List<Action<object>>> events = new Dictionary<string, List<Action<object>>>();
 
@@ -52,7 +51,7 @@ public class EventManager
 		}
 		else
 		{
-			Debug.LogWarning($"tried to unregister {eventKey} but not registered!");
+			if (LoggingEnabled) Debug.LogWarning($"tried to unregister {eventKey} but not registered!");
 		}
 	}
 
@@ -78,14 +77,14 @@ public class EventManager
 				}
 				catch (Exception ex)
 				{
-					Debug.LogException(ex);
+					if (LoggingEnabled) Debug.LogException(ex);
 				}
 			}
 		}
 		else
 		{
 			// No listeners is not an error; useful for debug tracing
-			Debug.Log($"{eventKey} broadcast with no listeners.");
+			if (LoggingEnabled) Debug.Log($"{eventKey} broadcast with no listeners.");
 		}
 	}
 

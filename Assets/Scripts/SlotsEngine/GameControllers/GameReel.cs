@@ -2,6 +2,7 @@ using DG.Tweening;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 public class GameReel : MonoBehaviour
 {
@@ -377,6 +378,13 @@ public class GameReel : MonoBehaviour
 		else
 		{
 			spinning = false;
+
+			// Debug: dump final symbols for this reel to help verify ordering/mapping
+			if (Application.isEditor || Debug.isDebugBuild)
+			{
+				var names = symbols.Select(s => s != null && s.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray();
+				Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]");
+			}
 
 			for (int i = 0; i < symbols.Count; i++)
 			{
