@@ -14,6 +14,8 @@ public class SlotsEngine : MonoBehaviour
 	public Transform ReelsRootTransform => reelsRootTransform;
 
 	private List<GameReel> reels = new List<GameReel>();
+	public List<GameReel> CurrentReels => reels;
+
 	private EventManager eventManager;
 	private SlotsStateMachine stateMachine;
 
@@ -272,6 +274,35 @@ public class SlotsEngine : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Add a new reel at runtime using the template reel's BaseDefinition. Convenience when callers don't have a definition handy.
+	/// </summary>
+	public void AddReel()
+	{
+		if (stateMachine != null && stateMachine.CurrentState == State.Spinning)
+		{
+			Debug.LogWarning("Cannot add reel while spinning.");
+			return;
+		}
+
+		if (currentSlotsData == null || currentSlotsData.CurrentReelData == null || currentSlotsData.CurrentReelData.Count == 0)
+		{
+			Debug.LogWarning("No template reel available to create a new reel.");
+			return;
+		}
+
+		var template = currentSlotsData.CurrentReelData[0];
+		var def = template.BaseDefinition;
+		if (def != null)
+		{
+			AddReel(def);
+		}
+		else
+		{
+			Debug.LogWarning("Template reel does not have a BaseDefinition. Cannot create new reel.");
+		}
+	}
+
+	/// <summary>
 	/// Insert a reel into a specific index. Persists data and broadcasts event.
 	/// </summary>
 	public void InsertReelAt(int index, ReelData newReelData)
@@ -472,7 +503,7 @@ public class SlotsEngine : MonoBehaviour
 		// Configuration: how much of the container to fill (leave margins)
 		const float heightFill = 0.8f; // fraction of vertical space used
 		const float widthFill = 0.95f; // fraction of horizontal space used
-		const float spacingFactor = 0.2f; // spacing expressed as fraction of symbol size
+		const float spacingFactor = 0.1f; // spacing expressed as fraction of symbol size
 
 		// Compute max symbol size allowed by height
 		float symbolMaxByHeight = float.MaxValue;

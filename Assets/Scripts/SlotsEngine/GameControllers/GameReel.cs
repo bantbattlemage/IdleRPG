@@ -494,4 +494,127 @@ public class GameReel : MonoBehaviour
 			}
 		}
 	}
+
+	/// <summary>
+	/// Change the number of visible symbols on this reel at runtime. This will update the data model and either
+	/// incrementally add/remove visible symbols or fully respawn roots depending on the `incremental` flag.
+	/// </summary>
+	public void SetSymbolCount(int newCount, bool incremental = true)
+	{
+		if (newCount < 1) newCount = 1;
+
+		// Do not allow layout changes while spinning
+		if (spinning)
+		{
+			Debug.LogWarning("Cannot change symbol count while reel is spinning.");
+			return;
+		}
+
+		int oldCount = currentReelData.SymbolCount;
+		if (newCount == oldCount) return;
+
+		// Update data model count first
+		currentReelData.SetSymbolCount(newCount);
+
+		// Ensure current symbol data list matches the desired length
+		var dataList = currentReelData.CurrentSymbolData ?? new List<SymbolData>();
+
+		if (dataList.Count > newCount)
+		{
+			// trim
+			dataList.RemoveRange(newCount, dataList.Count - newCount);
+		}
+		else if (dataList.Count < newCount)
+		{
+			// append random symbols from strip to fill
+			for (int i = dataList.Count; i < newCount; i++)
+			{
+				dataList.Add(reelStrip.GetWeightedSymbol());
+			}
+		}
+
+		currentReelData.SetCurrentSymbolData(dataList);
+
+		// If full respawn requested, reuse existing SpawnReel behavior
+		if (!incremental)
+		{
+			SpawnReel(currentReelData.CurrentSymbolData);
+
+			// Notify manager to adjust layouts since visual count changed
+			SlotsEngineManager.Instance.AdjustSlotsCanvases();
+			return;
+		}
+
+		// Incremental path: add or remove active symbols without destroying other active symbols
+		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+
+		if (newCount > oldCount)
+		{
+			// Add new symbols at the end
+			for (int i = oldCount; i < newCount; i++)
+			{
+				GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot);
+				SymbolData def = (currentReelData.CurrentSymbolData != null && currentReelData.CurrentSymbolData.Count > i)
+					? currentReelData.CurrentSymbolData[i]
+					: reelStrip.GetWeightedSymbol();
+				sym.InitializeSymbol(def, eventManager);
+				sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+				symbols.Add(sym);
+			}
+		}
+		else // newCount < oldCount
+		{
+			// Remove symbols from the end (return to pool)
+			for (int i = oldCount - 1; i >= newCount; i--)
+			{
+				if (i < 0 || i >= symbols.Count) continue;
+				var sym = symbols[i];
+				if (sym != null) GameSymbolPool.Instance.Release(sym);
+				symbols.RemoveAt(i);
+			}
+		}
+
+		// Recreate dummy symbols: free existing dummies and spawn new ones to reflect the new count
+		if (topDummySymbols != null)
+		{
+			for (int i = 0; i < topDummySymbols.Count; i++) if (topDummySymbols[i] != null) GameSymbolPool.Instance.Release(topDummySymbols[i]);
+			topDummySymbols.Clear();
+		}
+
+		if (bottomDummySymbols != null)
+		{
+			for (int i = 0; i < bottomDummySymbols.Count; i++) if (bottomDummySymbols[i] != null) GameSymbolPool.Instance.Release(bottomDummySymbols[i]);
+			bottomDummySymbols.Clear();
+		}
+
+		// Spawn updated dummies under the active root
+		SpawnDummySymbols(symbolRoot);
+		SpawnDummySymbols(symbolRoot, false);
+
+		// Clear any buffered symbols in nextSymbolsRoot so future buffer spawn matches new count
+		ReleaseAllSymbolsInRoot(nextSymbolsRoot);
+
+		// Recompute buffer offset
+		if (nextSymbolsRoot != null)
+		{
+			float offsetY = ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount - 1) * 3));
+			nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+		}
+
+		// Ensure all active symbols have correct size/position
+		for (int i = 0; i < symbols.Count; i++)
+		{
+			var gs = symbols[i];
+			if (gs == null) continue;
+			var rt = gs.CachedRect;
+			if (rt != null)
+			{
+				rt.sizeDelta = new Vector2(currentReelData.SymbolSize, currentReelData.SymbolSize);
+				rt.localPosition = new Vector3(rt.localPosition.x, step * i, 0f);
+			}
+		}
+
+		// Notify manager to adjust layouts since visual count changed
+		SlotsEngineManager.Instance.AdjustSlotsCanvases();
+	}
 }

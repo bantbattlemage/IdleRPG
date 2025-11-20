@@ -38,12 +38,10 @@ public class ReelData : Data
 		get { EnsureResolved(); return currentSymbolData; }
 	}
 
-	public ReelData(float duration, int count, int size, int spacing, ReelStripDefinition defaultStrip, ReelDefinition def, ReelStripData existingStripData = null)
+	public ReelData(float duration, int count, ReelStripDefinition defaultStrip, ReelDefinition def, ReelStripData existingStripData = null)
 	{
 		reelSpinDuration = duration;
 		symbolCount = count;
-		symbolSize = size;
-		symbolSpacing = spacing;
 		baseDefinition = def;
 		currentSymbolData = new List<SymbolData>();
 
@@ -83,6 +81,14 @@ public class ReelData : Data
 	{
 		symbolSize = (int)size;
 		symbolSpacing = (int)spacing;
+	}
+
+	// Allow changing the number of symbols (rows) on a reel at runtime.
+	public void SetSymbolCount(int count)
+	{
+		if (count < 1) count = 1;
+		symbolCount = count;
+		// Note: visual update is handled by GameReel which owns the spawned GameObjects.
 	}
 
 	private void EnsureResolved()

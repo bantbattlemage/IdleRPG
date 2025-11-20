@@ -70,10 +70,16 @@ public class GamePlayer : Singleton<GamePlayer>
 		//	Testing add reels
 		if (Input.GetKeyDown(KeyCode.R))
 		{
-			foreach(var slots in playerSlots)
-			{
-				slots.AddReel(slots.CurrentSlotsData.CurrentReelData[0].BaseDefinition);
-			}
+			var slots = playerSlots.GetRandom();
+			slots.AddReel();
+		}
+
+		//	Testing add symbols
+		if (Input.GetKeyDown(KeyCode.A))
+		{
+			var slots = playerSlots.GetRandom();
+			var reel = slots.CurrentReels.GetRandom();
+			reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
 		}
 
 		//	Testing kill slots
