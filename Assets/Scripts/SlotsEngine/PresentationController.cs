@@ -25,13 +25,20 @@ public class PresentationController : Singleton<PresentationController>
 		var currentSymbolGrid = slotsToPresent.GetCurrentSymbolGrid();
 		// Derive grid dimensions explicitly for the evaluator
 		int columns = slotsToPresent.CurrentReels?.Count ?? slotsToPresent.CurrentSlotsData.CurrentReelData.Count;
-		int rows = 0;
-		if (slotsToPresent.CurrentSlotsData != null && slotsToPresent.CurrentSlotsData.CurrentReelData != null && slotsToPresent.CurrentSlotsData.CurrentReelData.Count > 0)
+		int[] rowsPerColumn = new int[columns];
+		for (int c = 0; c < columns; c++)
 		{
-			rows = slotsToPresent.CurrentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+			if (c < slotsToPresent.CurrentSlotsData.CurrentReelData.Count)
+			{
+				rowsPerColumn[c] = slotsToPresent.CurrentSlotsData.CurrentReelData[c].SymbolCount;
+			}
+			else
+			{
+				rowsPerColumn[c] = 0;
+			}
 		}
 
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDatas(), columns, rows, slotsToPresent.CurrentSlotsData.WinlineDefinitions);
+		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDatas(), columns, rowsPerColumn, slotsToPresent.CurrentSlotsData.WinlineDefinitions);
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
 		slotsData.SetCurrentWinData(winData);
 

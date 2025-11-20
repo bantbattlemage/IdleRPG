@@ -28,61 +28,82 @@ public class WinlineDefinition : ScriptableObject
     public int[] CustomRowOffsets => customRowOffsets;
 
     /// <summary>
-    /// Generate concrete symbol indexes for a grid with given columns (reels) and rows (symbols per reel).
-    /// Grid indexing is column-major with bottom-left origin: index = row * columns + column.
+    /// Legacy signature kept for compatibility: generates indexes using a uniform row count across columns.
     /// </summary>
     public int[] GenerateIndexes(int columns, int rows)
     {
-        if (columns <= 0 || rows <= 0) return System.Array.Empty<int>();
+        // Delegate to per-column overload using uniform counts
+        int[] perCol = new int[columns];
+        for (int i = 0; i < columns; i++) perCol[i] = rows;
+        return GenerateIndexes(columns, perCol);
+    }
+
+    /// <summary>
+    /// Generate concrete symbol indexes for a grid with given columns (reels) and per-column rows.
+    /// Grid indexing is column-major with bottom-left origin: index = row * columns + column.
+    /// If a given column does not have the requested row, the resulting grid cell will be null when
+    /// the grid array is constructed (Helpers.CombineColumnsToGrid uses Max rows). This method will
+    /// still return the index into the full rectangular grid (using maxRows) so callers can inspect
+    /// the produced cells.
+    /// </summary>
+    public int[] GenerateIndexes(int columns, int[] rowsPerColumn)
+    {
+        if (columns <= 0 || rowsPerColumn == null || rowsPerColumn.Length != columns)
+            return System.Array.Empty<int>();
+
+        int maxRows = 0;
+        for (int i = 0; i < rowsPerColumn.Length; i++) if (rowsPerColumn[i] > maxRows) maxRows = rowsPerColumn[i];
+        if (maxRows <= 0) return System.Array.Empty<int>();
 
         switch (pattern)
         {
             case PatternType.StraightAcross:
-                int r = Mathf.Clamp(rowIndex, 0, rows - 1);
+            {
+                int r = Mathf.Clamp(rowIndex, 0, maxRows - 1);
                 var straight = new int[columns];
                 for (int c = 0; c < columns; c++) straight[c] = r * columns + c;
                 return straight;
-
+            }
             case PatternType.DiagonalDown:
-                // Start near the top then step down to the right
+            {
                 var diagDown = new int[columns];
                 for (int c = 0; c < columns; c++)
                 {
-                    int row = (rows - 1 - rowOffset) - c;
-                    row = Mathf.Clamp(row, 0, rows - 1);
+                    int row = (maxRows - 1 - rowOffset) - c;
+                    row = Mathf.Clamp(row, 0, maxRows - 1);
                     diagDown[c] = row * columns + c;
                 }
                 return diagDown;
-
+            }
             case PatternType.DiagonalUp:
-                // Start near the bottom then step up to the right
+            {
                 var diagUp = new int[columns];
                 for (int c = 0; c < columns; c++)
                 {
                     int rowUp = rowOffset + c;
-                    rowUp = Mathf.Clamp(rowUp, 0, rows - 1);
+                    rowUp = Mathf.Clamp(rowUp, 0, maxRows - 1);
                     diagUp[c] = rowUp * columns + c;
                 }
                 return diagUp;
-
+            }
             case PatternType.Custom:
+            {
                 if (customRowOffsets != null && customRowOffsets.Length == columns)
                 {
                     var custom = new int[columns];
                     for (int c = 0; c < columns; c++)
                     {
-                        int rc = Mathf.Clamp(customRowOffsets[c], 0, rows - 1);
+                        int rc = Mathf.Clamp(customRowOffsets[c], 0, maxRows - 1);
                         custom[c] = rc * columns + c;
                     }
                     return custom;
                 }
 
-                // Fallback to middle row across
-                int mid = rows / 2;
+                int mid = maxRows / 2;
                 var fallback = new int[columns];
                 for (int c2 = 0; c2 < columns; c2++) fallback[c2] = mid * columns + c2;
                 return fallback;
-
+            }
             default:
                 return System.Array.Empty<int>();
         }
