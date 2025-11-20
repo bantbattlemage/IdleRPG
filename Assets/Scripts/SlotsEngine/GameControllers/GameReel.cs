@@ -190,13 +190,15 @@ public class GameReel : MonoBehaviour
 
 		symbols = newSymbols;
 
-		SpawnDummySymbols(nextSymbolsRoot);
-		SpawnDummySymbols(nextSymbolsRoot, false);
+		// Spawn dummies for the buffer. These are created while the reel is already spinning,
+		// so they should remain unfaded (white) when spawned. Pass dim=false to keep them white.
+		SpawnDummySymbols(nextSymbolsRoot, true, null, dim: false);
+		SpawnDummySymbols(nextSymbolsRoot, false, null, dim: false);
 
 		// nextSymbolsRoot is already the buffer root
 	}
 
-	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null)
+	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
 
@@ -204,6 +206,9 @@ public class GameReel : MonoBehaviour
 		int flip = bottom ? -1 : 1;
 		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount;		
 		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+
+		// Color used for initial dimming
+		Color dimColor = new Color(0.5f, 0.5f, 0.5f);
 
 		for (int i = 0; i < total; i++)
 		{
@@ -224,6 +229,15 @@ public class GameReel : MonoBehaviour
 			// Use helper to set size and Y in one call
 			float y = (step * (i + startIndex)) * flip;
 			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, y);
+
+			// Apply initial color according to `dim` flag. If dim==true (default for initialization/adjust),
+			// set to the dim color immediately. If dim==false (used when spawning buffer during spin), keep white.
+			var img = symbol.CachedImage;
+			if (img != null)
+			{
+				img.DOKill();
+				img.color = dim ? dimColor : Color.white;
+			}
 
 			dummies.Add(symbol);
 		}
@@ -440,7 +454,7 @@ public class GameReel : MonoBehaviour
 					}
 				}
 			}
-		}
+		};
 
 		// Update both active and buffer roots
 		UpdateRootChildren(symbolRoot);
@@ -493,6 +507,12 @@ public class GameReel : MonoBehaviour
 				float y = (newStepLocal * (i + currentReelData.SymbolCount)) * 1f;
 				rt.localPosition = new Vector3(rt.localPosition.x, y, 0f);
 			}
+		}
+
+		// Ensure dummy symbols reflect dimmed state when resizing outside of a spin.
+		if (!spinning)
+		{
+			DimDummySymbols();
 		}
 	}
 

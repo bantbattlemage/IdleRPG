@@ -80,20 +80,6 @@ public class SlotsEngine : MonoBehaviour
 		reelsRootTransform = canvasTransform;
 
 		SpawnReels(reelsRootTransform);
-
-		foreach (GameReel r in reels)
-		{
-			int count;
-
-			if (r.CurrentReelData != null)
-			{
-				count = r.CurrentReelData.SymbolCount * 4;
-			}
-			else
-			{
-				count = 20;
-			}
-		}
 	}
 
 	public void BeginSlots()
@@ -126,7 +112,7 @@ public class SlotsEngine : MonoBehaviour
 	{
 		if (spinInProgress)
 		{
-			throw new Exception("spin already in progress!");
+			throw new InvalidOperationException("Spin already in progress!");
 		}
 
 		float falloutDelay = 0.025f;
@@ -158,18 +144,16 @@ public class SlotsEngine : MonoBehaviour
 			{
 				eventManager.BroadcastEvent(State.Spinning, "Enter");
 			}
-			catch { }
+			catch (Exception ex)
+			{
+				Debug.LogException(ex);
+				throw;
+			}
 
 			return;
 		}
 
-		// If already in spinInProgress, keep existing logic for completeness (no-op)
-		if (reels.TrueForAll(x => x.Spinning))
-		{
-			spinInProgress = true;
-			stateMachine.SetState(State.Spinning);
-			try { eventManager.BroadcastEvent(State.Spinning, "Enter"); } catch { }
-		}
+		// If already in spinInProgress, no further action required.
 	}
 
 	private void StopAllReels()
@@ -250,7 +234,7 @@ public class SlotsEngine : MonoBehaviour
 
 		if (currentSlotsData == null)
 		{
-			throw new Exception("CurrentSlotsData is null");
+			throw new InvalidOperationException("CurrentSlotsData is null");
 		}
 
 		// Make sure the new reel matches current layout sizes if possible
@@ -346,7 +330,7 @@ public class SlotsEngine : MonoBehaviour
 
 		if (currentSlotsData == null)
 		{
-			throw new Exception("CurrentSlotsData is null");
+			throw new InvalidOperationException("CurrentSlotsData is null");
 		}
 
 		if (index < 0 || index > currentSlotsData.CurrentReelData.Count)
@@ -410,11 +394,7 @@ public class SlotsEngine : MonoBehaviour
 		var dataToRemove = currentSlotsData.CurrentReelData[index];
 		currentSlotsData.RemoveReel(dataToRemove);
 		// Also remove from ReelDataManager local store if exists
-		try
-		{
-			ReelDataManager.Instance.RemoveDataIfExists(dataToRemove);
-		}
-		catch { }
+		ReelDataManager.Instance.RemoveDataIfExists(dataToRemove);
 		SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
 
 		// Destroy visual reel and remove from list
@@ -439,7 +419,7 @@ public class SlotsEngine : MonoBehaviour
 	public void RemoveReel(GameReel reelToRemove)
 	{
 		int idx = reels.IndexOf(reelToRemove);
-		if (idx == -1) throw new Exception("Reel not part of this SlotsEngine");
+		if (idx == -1) throw new ArgumentException("Reel not part of this SlotsEngine", nameof(reelToRemove));
 		RemoveReelAt(idx);
 	}
 
@@ -507,7 +487,7 @@ public class SlotsEngine : MonoBehaviour
 		// Do not allow layout changes while reels are actively spinning
 		if (stateMachine.CurrentState == State.Spinning)
 		{
-			throw new Exception("should not adjust reels while they are spinning!");
+			throw new InvalidOperationException("Should not adjust reels while they are spinning!");
 		}
 
 		// If reels haven't been created yet - create them using the usual path.
