@@ -27,11 +27,11 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	public void InitializePlayer(BetLevelDefinition defaultBetLevel)
 	{
-		GlobalEventManager.Instance.RegisterEvent("BetUpPressed", OnBetUpPressed);
-		GlobalEventManager.Instance.RegisterEvent("BetDownPressed", OnBetDownPressed);
-		GlobalEventManager.Instance.RegisterEvent("SpinButtonPressed", OnPlayerInputPressed);
-		GlobalEventManager.Instance.RegisterEvent("StopButtonPressed", OnPlayerInputPressed);
-		GlobalEventManager.Instance.RegisterEvent("PlayerInputPressed", OnPlayerInputPressed);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetUpPressed, OnBetUpPressed);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetDownPressed, OnBetDownPressed);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.SpinButtonPressed, OnPlayerInputPressed);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.StopButtonPressed, OnPlayerInputPressed);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.PlayerInputPressed, OnPlayerInputPressed);
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
 
@@ -58,7 +58,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		//	Space input
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
-			GlobalEventManager.Instance.BroadcastEvent("PlayerInputPressed");
+			GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.PlayerInputPressed);
 		}
 
 		//	Testing add slots
@@ -125,7 +125,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 
 		SetCurrentBet(playerData.CurrentBet);
-		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.CreditsChanged, CurrentCredits);
 	}
 
 	private void SpawnSlots(SlotsData existingData = null, bool beginSlots = false)
@@ -201,7 +201,7 @@ public class GamePlayer : Singleton<GamePlayer>
 	public void AddCredits(int value)
 	{
 		playerData.SetCurrentCredits(CurrentCredits + value);
-		GlobalEventManager.Instance.BroadcastEvent("CreditsChanged", CurrentCredits);
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.CreditsChanged, CurrentCredits);
 	}
 
 	public void SetCurrentBet(BetLevelDefinition bet)
@@ -212,7 +212,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 
 		playerData.SetCurrentBet(bet);
-		GlobalEventManager.Instance.BroadcastEvent("BetChanged", bet);
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.BetChanged, bet);
 	}
 
 	private void OnBetDownPressed(object obj)

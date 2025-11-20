@@ -4,11 +4,16 @@ using UnityEngine;
 
 public class EventManager
 {
+	// string-based channels
 	private Dictionary<string, List<Action<object>>> events = new Dictionary<string, List<Action<object>>>();
 
+	// -------------------- Legacy string-based API --------------------
 	public void RegisterEvent(string eventName, Action<object> action)
 	{
-		if(events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
+		if (string.IsNullOrEmpty(eventName)) throw new ArgumentNullException(nameof(eventName));
+		if (action == null) throw new ArgumentNullException(nameof(action));
+
+		if (events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
 		{
 			currentRegisteredEvents.Add(action);
 		}
@@ -21,9 +26,16 @@ public class EventManager
 
 	public void UnregisterEvent(string eventName, Action<object> action)
 	{
+		if (string.IsNullOrEmpty(eventName)) throw new ArgumentNullException(nameof(eventName));
+		if (action == null) throw new ArgumentNullException(nameof(action));
+
 		if (events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
 		{
 			currentRegisteredEvents.Remove(action);
+			if (currentRegisteredEvents.Count == 0)
+			{
+				events.Remove(eventName);
+			}
 		}
 		else
 		{
@@ -33,17 +45,70 @@ public class EventManager
 
 	public void BroadcastEvent(string eventName, object value = null)
 	{
+		if (string.IsNullOrEmpty(eventName)) throw new ArgumentNullException(nameof(eventName));
+
 		if (events.TryGetValue(eventName, out List<Action<object>> currentRegisteredEvents))
 		{
-			foreach (Action<object> e in currentRegisteredEvents)
+			// iterate over a copy to avoid collection modified issues
+			var copy = currentRegisteredEvents.ToArray();
+			foreach (Action<object> e in copy)
 			{
-				e.Invoke(value);
+				if (e == null) continue;
+				try
+				{
+					e.Invoke(value);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogException(ex);
+				}
 			}
 		}
 		else
 		{
 			Debug.Log($"{eventName} broadcast with no listeners.");
-			//throw new System.Exception($"Tried to broadcast event {eventName} but event is not registered!");
 		}
+	}
+
+	public bool HasSubscribers(string eventName)
+	{
+		if (string.IsNullOrEmpty(eventName)) return false;
+		return events.TryGetValue(eventName, out var list) && list.Count > 0;
+	}
+
+	// -------------------- Enum convenience overloads --------------------
+	public void RegisterEvent(Enum baseEnum, string suffix, Action<object> action)
+	{
+		RegisterEvent(EventKey.Compose(baseEnum, suffix), action);
+	}
+
+	public void RegisterEvent(Enum baseEnum, Action<object> action)
+	{
+		RegisterEvent(baseEnum, null, action);
+	}
+
+	public void UnregisterEvent(Enum baseEnum, string suffix, Action<object> action)
+	{
+		UnregisterEvent(EventKey.Compose(baseEnum, suffix), action);
+	}
+
+	public void UnregisterEvent(Enum baseEnum, Action<object> action)
+	{
+		UnregisterEvent(baseEnum, null, action);
+	}
+
+	public void BroadcastEvent(Enum baseEnum, string suffix, object value = null)
+	{
+		BroadcastEvent(EventKey.Compose(baseEnum, suffix), value);
+	}
+
+	public void BroadcastEvent(Enum baseEnum, object value = null)
+	{
+		BroadcastEvent(baseEnum, null, value);
+	}
+
+	public bool HasSubscribers(Enum baseEnum, string suffix = null)
+	{
+		return HasSubscribers(EventKey.Compose(baseEnum, suffix));
 	}
 }

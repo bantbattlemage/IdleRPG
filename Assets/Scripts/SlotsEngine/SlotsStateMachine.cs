@@ -1,3 +1,4 @@
+using System;
 
 public class SlotsStateMachine : StateMachine
 {
@@ -17,7 +18,8 @@ public class SlotsStateMachine : StateMachine
 		RegisterState(State.Spinning);
 		RegisterState(State.Presentation);
 
-		eventManager.RegisterEvent("InitEnter", OnInitEnter);
+		// register Init enter using enum+suffix so it matches BroadcastEvent in GameState.EnterState
+		eventManager.RegisterEvent(State.Init, "Enter", OnInitEnter);
 
 		currentState = State.Init;
 		states[currentState].EnterState();

@@ -102,10 +102,6 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		SlotsEngine newSlots = Instantiate(slotsEnginePrefab, transform).GetComponent<SlotsEngine>();
 		GameObject newReelsGroup = Instantiate(reelsGroupPrefab, targetTransform);
 
-		// Subscribe to runtime reel add/remove so manager can adjust layout
-		newSlots.ReelAdded += OnSlotReelChanged;
-		newSlots.ReelRemoved += OnSlotReelChanged;
-
 		if (existingData != null)
 		{
 			newSlots.InitializeSlotsEngine(newReelsGroup.transform, existingData);
@@ -114,6 +110,10 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		{
 			newSlots.InitializeSlotsEngine(newReelsGroup.transform, testDefinition);
 		}
+
+		// Subscribe to runtime reel add/remove so manager can adjust layout
+		// Old native events replaced with EventManager-backed API
+		newSlots.RegisterReelChanged(OnSlotReelChangedEvent);
 
 		slotsEngines.Add(newSlots);
 		pageToUse.AddSlotsToPage(newSlots);
@@ -159,9 +159,8 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 			}
 		}
 
-		// Unsubscribe events
-		slotsToDestroy.ReelAdded -= OnSlotReelChanged;
-		slotsToDestroy.ReelRemoved -= OnSlotReelChanged;
+		// Unsubscribe events (EventManager-backed API)
+		slotsToDestroy.UnregisterReelChanged(OnSlotReelChangedEvent);
 
 		// Remove from the master engines list and destroy the engine + its reels root
 		slotsEngines.Remove(slotsToDestroy);
@@ -281,6 +280,12 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 	{
 		// Called whenever a reel is added/removed in any SlotsEngine
 		// Trigger layout adjustments so other slots and the page update sizes/positions
+		AdjustSlotsCanvases();
+	}
+
+	private void OnSlotReelChangedEvent(object obj)
+	{
+		// EventManager passes the changed reel or similar payload; we only need to update layout
 		AdjustSlotsCanvases();
 	}
 }

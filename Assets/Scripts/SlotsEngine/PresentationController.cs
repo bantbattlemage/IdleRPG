@@ -15,7 +15,7 @@ public class PresentationController : Singleton<PresentationController>
 		};
 		slots.Add(newData);
 
-		eventManager.RegisterEvent("BeginSlotPresentation", OnBeginSlotPresentation);
+		eventManager.RegisterEvent(SlotsEvent.BeginSlotPresentation, OnBeginSlotPresentation);
 	}
 
 	private void OnBeginSlotPresentation(object obj)
@@ -63,7 +63,7 @@ public class PresentationController : Singleton<PresentationController>
 		{
 			foreach (int index in w.WinningSymbolIndexes)
 			{
-				slotsToPresent.BroadcastSlotsEvent("SymbolWin", grid[index]);
+				slotsToPresent.BroadcastSlotsEvent(SlotsEvent.SymbolWin, grid[index]);
 			}
 		}
 
@@ -96,7 +96,7 @@ public class PresentationController : Singleton<PresentationController>
 	private void CompletePresentation(SlotsPresentationData slotsToComplete)
 	{
 		slotsToComplete.SetPresentationCompleted(true);
-		slotsToComplete.slotsEngine.BroadcastSlotsEvent("PresentationComplete");
+		slotsToComplete.slotsEngine.BroadcastSlotsEvent(SlotsEvent.PresentationComplete);
 		slotsToComplete.ClearCurrentWinData();
 
 		if (slots.TrueForAll(x => x.presentationCompleted))

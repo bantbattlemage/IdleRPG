@@ -26,9 +26,9 @@ public class GameSymbol : MonoBehaviour
 		eventManager = slotsEventManager;
 
 		// register to slot events
-		eventManager.RegisterEvent("SymbolLanded", OnSymbolLanded);
-		eventManager.RegisterEvent("SymbolWin", OnSymbolWin);
-		eventManager.RegisterEvent("IdleExit", OnIdleExit);
+		eventManager.RegisterEvent(SlotsEvent.SymbolLanded, OnSymbolLanded);
+		eventManager.RegisterEvent(SlotsEvent.SymbolWin, OnSymbolWin);
+		eventManager.RegisterEvent(State.Idle, "Exit", OnIdleExit);
 
 		ApplySymbol(symbol);
 	}
@@ -81,9 +81,9 @@ public class GameSymbol : MonoBehaviour
 	{
 		if (eventManager == null) return;
 
-		eventManager.UnregisterEvent("SymbolLanded", OnSymbolLanded);
-		eventManager.UnregisterEvent("SymbolWin", OnSymbolWin);
-		eventManager.UnregisterEvent("IdleExit", OnIdleExit);
+		eventManager.UnregisterEvent(SlotsEvent.SymbolLanded, OnSymbolLanded);
+		eventManager.UnregisterEvent(SlotsEvent.SymbolWin, OnSymbolWin);
+		eventManager.UnregisterEvent(State.Idle, "Exit", OnIdleExit);
 
 		eventManager = null;
 	}

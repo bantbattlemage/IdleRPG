@@ -23,9 +23,6 @@ public class SlotsEngine : MonoBehaviour
 
 	private Transform currentReelsGroup;
 
-	public event Action<GameReel, int> ReelAdded; // (addedReel, index)
-	public event Action<GameReel, int> ReelRemoved; // (removedReel, previousIndex)
-
 	public State CurrentState
 	{
 		get => stateMachine.CurrentState;
@@ -49,19 +46,36 @@ public class SlotsEngine : MonoBehaviour
 		InitializeSlotsEngine(canvasTransform, currentSlotsData);
 	}
 
+	private List<Action<object>> pendingReelChangedHandlers = new List<Action<object>>();
+
 	public void InitializeSlotsEngine(Transform canvasTransform, SlotsData data)
 	{
 		currentSlotsData = data;
 
 		eventManager = new EventManager();
+		// register any pending reel-changed handlers that were added early
+		if (pendingReelChangedHandlers != null && pendingReelChangedHandlers.Count > 0)
+		{
+			foreach (var h in pendingReelChangedHandlers)
+			{
+				eventManager.RegisterEvent(SlotsEvent.ReelAdded, h);
+				eventManager.RegisterEvent(SlotsEvent.ReelRemoved, h);
+			}
+			pendingReelChangedHandlers.Clear();
+		}
 		stateMachine = new SlotsStateMachine();
 		stateMachine.InitializeStateMachine(this, eventManager);
 
-		eventManager.RegisterEvent("SpinCompleted", OnSpinCompleted);
-		eventManager.RegisterEvent("ReelSpinStarted", OnReelSpinStarted);
-		eventManager.RegisterEvent("ReelCompleted", OnReelCompleted);
-		eventManager.RegisterEvent("PresentationEnter", OnPresentationEnter);
-		eventManager.RegisterEvent("PresentationComplete", OnPresentationComplete);
+		// subscribe to engine-local events using enum keys where available
+		eventManager.RegisterEvent(SlotsEvent.SpinCompleted, OnSpinCompleted);
+		eventManager.RegisterEvent(SlotsEvent.ReelSpinStarted, OnReelSpinStarted);
+		eventManager.RegisterEvent(SlotsEvent.ReelCompleted, OnReelCompleted);
+
+		// respond to the state machine entering the Presentation state
+		eventManager.RegisterEvent(State.Presentation, "Enter", OnPresentationEnter);
+
+		// presentation complete comes from presentation controller
+		eventManager.RegisterEvent(SlotsEvent.PresentationComplete, OnPresentationComplete);
 
 		reelsRootTransform = canvasTransform;
 
@@ -134,10 +148,27 @@ public class SlotsEngine : MonoBehaviour
 
 	private void OnReelSpinStarted(object obj)
 	{
+		// When any reel reports it has started spinning, enter the Spinning state if not already.
+		if (!spinInProgress)
+		{
+			spinInProgress = true;
+			stateMachine.SetState(State.Spinning);
+			// Fallback: ensure any listeners receive the state enter event even if SetState's broadcast was missed
+			try
+			{
+				eventManager.BroadcastEvent(State.Spinning, "Enter");
+			}
+			catch { }
+
+			return;
+		}
+
+		// If already in spinInProgress, keep existing logic for completeness (no-op)
 		if (reels.TrueForAll(x => x.Spinning))
 		{
 			spinInProgress = true;
 			stateMachine.SetState(State.Spinning);
+			try { eventManager.BroadcastEvent(State.Spinning, "Enter"); } catch { }
 		}
 	}
 
@@ -155,7 +186,7 @@ public class SlotsEngine : MonoBehaviour
 			stagger += 0.025f;
 		}
 
-		eventManager.BroadcastEvent("StoppingReels");
+		eventManager.BroadcastEvent(SlotsEvent.StoppingReels);
 	}
 
 	private void SpawnReels(Transform gameCanvas)
@@ -261,7 +292,7 @@ public class SlotsEngine : MonoBehaviour
 		RepositionReels();
 
 		// Broadcast event
-		ReelAdded?.Invoke(reel, newIndex);
+		eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
 	}
 
 	/// <summary>
@@ -356,7 +387,7 @@ public class SlotsEngine : MonoBehaviour
 		RefreshReelsAfterModification();
 
 		// Broadcast event
-		ReelAdded?.Invoke(reel, index);
+		eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
 	}
 
 	/// <summary>
@@ -399,7 +430,7 @@ public class SlotsEngine : MonoBehaviour
 		RefreshReelsAfterModification();
 
 		// Broadcast removed event
-		ReelRemoved?.Invoke(reel, index);
+		eventManager.BroadcastEvent(SlotsEvent.ReelRemoved, reel);
 	}
 
 	/// <summary>
@@ -592,7 +623,7 @@ public class SlotsEngine : MonoBehaviour
 		if (reels.TrueForAll(x => !x.Spinning))
 		{
 			spinInProgress = false;
-			eventManager.BroadcastEvent("SpinCompleted");
+			eventManager.BroadcastEvent(SlotsEvent.SpinCompleted);
 		}
 	}
 
@@ -608,7 +639,7 @@ public class SlotsEngine : MonoBehaviour
 			gr.DimDummySymbols();
 		}
 
-		eventManager.BroadcastEvent("BeginSlotPresentation", this);
+		eventManager.BroadcastEvent(SlotsEvent.BeginSlotPresentation, this);
 	}
 
 	private void OnPresentationComplete(object obj)
@@ -632,7 +663,7 @@ public class SlotsEngine : MonoBehaviour
 		return Helpers.CombineColumnsToGrid(reelSymbols);
 	}
 
-	public void BroadcastSlotsEvent(string eventName, object value = null)
+	public void BroadcastSlotsEvent(SlotsEvent eventName, object value = null)
 	{
 		eventManager.BroadcastEvent(eventName, value);
 	}
@@ -641,5 +672,35 @@ public class SlotsEngine : MonoBehaviour
 	{
 		SlotsDataManager.Instance.AddNewData(currentSlotsData);
 		DataPersistenceManager.Instance.SaveGame();
+	}
+
+	// Allow external managers to subscribe to reel add/remove notifications using the EventManager
+	public void RegisterReelChanged(Action<object> handler)
+	{
+		if (handler == null) return;
+		if (eventManager == null)
+		{
+			// queue until initialization completes
+			if (pendingReelChangedHandlers == null) pendingReelChangedHandlers = new List<Action<object>>();
+			pendingReelChangedHandlers.Add(handler);
+			return;
+		}
+		eventManager.RegisterEvent(SlotsEvent.ReelAdded, handler);
+		eventManager.RegisterEvent(SlotsEvent.ReelRemoved, handler);
+	}
+
+	public void UnregisterReelChanged(Action<object> handler)
+	{
+		if (handler == null) return;
+		if (eventManager == null)
+		{
+			if (pendingReelChangedHandlers != null && pendingReelChangedHandlers.Contains(handler))
+			{
+				pendingReelChangedHandlers.Remove(handler);
+			}
+			return;
+		}
+		eventManager.UnregisterEvent(SlotsEvent.ReelAdded, handler);
+		eventManager.UnregisterEvent(SlotsEvent.ReelRemoved, handler);
 	}
 }

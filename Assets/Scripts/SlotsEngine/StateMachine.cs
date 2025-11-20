@@ -74,13 +74,13 @@ public class GameState
 
 	public void EnterState()
 	{
-		eventManager.BroadcastEvent($"{state.ToString()}Enter");
+		eventManager.BroadcastEvent(state, "Enter");
 		if (enterAction != null) enterAction();
 	}
 
 	public void ExitState()
 	{
-		eventManager.BroadcastEvent($"{state.ToString()}Exit");
+		eventManager.BroadcastEvent(state, "Exit");
 		if (exitAction != null) exitAction();
 	}
 }

@@ -130,7 +130,8 @@ public class GameReel : MonoBehaviour
 			{
 				FallOut(solution, true);
 				spinning = true;
-				eventManager.BroadcastEvent("ReelSpinStarted", ID);
+				// use enum-based broadcast to match EventManager registrations
+				eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
 			});
 		});
 	}
@@ -320,10 +321,10 @@ public class GameReel : MonoBehaviour
 			for (int i = 0; i < symbols.Count; i++)
 			{
 				// batch-friendly: broadcast reel-level event instead of per-symbol if desired later
-				eventManager.BroadcastEvent("SymbolLanded", symbols[i]);
+				eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]);
 			}
 
-			eventManager.BroadcastEvent("ReelCompleted", ID);
+			eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID);
 		}
 	}
 
@@ -370,7 +371,7 @@ public class GameReel : MonoBehaviour
 	{
 		if (root == null) return;
 
-		// Release children until none remain — avoids allocating collections each spin.
+		// Release children until none remain ? avoids allocating collections each spin.
 		// We always take child at index 0 because Release() will reparent the child under the pool root,
 		// which reduces root.childCount and lets us loop without extra allocations.
 		while (root.childCount > 0)

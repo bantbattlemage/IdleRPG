@@ -28,8 +28,8 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		BetDownButton.onClick.AddListener(OnBetDownPressed);
 		BetUpButton.onClick.AddListener(OnBetUpPressed);
 
-		GlobalEventManager.Instance.RegisterEvent("BetChanged", OnBetChanged);
-		GlobalEventManager.Instance.RegisterEvent("CreditsChanged", OnCreditsChanged);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetChanged, OnBetChanged);
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.CreditsChanged, OnCreditsChanged);
 
 		WinText.text = string.Empty;
 		SetConsoleMessage(string.Empty);
@@ -40,11 +40,11 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	public void RegisterSlotsToConsole(EventManager slotsEventManager)
 	{
-		slotsEventManager.RegisterEvent("IdleEnter", OnIdleEnter);
-		slotsEventManager.RegisterEvent("SpinPurchasedEnter", OnSpinPurchased);
-		slotsEventManager.RegisterEvent("SpinningEnter", OnSpinningEnter);
-		slotsEventManager.RegisterEvent("SpinningExit", OnSpinningExit);
-		slotsEventManager.RegisterEvent("StoppingReels", OnStoppingReels);
+		slotsEventManager.RegisterEvent(State.Idle, "Enter", OnIdleEnter);
+		slotsEventManager.RegisterEvent(State.SpinPurchased, "Enter", OnSpinPurchased);
+		slotsEventManager.RegisterEvent(State.Spinning, "Enter", OnSpinningEnter);
+		slotsEventManager.RegisterEvent(State.Spinning, "Exit", OnSpinningExit);
+		slotsEventManager.RegisterEvent(SlotsEvent.StoppingReels, OnStoppingReels);
 	}
 
 	private void OnCreditsChanged(object obj)
@@ -56,12 +56,12 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	private void OnBetUpPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent("BetUpPressed");
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.BetUpPressed);
 	}
 
 	private void OnBetDownPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent("BetDownPressed");
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.BetDownPressed);
 	}
 
 	private void OnBetChanged(object obj)
@@ -151,18 +151,18 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		{
 			DOTween.Sequence().AppendInterval(1f).AppendCallback(() =>
 			{
-				GlobalEventManager.Instance.BroadcastEvent("SpinButtonPressed");
+				GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.SpinButtonPressed);
 			});
 		}
 	}
 
 	void OnSpinPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent("SpinButtonPressed");
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.SpinButtonPressed);
 	}
 
 	void OnStopPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent("StopButtonPressed");
+		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.StopButtonPressed);
 	}
 }
