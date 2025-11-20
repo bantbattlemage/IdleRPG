@@ -10,8 +10,10 @@ public class GameSymbolPool : Singleton<GameSymbolPool>
 
 	private ObjectPool<GameSymbol> symbolPool;
 
-	private void Awake()
+	protected override void Awake()
 	{
+		base.Awake();
+
 		if (symbolPrefab == null)
 		{
 			Debug.LogError("GameSymbolPool: symbolPrefab is not assigned.", this);

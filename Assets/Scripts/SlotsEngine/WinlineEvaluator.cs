@@ -8,6 +8,11 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 	public List<WinData> CurrentSpinWinData => currentSpinWinData;
 
 	// New API: explicit columns and rows per column
+	/// <summary>
+	/// Evaluate wins for a rectangular grid represented in column-major layout.
+	/// Caller provides explicit number of columns and an array with rows per column.
+	/// Returns a list of WinData for lines that match a symbol across a winline definition.
+	/// </summary>
 	public List<WinData> EvaluateWins(SymbolData[] grid, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines)
 	{
 		List<WinData> winData = new List<WinData>();
@@ -18,6 +23,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 			return winData;
 		}
 
+		// validate dimensions
 		if (columns <= 0 || rowsPerColumn == null || rowsPerColumn.Length != columns)
 		{
 			currentSpinWinData = winData;
@@ -30,7 +36,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 		// grid returned by CombineColumnsToGrid will use maxRows * columns layout; if caller provided such grid, accept it.
 		if (grid.Length != expectedGridSize)
 		{
-			// If grid length doesn't match expected rectangular grid, attempt graceful fallback by padding.
+			// If grid length doesn't match expected rectangular grid, attempt graceful fallback by padding/resizing.
 			Array.Resize(ref grid, expectedGridSize);
 		}
 
@@ -58,6 +64,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 				int col = symbolIndex % columns;
 				int row = symbolIndex / columns;
 
+				// If the target row isn't present on that column, the winline is truncated here.
 				if (row >= rowsPerColumn[col]) break; // that column doesn't have that row
 
 				var cell = grid[symbolIndex];
@@ -69,10 +76,12 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 				}
 				else
 				{
+					// mismatch - winline stops
 					break;
 				}
 			}
 
+			// Only award wins when the depth exceeds the symbol's MinWinDepth and at least one match
 			if (winningIndexes.Count > 0 && winningIndexes.Count > grid[winningIndexes[0]].MinWinDepth)
 			{
 				int lineIndex = i;
@@ -90,7 +99,10 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 		return winData;
 	}
 
-	// Backwards-compatible overload: uniform rows
+	/// <summary>
+	/// Backwards-compatible overload for uniform rows per column.
+	/// Constructs a per-column array and delegates to the main overload.
+	/// </summary>
 	public List<WinData> EvaluateWins(SymbolData[] grid, int columns, int rows, List<WinlineDefinition> winlines)
 	{
 		int[] perCol = new int[columns];

@@ -1,35 +1,17 @@
 using System;
-using System.Collections.Generic;
-using Unity.VisualScripting;
-using UnityEditor.PackageManager;
 using UnityEngine;
 
 public class GlobalEventManager : Singleton<GlobalEventManager>
 {
 	private EventManager eventManager;
 
-	void Awake()
+	protected override void Awake()
 	{
+		base.Awake();
 		eventManager = new EventManager();
 	}
 
-	// legacy string-based API
-	public void RegisterEvent(string eventName, Action<object> action)
-	{
-		eventManager.RegisterEvent(eventName, action);
-	}
-
-	public void UnregisterEvent(string eventName, Action<object> action)
-	{
-		eventManager.UnregisterEvent(eventName, action);
-	}
-
-	public void BroadcastEvent(string eventName, object value = null)
-	{
-		eventManager.BroadcastEvent(eventName, value);
-	}
-
-	// enum convenience passthroughs
+	// Enum-based API only
 	public void RegisterEvent(Enum baseEnum, string suffix, Action<object> action)
 	{
 		eventManager.RegisterEvent(baseEnum, suffix, action);
@@ -60,6 +42,5 @@ public class GlobalEventManager : Singleton<GlobalEventManager>
 		eventManager.BroadcastEvent(baseEnum, value);
 	}
 
-	public bool HasSubscribers(string eventName) => eventManager.HasSubscribers(eventName);
 	public bool HasSubscribers(Enum baseEnum, string suffix = null) => eventManager.HasSubscribers(baseEnum, suffix);
 }

@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+/// <summary>
+/// Top-level controller for a single slots instance. Manages reel GameObjects, state machine and
+/// event wiring for spins and presentations. Responsible for creating/destroying reels and updating
+/// layout when reels are added/removed.
+/// </summary>
 public class SlotsEngine : MonoBehaviour
 {
 	[SerializeField] private GameObject reelPrefab;
@@ -19,6 +24,7 @@ public class SlotsEngine : MonoBehaviour
 	private EventManager eventManager;
 	private SlotsStateMachine stateMachine;
 
+	// Tracks whether any reel has started spinning; used to coordinate Stop/Spin logic
 	private bool spinInProgress = false;
 
 	private Transform currentReelsGroup;
@@ -33,6 +39,9 @@ public class SlotsEngine : MonoBehaviour
 		stateMachine.SetState(state);
 	}
 
+	/// <summary>
+	/// Create slots engine runtime data from a definition asset and initialize reels.
+	/// </summary>
 	public void InitializeSlotsEngine(Transform canvasTransform, SlotsDefinition definition)
 	{
 		currentSlotsData = definition.CreateInstance();
@@ -48,6 +57,10 @@ public class SlotsEngine : MonoBehaviour
 
 	private List<Action<object>> pendingReelChangedHandlers = new List<Action<object>>();
 
+	/// <summary>
+	/// Initialize the engine with existing runtime data. Sets up the EventManager and state machine,
+	/// registers internal event handlers and spawns visual reel GameObjects under the provided canvas.
+	/// </summary>
 	public void InitializeSlotsEngine(Transform canvasTransform, SlotsData data)
 	{
 		currentSlotsData = data;
@@ -87,6 +100,10 @@ public class SlotsEngine : MonoBehaviour
 		stateMachine.BeginStateMachine();
 	}
 
+	/// <summary>
+	/// UI-level toggle used to either start spins or stop currently spinning reels.
+	/// Decides action using local spinInProgress flag and state machine state.
+	/// </summary>
 	public void SpinOrStopReels(bool spin)
 	{
 		if (!spinInProgress && spin)
@@ -108,6 +125,10 @@ public class SlotsEngine : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Start spins on every reel. Generates a random solution for each reel if one isn't provided
+	/// and instructs reels to BeginSpin with a small staggered fallout delay.
+	/// </summary>
 	private void SpinAllReels()
 	{
 		if (spinInProgress)
@@ -158,6 +179,7 @@ public class SlotsEngine : MonoBehaviour
 
 	private void StopAllReels()
 	{
+		// Only allow stopping once every reel is actively spinning
 		if (!reels.TrueForAll(x => x.Spinning))
 		{
 			return;
@@ -173,6 +195,10 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.BroadcastEvent(SlotsEvent.StoppingReels);
 	}
 
+	/// <summary>
+	/// Create visual reel GameObjects and initialize them using the runtime data model.
+	/// If a group exists it will be destroyed and recreated to reflect the new data.
+	/// </summary>
 	private void SpawnReels(Transform gameCanvas)
 	{
 		if (currentReelsGroup != null)
@@ -204,6 +230,7 @@ public class SlotsEngine : MonoBehaviour
 			reels.Add(reel);
 		}
 
+		// Compute center offsets so the group is positioned as expected in the parent canvas
 		ReelData reelDefinition = currentSlotsData.CurrentReelData[0];
 
 		int count = reels.Count;
@@ -319,6 +346,7 @@ public class SlotsEngine : MonoBehaviour
 
 	/// <summary>
 	/// Insert a reel into a specific index. Persists data and broadcasts event.
+	/// After insertion, subsequent reels are refreshed so their IDs/positions remain consistent.
 	/// </summary>
 	public void InsertReelAt(int index, ReelData newReelData)
 	{
@@ -425,6 +453,7 @@ public class SlotsEngine : MonoBehaviour
 
 	/// <summary>
 	/// Reinitialize remaining reels so their IDs and positions match list indices.
+	/// This calls InitializeReel on each reel to update internal ids and layout values.
 	/// </summary>
 	private void RefreshReelsAfterModification()
 	{

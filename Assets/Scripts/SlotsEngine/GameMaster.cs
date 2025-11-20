@@ -10,8 +10,10 @@ public class GameMaster : Singleton<GameMaster>
 
 	private StateMachine stateMachine;
 
-	void Awake()
+	protected override void Awake()
 	{
+		base.Awake();
+
 		Application.runInBackground = true;
 
 		stateMachine = new StateMachine();

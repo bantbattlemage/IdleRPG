@@ -28,12 +28,16 @@ public class GameReel : MonoBehaviour
 	private List<GameSymbol> topDummySymbols = new List<GameSymbol>();
 	private List<GameSymbol> bottomDummySymbols = new List<GameSymbol>();
 
+	// Flag set by StopReel to indicate we should complete/land on next buffer swap
 	private bool completeOnNextSpin = false;
 
 	private Tweener[] activeSpinTweens = new Tweener[2];
 
 	private EventManager eventManager;
 
+	/// <summary>
+	/// Initialize using a ReelStripDefinition asset. Creates a runtime strip instance.
+	/// </summary>
 	public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition)
 	{
 		currentReelData = data;
@@ -45,6 +49,9 @@ public class GameReel : MonoBehaviour
 		SpawnReel(currentReelData.CurrentSymbolData);
 	}
 
+	/// <summary>
+	/// Initialize using an existing runtime ReelStripData instance.
+	/// </summary>
 	public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripData stripData)
 	{
 		currentReelData = data;
@@ -61,6 +68,10 @@ public class GameReel : MonoBehaviour
 		return reelStrip.GetWeightedSymbol();
 	}
 
+	/// <summary>
+	/// Ensure the two persistent roots used for active and buffered symbols exist. These roots are
+	/// reused across spins to avoid creating/destroying many GameObjects every spin.
+	/// </summary>
 	private void EnsureRootsCreated()
 	{
 		// Create two persistent roots if missing. They will be reused each spin.
@@ -83,6 +94,10 @@ public class GameReel : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Spawn the visible symbols under the active root. If existingSymbolData is provided it will be used
+	/// to deterministically set symbols; otherwise random symbols are taken from the strip.
+	/// </summary>
 	private void SpawnReel(List<SymbolData> existingSymbolData)
 	{
 		// Clear any previous symbols on the active root and lists
@@ -116,10 +131,15 @@ public class GameReel : MonoBehaviour
 			symbols.Add(sym);
 		}
 
+		// Spawn dummies (buffer visuals) above and below the active list
 		SpawnDummySymbols(symbolRoot);
 		SpawnDummySymbols(symbolRoot, false);
 	}
 
+	/// <summary>
+	/// Begin a spin. Optionally accepts a target solution to land on and a start delay. Triggers
+	/// a small bounce before starting the continuous fall animation.
+	/// </summary>
 	public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
 	{
 		completeOnNextSpin = false;
@@ -136,13 +156,16 @@ public class GameReel : MonoBehaviour
 		});
 	}
 
+	/// <summary>
+	/// Request that the reel complete on its next landing. This accelerates active tweens to produce a slam effect.
+	/// </summary>
 	public void StopReel(float delay = 0f)
 	{
 		DOTween.Sequence().AppendInterval(delay).AppendCallback(() =>
 		{
 			completeOnNextSpin = true;
 
-			//	slam the reels
+			//	slam the reels by increasing timeScale on the active tweens
 			activeSpinTweens[0].timeScale = 4f;
 			activeSpinTweens[1].timeScale = 4f;
 		});
@@ -153,6 +176,10 @@ public class GameReel : MonoBehaviour
 
 	}
 
+	/// <summary>
+	/// Prepare the buffered root with the next set of symbols. Positions the buffer offscreen and fills it.
+	/// If a `solution` is provided it will be used to deterministically populate the buffer.
+	/// </summary>
 	private void SpawnNextReel(List<SymbolData> solution = null)
 	{
 		// Position the buffer root offscreen (top). This mirrors the previous Create+position.
@@ -188,6 +215,7 @@ public class GameReel : MonoBehaviour
 			newSymbols.Add(symbol);
 		}
 
+		// Replace current symbol references with the buffered ones. The visual swap will occur on tween completion.
 		symbols = newSymbols;
 
 		// Spawn dummies for the buffer. These are created while the reel is already spinning,
@@ -198,6 +226,10 @@ public class GameReel : MonoBehaviour
 		// nextSymbolsRoot is already the buffer root
 	}
 
+	/// <summary>
+	/// Spawn dummy symbols used to pad the reel visuals above and below the active range.
+	/// `bottom` controls which side to create. When `dim` is true the dummy images are tinted to a dim color.
+	/// </summary>
 	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
@@ -254,6 +286,9 @@ public class GameReel : MonoBehaviour
 
 	private bool sequenceA = false;
 	private bool sequenceB = false;
+	/// <summary>
+	/// Start the fall animations for the active and buffered roots. When both complete the landing is processed.
+	/// </summary>
 	public void FallOut(List<SymbolData> solution = null, bool kickback = false)
 	{
 		ResetDimmedSymbols();
@@ -282,6 +317,9 @@ public class GameReel : MonoBehaviour
 		}).SetEase(Ease.Linear);
 	}
 
+	/// <summary>
+	/// Called after both fall tweens complete; triggers landing bounce or immediate completion.
+	/// </summary>
 	private void CheckBeginLandingBounce(List<SymbolData> solution)
 	{
 		if (sequenceA && sequenceB)
@@ -300,6 +338,9 @@ public class GameReel : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Small visual pulse used before/after landing. Uses custom easing helpers to animate roots.
+	/// </summary>
 	private void BounceReel(Vector3 direction, float strength = 100f, float duration = 0.5f, float sharpness = 0f, float peak = 0.4f, Action onComplete = null)
 	{
 		if (nextSymbolsRoot != null)
@@ -310,6 +351,10 @@ public class GameReel : MonoBehaviour
 		symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { if (onComplete != null) onComplete(); });
 	}
 
+	/// <summary>
+	/// Complete the spin: release old symbols, swap roots, broadcast landed/completed events and optionally
+	/// schedule another cycle if not requested to stop.
+	/// </summary>
 	private void CompleteReelSpin(List<SymbolData> solution)
 	{
 		// Release symbols from the old active root back to the pool
@@ -326,6 +371,7 @@ public class GameReel : MonoBehaviour
 
 		if (!completeOnNextSpin)
 		{
+			// continue spinning (start another fallout)
 			FallOut(solution);
 		}
 		else
@@ -380,6 +426,7 @@ public class GameReel : MonoBehaviour
 
 	/// <summary>
 	/// Helper: release all GameSymbol instances parented under <paramref name="root"/> back to the pool.
+	/// Using child-at-index-0 loop avoids creating temporary collections each spin.
 	/// </summary>
 	private void ReleaseAllSymbolsInRoot(Transform root)
 	{
@@ -430,7 +477,7 @@ public class GameReel : MonoBehaviour
 		// Update the data model with new values
 		currentReelData.SetSymbolSize(newSymbolSize, newSpacing);
 
-		// Helper to update all GameSymbol children under a root: scale position by ratio and set sizeDelta.
+		// Helper to update all GameSymbol children under a root: scale position by ratio and set sizeDelta
 		void UpdateRootChildren(Transform root)
 		{
 			if (root == null) return;

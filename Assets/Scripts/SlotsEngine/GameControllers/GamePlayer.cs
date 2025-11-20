@@ -22,7 +22,11 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void SetAllSlotsState(State state)
 	{
-		playerSlots.ForEach(x => x.SetState(state));
+		// iterate over a copy to avoid collection modified during callbacks
+		foreach (var s in playerSlots.ToArray())
+		{
+			s.SetState(state);
+		}
 	}
 
 	public void InitializePlayer(BetLevelDefinition defaultBetLevel)
@@ -55,26 +59,28 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	void Update()
 	{
-		//	Space input
+		// Space input (keep in runtime)
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
 			GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.PlayerInputPressed);
 		}
 
-		//	Testing add slots
+#if UNITY_EDITOR
+		// Debug/testing inputs (editor only)
+		// Testing add slots
 		if (Input.GetKeyDown(KeyCode.S))
 		{
 			SpawnSlots(null, true);
 		}
 
-		//	Testing add reels
+		// Testing add reels
 		if (Input.GetKeyDown(KeyCode.R))
 		{
 			var slots = playerSlots.GetRandom();
 			slots.AddReel();
 		}
 
-		//	Testing add symbols
+		// Testing add symbols
 		if (Input.GetKeyDown(KeyCode.A))
 		{
 			var slots = playerSlots.GetRandom();
@@ -88,7 +94,7 @@ public class GamePlayer : Singleton<GamePlayer>
 			reel.SetSymbolCount(reel.CurrentReelData.SymbolCount - 1);
 		}
 
-		//	Testing kill slots
+		// Testing kill slots
 		if (Input.GetKeyDown(KeyCode.X))
 		{
 			if (playerSlots.Count > 0)
@@ -97,29 +103,31 @@ public class GamePlayer : Singleton<GamePlayer>
 			}
 		}
 
-		//	Testing add credits
+		// Testing add credits
 		if (Input.GetKeyDown(KeyCode.Alpha1))
 		{
 			Debug.LogWarning("Adding credits for testing.");
 			AddCredits(100);
 		}
 
-		//	Testing slow/speed game
+		// Testing slow/speed game
 		if (Input.GetKeyDown(KeyCode.Minus))
 		{
-			Time.timeScale -= 0.1f;
+			Time.timeScale = Mathf.Clamp(Time.timeScale - 0.1f, 0.1f, 10f);
 			Debug.LogWarning(Time.timeScale);
 		}
 		if (Input.GetKeyDown(KeyCode.Equals))
 		{
-			Time.timeScale += 0.1f;
+			Time.timeScale = Mathf.Clamp(Time.timeScale + 0.1f, 0.1f, 10f);
 			Debug.LogWarning(Time.timeScale);
 		}
+#endif
 	}
 
 	public void BeginGame()
 	{
-		foreach (SlotsEngine slots in playerSlots)
+		// iterate over copy in case BeginSlots can modify playerSlots
+		foreach (var slots in playerSlots.ToArray())
 		{
 			slots.BeginSlots();
 		}
@@ -186,6 +194,11 @@ public class GamePlayer : Singleton<GamePlayer>
 			return false;
 		}
 
+		if (CurrentBet == null)
+		{
+			return false;
+		}
+
 		if (CurrentCredits < CurrentBet.CreditCost)
 		{
 			return false;
@@ -221,22 +234,11 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		var betLevels = primarySlots.CurrentSlotsData.BetLevelDefinitions;
 
-		int targetLevel = -1;
-		for (int i = 0; i < betLevels.Count; i++)
+		int currentIndex = betLevels.IndexOf(CurrentBet);
+		if (currentIndex > 0)
 		{
-			if (CurrentBet == betLevels[i] && i - 1 >= 0)
-			{
-				targetLevel = i - 1;
-				break;
-			}
+			SetCurrentBet(betLevels[currentIndex - 1]);
 		}
-
-		if (targetLevel == -1)
-		{
-			return;
-		}
-
-		SetCurrentBet(betLevels[targetLevel]);
 	}
 
 	private void OnBetUpPressed(object obj)
@@ -245,31 +247,44 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		var betLevels = primarySlots.CurrentSlotsData.BetLevelDefinitions;
 
-		int targetLevel = -1;
-		for (int i = 0; i < betLevels.Count; i++)
+		int currentIndex = betLevels.IndexOf(CurrentBet);
+		if (currentIndex >= 0 && currentIndex + 1 < betLevels.Count)
 		{
-			if (CurrentBet == betLevels[i] && i + 1 < betLevels.Count)
-			{
-				targetLevel = i + 1;
-				break;
-			}
+			SetCurrentBet(betLevels[currentIndex + 1]);
 		}
-
-		if (targetLevel == -1)
-		{
-			return;
-		}
-
-		SetCurrentBet(betLevels[targetLevel]);
 	}
 
 	private void OnPlayerInputPressed(object obj)
 	{
 		bool spinPurchase = RequestSpinPurchase();
 
-		foreach (SlotsEngine slots in playerSlots)
+		// iterate over copy to avoid modification during iteration
+		foreach (var slots in playerSlots.ToArray())
 		{
 			slots.SpinOrStopReels(spinPurchase);
+		}
+	}
+
+	protected override void OnDestroy()
+	{
+		base.OnDestroy();
+
+		// Ensure we unregister any global events we registered to avoid dangling callbacks
+		var gm = GlobalEventManager.Instance;
+		if (gm != null)
+		{
+			try
+			{
+				gm.UnregisterEvent(SlotsEvent.BetUpPressed, OnBetUpPressed);
+				gm.UnregisterEvent(SlotsEvent.BetDownPressed, OnBetDownPressed);
+				gm.UnregisterEvent(SlotsEvent.SpinButtonPressed, OnPlayerInputPressed);
+				gm.UnregisterEvent(SlotsEvent.StopButtonPressed, OnPlayerInputPressed);
+				gm.UnregisterEvent(SlotsEvent.PlayerInputPressed, OnPlayerInputPressed);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogException(ex);
+			}
 		}
 	}
 }
