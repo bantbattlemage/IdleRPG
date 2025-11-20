@@ -62,9 +62,18 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 
 		//	Testing add slots
-		if (Input.GetKeyDown(KeyCode.R))
+		if (Input.GetKeyDown(KeyCode.S))
 		{
 			SpawnSlots(null, true);
+		}
+
+		//	Testing add reels
+		if (Input.GetKeyDown(KeyCode.R))
+		{
+			foreach(var slots in playerSlots)
+			{
+				slots.AddReel(slots.CurrentSlotsData.CurrentReelData[0].BaseDefinition);
+			}
 		}
 
 		//	Testing kill slots

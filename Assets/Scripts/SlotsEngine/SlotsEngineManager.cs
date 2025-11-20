@@ -96,14 +96,15 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 
 		currentSlotPageIndex = slotsDisplayPages.Count - 1;
 
-		RectTransform targetTransform = pageToUse.standardGroup;
-		if (useGrid)
-		{
-			targetTransform = pageToUse.gridGroup;
-		}
+		// Always use the single gridGroup as the parent for reels
+		RectTransform targetTransform = pageToUse.gridGroup;
 
 		SlotsEngine newSlots = Instantiate(slotsEnginePrefab, transform).GetComponent<SlotsEngine>();
 		GameObject newReelsGroup = Instantiate(reelsGroupPrefab, targetTransform);
+
+		// Subscribe to runtime reel add/remove so manager can adjust layout
+		newSlots.ReelAdded += OnSlotReelChanged;
+		newSlots.ReelRemoved += OnSlotReelChanged;
 
 		if (existingData != null)
 		{
@@ -121,6 +122,9 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		{
 			prevPageButton.gameObject.SetActive(true);
 		}
+
+		// Ensure layout updates in case reel count affects sizing
+		AdjustSlotsCanvases();
 
 		return newSlots;
 	}
@@ -154,6 +158,10 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 				break; // a slotsEngine will only be on a single page
 			}
 		}
+
+		// Unsubscribe events
+		slotsToDestroy.ReelAdded -= OnSlotReelChanged;
+		slotsToDestroy.ReelRemoved -= OnSlotReelChanged;
 
 		// Remove from the master engines list and destroy the engine + its reels root
 		slotsEngines.Remove(slotsToDestroy);
@@ -192,45 +200,87 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 
 	public void AdjustSlotsCanvases()
 	{
-		if (currentSlotsDisplayPage.slotsToDisplay.Count >= 3)
+		// Force UI update to ensure layout components have up-to-date values
+		Canvas.ForceUpdateCanvases();
+
+		// Force rebuild so GridLayoutGroup.cellSize / rect is correct
+		LayoutRebuilder.ForceRebuildLayoutImmediate(currentSlotsDisplayPage.gridGroup);
+
+		var grid = currentSlotsDisplayPage.gridGroup.GetComponent<GridLayoutGroup>();
+		if (grid == null) return;
+
+		int slotCount = currentSlotsDisplayPage.slotsToDisplay?.Count ?? 0;
+		if (slotCount == 0)
 		{
-			currentSlotsDisplayPage.gridGroup.gameObject.SetActive(true);
-			MovePageSlotsToGrid();
-			currentSlotsDisplayPage.standardGroup.gameObject.SetActive(false);
-
-			foreach (SlotsEngine s in currentSlotsDisplayPage.slotsToDisplay)
-			{
-				s.AdjustReelSize(currentSlotsDisplayPage.gridGroup.GetComponent<GridLayoutGroup>().cellSize.y);
-			}
-
 			currentSlotsDisplayPage.AdjustPlaceholderGroup();
+			return;
 		}
-		else
-		{
-			currentSlotsDisplayPage.standardGroup.gameObject.SetActive(true);
-			MovePageSlotsToDefaultCanvas();
-			currentSlotsDisplayPage.gridGroup.gameObject.SetActive(false);
 
-			foreach (SlotsEngine s in currentSlotsDisplayPage.slotsToDisplay)
+		// Determine an appropriate columns/rows layout (try to form a near-square grid)
+		int columns = Mathf.CeilToInt(Mathf.Sqrt(slotCount));
+		int rows = Mathf.CeilToInt(slotCount / (float)columns);
+
+		// Calculate available space inside the grid rect (subtract padding)
+		Rect rect = currentSlotsDisplayPage.gridGroup.rect;
+		float availableWidth = Mathf.Max(1f, rect.width - grid.padding.left - grid.padding.right);
+		float availableHeight = Mathf.Max(1f, rect.height - grid.padding.top - grid.padding.bottom);
+
+		// Account for spacing between cells
+		float totalSpacingX = grid.spacing.x * (columns - 1);
+		float totalSpacingY = grid.spacing.y * (rows - 1);
+
+		float cellWidth = (availableWidth - totalSpacingX) / columns;
+		float cellHeight = (availableHeight - totalSpacingY) / rows;
+
+		// Ensure positive sizes
+		cellWidth = Mathf.Max(1f, cellWidth);
+		cellHeight = Mathf.Max(1f, cellHeight);
+
+		// Apply to GridLayoutGroup so it places children accordingly
+		grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+		grid.constraintCount = columns;
+		grid.cellSize = new Vector2(cellWidth, cellHeight);
+
+		// Use the grid cell sizes to size reels for every slot on the page
+		foreach (SlotsEngine s in currentSlotsDisplayPage.slotsToDisplay)
+		{
+			// Ensure the slot's root rect matches the grid cell so GridLayout places them correctly
+			if (s.ReelsRootTransform != null)
 			{
-				s.AdjustReelSize(currentSlotsDisplayPage.standardGroup.sizeDelta.y);
+				var rt = s.ReelsRootTransform.GetComponent<RectTransform>();
+				if (rt != null)
+				{
+					rt.sizeDelta = new Vector2(cellWidth, cellHeight);
+					rt.localScale = Vector3.one;
+				}
 			}
+
+			// Pass both height and width from the cell size so the slot can constrain layout
+			s.AdjustReelSize(cellHeight, cellWidth);
 		}
+
+		currentSlotsDisplayPage.AdjustPlaceholderGroup();
 	}
 
 	public void MovePageSlotsToGrid()
 	{
 		foreach (SlotsEngine slot in currentSlotsDisplayPage.slotsToDisplay)
 		{
-			slot.ReelsRootTransform.SetParent(currentSlotsDisplayPage.gridGroup);
+			// Use worldPositionStays=false so anchored positions behave under the layout
+			slot.ReelsRootTransform.SetParent(currentSlotsDisplayPage.gridGroup, false);
 		}
 	}
 
 	public void MovePageSlotsToDefaultCanvas()
 	{
-		foreach (SlotsEngine slot in currentSlotsDisplayPage.slotsToDisplay)
-		{
-			slot.ReelsRootTransform.SetParent(currentSlotsDisplayPage.standardGroup);
-		}
+		// Alias to gridGroup now - single group approach
+		MovePageSlotsToGrid();
+	}
+
+	private void OnSlotReelChanged(GameReel reel, int index)
+	{
+		// Called whenever a reel is added/removed in any SlotsEngine
+		// Trigger layout adjustments so other slots and the page update sizes/positions
+		AdjustSlotsCanvases();
 	}
 }

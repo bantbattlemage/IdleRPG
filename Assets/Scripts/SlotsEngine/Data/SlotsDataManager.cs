@@ -23,6 +23,38 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		}
 	}
 
+	public void UpdateSlotsData(SlotsData slotsData)
+	{
+		if (slotsData == null) return;
+
+		if (LocalData == null)
+		{
+			LocalData = new SerializableDictionary<int, SlotsData>();
+		}
+
+		if (slotsData.AccessorId == 0 || !LocalData.ContainsKey(slotsData.AccessorId))
+		{
+			// Treat as new slots data
+			AddNewData(slotsData);
+		}
+		else
+		{
+			// Ensure any new reel data within the slots is added to ReelDataManager
+			foreach (var reel in slotsData.CurrentReelData)
+			{
+				if (reel != null && reel.AccessorId == 0)
+				{
+					ReelDataManager.Instance.AddNewData(reel);
+				}
+			}
+
+			// Replace stored reference
+			LocalData[slotsData.AccessorId] = slotsData;
+		}
+
+		DataPersistenceManager.Instance.SaveGame();
+	}
+
 	public void ClearSlotsData()
 	{
 		ClearData();

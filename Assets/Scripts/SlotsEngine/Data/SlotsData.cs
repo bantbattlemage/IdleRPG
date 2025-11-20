@@ -108,4 +108,24 @@ public class SlotsData : Data
 	{
 		currentReelData.Add(reelData);
 	}
+
+	public void InsertReelAt(int index, ReelData reelData)
+	{
+		if (index < 0 || index > currentReelData.Count)
+		{
+			throw new ArgumentOutOfRangeException(nameof(index));
+		}
+
+		currentReelData.Insert(index, reelData);
+	}
+
+	public void RemoveReel(ReelData reelData)
+	{
+		if (!currentReelData.Contains(reelData))
+		{
+			throw new Exception("tried to remove reel that isn't registered!");
+		}
+
+		currentReelData.Remove(reelData);
+	}
 }

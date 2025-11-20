@@ -8,10 +8,9 @@ using UnityEngine.UI;
 public class SlotsDisplayPage : MonoBehaviour
 {
 	public List<SlotsEngine> slotsToDisplay;
-	public RectTransform standardGroup;
-	public RectTransform gridGroup;
+	public RectTransform gridGroup; // Single group now used for all layouts
 
-	[SerializeField] private RectTransform placeHolderGroup;	//	placeholder when there are 3 items so 4th position isn't transparent
+	[SerializeField] private RectTransform placeHolderGroup; // placeholder when there are 3 items so 4th position isn't transparent
 
 	public void AddSlotsToPage(SlotsEngine slotsToAdd)
 	{
@@ -22,10 +21,12 @@ public class SlotsDisplayPage : MonoBehaviour
 	public void RemoveSlotsFromPage(SlotsEngine slotsToRemove)
 	{
 		slotsToDisplay.Remove(slotsToRemove);
+		AdjustPlaceholderGroup();
 	}
 
 	public void AdjustPlaceholderGroup()
 	{
+		if (placeHolderGroup == null) return;
 		placeHolderGroup.gameObject.SetActive(slotsToDisplay.Count == 3);
 		placeHolderGroup.SetAsLastSibling();
 	}

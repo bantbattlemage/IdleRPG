@@ -23,4 +23,14 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 
 		DataPersistenceManager.Instance.SaveGame();
 	}
+
+	public void RemoveDataIfExists(ReelData data)
+	{
+		if (data == null) return;
+		if (LocalData != null && LocalData.ContainsKey(data.AccessorId))
+		{
+			LocalData.Remove(data.AccessorId);
+			DataPersistenceManager.Instance.SaveGame();
+		}
+	}
 }
