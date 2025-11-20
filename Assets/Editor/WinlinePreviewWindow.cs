@@ -92,13 +92,40 @@ public class WinlinePreviewWindow : EditorWindow
 
     private int[] ParseRowsPerColumn()
     {
-        var parts = rowsPerColumnText.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = rowsPerColumnText.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).ToArray();
         var result = new int[columns];
+
+        if (parts.Length == 0)
+        {
+            for (int i = 0; i < columns; i++) result[i] = 0;
+            return result;
+        }
+
+        // If a single value provided, apply to all columns
+        if (parts.Length == 1)
+        {
+            if (int.TryParse(parts[0], out int v))
+            {
+                for (int i = 0; i < columns; i++) result[i] = Math.Max(0, v);
+            }
+            return result;
+        }
+
+        // If multiple values provided but fewer than columns, fill remaining with last provided value
+        int lastVal = 0;
         for (int i = 0; i < columns; i++)
         {
-            if (i < parts.Length && int.TryParse(parts[i].Trim(), out int v)) result[i] = Math.Max(0, v);
-            else result[i] = 0;
+            if (i < parts.Length && int.TryParse(parts[i], out int v))
+            {
+                result[i] = Math.Max(0, v);
+                lastVal = result[i];
+            }
+            else
+            {
+                result[i] = lastVal; // fill with last seen
+            }
         }
+
         return result;
     }
 
@@ -146,6 +173,12 @@ public class WinlinePreviewWindow : EditorWindow
             var indexes = gen.Invoke(obj, new object[] { columns, perCol }) as int[];
             lastGeneratedIndexes[i] = indexes;
             output += $"[{i}] {obj.name} -> Indexes: [{(indexes != null ? string.Join(",", indexes) : "(null)")} ]\n";
+        }
+
+        // Warn if any column has zero rows
+        if (perCol.Any(x => x == 0))
+        {
+            output += "Warning: one or more columns have 0 rows (check Rows per column input).\n";
         }
 
         Repaint();
@@ -245,8 +278,9 @@ public class WinlinePreviewWindow : EditorWindow
                 int col = idx % columns;
                 int row = idx / columns;
                 if (row >= perCol[col]) break; // column doesn't have this row
-                if (lastGrid[idx] == null) break;
-                if (lastGrid[idx] == match) winning.Add(idx);
+                string val = lastGrid[idx];
+                if (val == null) break;
+                if (val == match) winning.Add(idx);
                 else break;
             }
 
