@@ -19,11 +19,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1e498b0d9614d974385d94c0bbe9810a, type: 2}
   - {fileID: 11400000, guid: 9d400323bfb1e064fa74825e174303fc, type: 2}
   winlineDefinitions:
-  - {fileID: 11400000, guid: 992277eef375b644ebb21c23a294af4a, type: 2}
-  - {fileID: 11400000, guid: d5c93d8cd0781674f859e3ee67e7129c, type: 2}
-  - {fileID: 11400000, guid: 51636b4085105af4d822efa1cfb1c634, type: 2}
-  - {fileID: 11400000, guid: 6c9439699903e7a4488bc538b9bbca24, type: 2}
-  - {fileID: 11400000, guid: f8b50063c7ad9424e9548025e464dab8, type: 2}
+  - {fileID: 11400000, guid: e566fff81f313b0488d84530071f28d7, type: 2}
+  - {fileID: 11400000, guid: ec83838f98f9d964ea03f995f0d010e1, type: 2}
+  - {fileID: 11400000, guid: d35c3fee3e9cd0f43b6aab1a08a1b03c, type: 2}
   betLevelDefinitions:
   - {fileID: 11400000, guid: 96bf0fc9e9c987b4ba91c2ebace1020d, type: 2}
   - {fileID: 11400000, guid: fafe5611c7f04494caa24ba0e909b721, type: 2}

@@ -23,7 +23,15 @@ public class PresentationController : Singleton<PresentationController>
 		SlotsEngine slotsToPresent = (SlotsEngine)obj;
 
 		var currentSymbolGrid = slotsToPresent.GetCurrentSymbolGrid();
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDatas(), slotsToPresent.CurrentSlotsData.WinlineDefinitions);
+		// Derive grid dimensions explicitly for the evaluator
+		int columns = slotsToPresent.CurrentReels?.Count ?? slotsToPresent.CurrentSlotsData.CurrentReelData.Count;
+		int rows = 0;
+		if (slotsToPresent.CurrentSlotsData != null && slotsToPresent.CurrentSlotsData.CurrentReelData != null && slotsToPresent.CurrentSlotsData.CurrentReelData.Count > 0)
+		{
+			rows = slotsToPresent.CurrentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		}
+
+		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWins(currentSymbolGrid.ToSymbolDatas(), columns, rows, slotsToPresent.CurrentSlotsData.WinlineDefinitions);
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
 		slotsData.SetCurrentWinData(winData);
 

@@ -81,6 +81,12 @@ public class GamePlayer : Singleton<GamePlayer>
 			var reel = slots.CurrentReels.GetRandom();
 			reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
 		}
+		if (Input.GetKeyDown(KeyCode.Z))
+		{
+			var slots = playerSlots.GetRandom();
+			var reel = slots.CurrentReels.GetRandom();
+			reel.SetSymbolCount(reel.CurrentReelData.SymbolCount - 1);
+		}
 
 		//	Testing kill slots
 		if (Input.GetKeyDown(KeyCode.X))
