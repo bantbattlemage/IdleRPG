@@ -11,13 +11,42 @@ public class SlotsData : Data
 	[SerializeField] private List<ReelData> currentReelData;
 	public List<ReelData> CurrentReelData => currentReelData;
 
-	[SerializeField] private List<WinlineDefinition> winlineDefinitions;
-	public List<WinlineDefinition> WinlineDefinitions => winlineDefinitions;
+	// store definition keys
+	[SerializeField] private string[] winlineDefinitionKeys;
+	[SerializeField] private string[] betLevelDefinitionKeys;
 
-	[SerializeField] private List<BetLevelDefinition> betLevelDefinitions;
-	public List<BetLevelDefinition> BetLevelDefinitions => betLevelDefinitions;
+	[System.NonSerialized] private List<WinlineDefinition> winlineDefinitions;
+	[System.NonSerialized] private List<BetLevelDefinition> betLevelDefinitions;
 
-	[SerializeField] private SlotsDefinition baseDefinition;
+	[SerializeField] private string baseDefinitionKey;
+	[System.NonSerialized] private SlotsDefinition baseDefinition;
+
+	public List<WinlineDefinition> WinlineDefinitions
+	{
+		get
+		{
+			EnsureResolved();
+			return winlineDefinitions;
+		}
+	}
+
+	public List<BetLevelDefinition> BetLevelDefinitions
+	{
+		get
+		{
+			EnsureResolved();
+			return betLevelDefinitions;
+		}
+	}
+
+	public SlotsDefinition BaseDefinition
+	{
+		get
+		{
+			EnsureResolved();
+			return baseDefinition;
+		}
+	}
 
 	public SlotsData(int id, List<WinlineDefinition> winlines, List<BetLevelDefinition> bets)
 	{
@@ -25,6 +54,18 @@ public class SlotsData : Data
 		currentReelData = new List<ReelData>();
 		winlineDefinitions = winlines;
 		betLevelDefinitions = bets;
+
+		if (winlineDefinitions != null)
+		{
+			winlineDefinitionKeys = new string[winlineDefinitions.Count];
+			for (int i = 0; i < winlineDefinitions.Count; i++) winlineDefinitionKeys[i] = winlineDefinitions[i].name;
+		}
+
+		if (betLevelDefinitions != null)
+		{
+			betLevelDefinitionKeys = new string[betLevelDefinitions.Count];
+			for (int i = 0; i < betLevelDefinitions.Count; i++) betLevelDefinitionKeys[i] = betLevelDefinitions[i].name;
+		}
 	}
 
 	public SlotsData(int id, List<ReelData> reelData, SlotsDefinition slotDefinition)
@@ -32,6 +73,35 @@ public class SlotsData : Data
 		index = id;
 		currentReelData = reelData;
 		baseDefinition = slotDefinition;
+		baseDefinitionKey = slotDefinition != null ? slotDefinition.name : null;
+	}
+
+	private void EnsureResolved()
+	{
+		if ((winlineDefinitions == null || winlineDefinitions.Count == 0) && winlineDefinitionKeys != null)
+		{
+			winlineDefinitions = new List<WinlineDefinition>();
+			for (int i = 0; i < winlineDefinitionKeys.Length; i++)
+			{
+				var def = DefinitionResolver.Resolve<WinlineDefinition>(winlineDefinitionKeys[i]);
+				if (def != null) winlineDefinitions.Add(def);
+			}
+		}
+
+		if ((betLevelDefinitions == null || betLevelDefinitions.Count == 0) && betLevelDefinitionKeys != null)
+		{
+			betLevelDefinitions = new List<BetLevelDefinition>();
+			for (int i = 0; i < betLevelDefinitionKeys.Length; i++)
+			{
+				var def = DefinitionResolver.Resolve<BetLevelDefinition>(betLevelDefinitionKeys[i]);
+				if (def != null) betLevelDefinitions.Add(def);
+			}
+		}
+
+		if (baseDefinition == null && !string.IsNullOrEmpty(baseDefinitionKey))
+		{
+			baseDefinition = DefinitionResolver.Resolve<SlotsDefinition>(baseDefinitionKey);
+		}
 	}
 
 	public void AddNewReel(ReelData reelData)

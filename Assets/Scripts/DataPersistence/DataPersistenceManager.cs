@@ -3,19 +3,22 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 using UnityEngine.SceneManagement;
+using System.IO;
+using System;
 
 public class DataPersistenceManager : MonoBehaviour
 {
 	[Header("Debugging")]
 	[SerializeField] private bool disableDataPersistence = false;
 	[SerializeField] private bool initializeDataIfNull = false;
+	[SerializeField] private bool autoSaveOnQuitAndPause = true;
 
 	[Header("File Storage Config")]
 	[SerializeField] private string fileName;
 	[SerializeField] private bool useEncryption;
 
 	private GameData gameData;
-	private List<IDataPersistence> dataPersistenceObjects;
+	private readonly List<IDataPersistence> dataPersistenceObjects = new List<IDataPersistence>();
 	FileDataHandler dataHandler;
 
 	private string selectedProfileId = "";
@@ -56,22 +59,30 @@ public class DataPersistenceManager : MonoBehaviour
 
 	public void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 	{
-		//Debug.Log("echo");
+		// By default we don't auto-load on scene changes. Controlled LoadGame should be used.
+	}
 
-		//dataPersistenceObjects = FindAllDataPersistenceObjects();
-		//LoadGame();
+	public void RegisterDataPersistence(IDataPersistence obj)
+	{
+		if (!dataPersistenceObjects.Contains(obj))
+		{
+			dataPersistenceObjects.Add(obj);
+		}
+	}
 
-		//gameData = new GameData();
+	public void UnregisterDataPersistence(IDataPersistence obj)
+	{
+		if (dataPersistenceObjects.Contains(obj))
+		{
+			dataPersistenceObjects.Remove(obj);
+		}
 	}
 
 	public void DeleteProfileData(string profileId)
 	{
+		profileId = SanitizeProfileId(profileId);
 		// delete the data for this profile id
 		dataHandler.Delete(profileId);
-		// initialize the selected profile id
-		//InitializeSelectedProfileId();
-		// reload the game so that our data matches the newly selected profile id
-		//LoadGame();
 	}
 
 	private void InitializeSelectedProfileId()
@@ -93,8 +104,8 @@ public class DataPersistenceManager : MonoBehaviour
 			name = defaultProfileId;
 		}
 
+		selectedProfileId = SanitizeProfileId(name);
 		gameData = new GameData();
-		selectedProfileId = name;
 
 		SaveGame();
 	}
@@ -123,12 +134,17 @@ public class DataPersistenceManager : MonoBehaviour
 			return;
 		}
 
-		dataPersistenceObjects = FindAllDataPersistenceObjects();
-
 		// push the loaded data to all other scripts that need it
 		foreach (IDataPersistence dataPersistenceObj in dataPersistenceObjects)
 		{
-			dataPersistenceObj.LoadData(gameData);
+			try
+			{
+				dataPersistenceObj.LoadData(gameData);
+			}
+			catch (Exception e)
+			{
+				Debug.LogError($"Error while loading data into {dataPersistenceObj.GetType().Name}: {e}");
+			}
 		}
 	}
 
@@ -147,26 +163,35 @@ public class DataPersistenceManager : MonoBehaviour
 			return;
 		}
 
-		dataPersistenceObjects = FindAllDataPersistenceObjects();
-
 		// pass the data to other scripts so they can update it
 		foreach (IDataPersistence dataPersistenceObj in dataPersistenceObjects)
 		{
-			dataPersistenceObj.SaveData(gameData);
+			try
+			{
+				dataPersistenceObj.SaveData(gameData);
+			}
+			catch (Exception e)
+			{
+				Debug.LogError($"Error while saving data from {dataPersistenceObj.GetType().Name}: {e}");
+			}
 		}
 
 		// timestamp the data so we know when it was last saved
 		gameData.lastUpdated = System.DateTime.Now.ToBinary();
 
 		// save that data to a file using the data handler
-		dataHandler.Save(gameData, selectedProfileId);
-	}
-
-	private List<IDataPersistence> FindAllDataPersistenceObjects()
-	{
-		IEnumerable<IDataPersistence> dataPersistenceObjects = FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None).OfType<IDataPersistence>();
-
-		return new List<IDataPersistence>(dataPersistenceObjects);
+		try
+		{
+			// attempt atomic save via temp file
+			string tempPath = Path.Combine(Application.persistentDataPath, "_tmp");
+			Directory.CreateDirectory(tempPath);
+			// rely on FileDataHandler to perform write/backup
+			dataHandler.Save(gameData, selectedProfileId);
+		}
+		catch (Exception e)
+		{
+			Debug.LogError($"Failed to save game data: {e}");
+		}
 	}
 
 	public Dictionary<string, GameData> GetAllProfilesGameData()
@@ -176,6 +201,28 @@ public class DataPersistenceManager : MonoBehaviour
 
 	private void OnApplicationQuit()
 	{
-		//SaveGame();
+		if (autoSaveOnQuitAndPause && !disableDataPersistence)
+		{
+			SaveGame();
+		}
+	}
+
+	private void OnApplicationPause(bool pause)
+	{
+		if (pause && autoSaveOnQuitAndPause && !disableDataPersistence)
+		{
+			SaveGame();
+		}
+	}
+
+	private string SanitizeProfileId(string profileId)
+	{
+		if (string.IsNullOrEmpty(profileId)) return defaultProfileId;
+
+		// remove invalid path chars and trim
+		var invalid = Path.GetInvalidFileNameChars();
+		var cleaned = string.Concat(profileId.Where(c => !invalid.Contains(c))).Trim();
+		if (string.IsNullOrEmpty(cleaned)) return defaultProfileId;
+		return cleaned;
 	}
 }

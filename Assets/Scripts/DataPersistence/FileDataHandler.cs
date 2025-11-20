@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using System.IO;
+using System.Text;
+using System.Security.Cryptography;
 
 public class FileDataHandler
 {
     private string dataDirPath = "";
     private string dataFileName = "";
     private bool useEncryption = false;
-    private readonly string encryptionCodeWord = "word";
+    private readonly string encryptionCodeWord = "word"; // consider moving to secure storage
     private readonly string backupExtension = ".bak";
 
     public FileDataHandler(string dataDirPath, string dataFileName, bool useEncryption) 
@@ -27,56 +29,64 @@ public class FileDataHandler
             return null;
         }
 
-        // use Path.Combine to account for different OS's having different path separators
         string fullPath = Path.Combine(dataDirPath, profileId, dataFileName);
         GameData loadedData = null;
-        if (File.Exists(fullPath)) 
+
+        if (!File.Exists(fullPath))
         {
+            return null;
+        }
+
+        int attempts = 0;
+        bool triedRollback = false;
+
+        while (attempts < 2)
+        {
+            attempts++;
             try 
             {
-                // load the serialized data from the file
-                string dataToLoad = "";
-                using (FileStream stream = new FileStream(fullPath, FileMode.Open))
+                // read the file
+                string dataToLoad;
+                if (useEncryption)
                 {
-                    using (StreamReader reader = new StreamReader(stream))
-                    {
-                        dataToLoad = reader.ReadToEnd();
-                    }
+                    byte[] fileBytes = File.ReadAllBytes(fullPath);
+                    dataToLoad = DecryptBytes(fileBytes);
+                }
+                else
+                {
+                    dataToLoad = File.ReadAllText(fullPath);
                 }
 
-                // optionally decrypt the data
-                if (useEncryption) 
-                {
-                    dataToLoad = EncryptDecrypt(dataToLoad);
-                }
-
-                // deserialize the data from Json back into the C# object
+                // deserialize
                 loadedData = JsonUtility.FromJson<GameData>(dataToLoad);
+                // success
+                return loadedData;
             }
             catch (Exception e) 
             {
-                // since we're calling Load(..) recursively, we need to account for the case where
-                // the rollback succeeds, but data is still failing to load for some other reason,
-                // which without this check may cause an infinite recursion loop.
-                if (allowRestoreFromBackup) 
+                Debug.LogWarning($"Failed to load data file at {fullPath}: {e}");
+
+                if (allowRestoreFromBackup && !triedRollback)
                 {
-                    Debug.LogWarning("Failed to load data file. Attempting to roll back.\n" + e);
+                    triedRollback = true;
                     bool rollbackSuccess = AttemptRollback(fullPath);
-                    if (rollbackSuccess)
+                    if (!rollbackSuccess)
                     {
-                        // try to load again recursively
-                        loadedData = Load(profileId, false);
+                        // no backup or rollback failed; break
+                        Debug.LogError("Rollback failed or no backup available.");
+                        break;
                     }
+                    // if rollback succeeded, loop will retry once
                 }
-                // if we hit this else block, one possibility is that the backup file is also corrupt
-                else 
+                else
                 {
-                    Debug.LogError("Error occured when trying to load file at path: " 
-                        + fullPath  + " and backup did not work.\n" + e);
+                    // either not allowed to rollback or already tried; stop
+                    break;
                 }
             }
         }
-        return loadedData;
+
+        return null;
     }
 
     public void Save(GameData data, string profileId) 
@@ -87,42 +97,88 @@ public class FileDataHandler
             return;
         }
 
-        // use Path.Combine to account for different OS's having different path separators
-        string fullPath = Path.Combine(dataDirPath, profileId, dataFileName);
+        string profileDir = Path.Combine(dataDirPath, profileId);
+        string fullPath = Path.Combine(profileDir, dataFileName);
         string backupFilePath = fullPath + backupExtension;
+        string tempFilePath = fullPath + ".tmp";
+
         try 
         {
             // create the directory the file will be written to if it doesn't already exist
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
+            Directory.CreateDirectory(profileDir);
 
             // serialize the C# game data object into Json
             string dataToStore = JsonUtility.ToJson(data, true);
 
-            // optionally encrypt the data
+            // optionally encrypt the data and write to a temp file
             if (useEncryption) 
             {
-                dataToStore = EncryptDecrypt(dataToStore);
+                byte[] encrypted = EncryptToBytes(dataToStore);
+                File.WriteAllBytes(tempFilePath, encrypted);
+            }
+            else
+            {
+                File.WriteAllText(tempFilePath, dataToStore, Encoding.UTF8);
             }
 
-            // write the serialized data to the file
-            using (FileStream stream = new FileStream(fullPath, FileMode.Create))
+            // verify the newly saved temp file can be loaded successfully (without invoking rollback recursion)
+            GameData verifiedGameData = null;
+            try
             {
-                using (StreamWriter writer = new StreamWriter(stream)) 
+                if (useEncryption)
                 {
-                    writer.Write(dataToStore);
+                    byte[] tempBytes = File.ReadAllBytes(tempFilePath);
+                    string decrypted = DecryptBytes(tempBytes);
+                    verifiedGameData = JsonUtility.FromJson<GameData>(decrypted);
+                }
+                else
+                {
+                    string tempText = File.ReadAllText(tempFilePath);
+                    verifiedGameData = JsonUtility.FromJson<GameData>(tempText);
                 }
             }
-
-            // verify the newly saved file can be loaded successfully
-            GameData verifiedGameData = Load(profileId);
-            // if the data can be verified, back it up
-            if (verifiedGameData != null) 
+            catch (Exception e)
             {
-                File.Copy(fullPath, backupFilePath, true);
+                // verification failed - remove temp and throw
+                File.Delete(tempFilePath);
+                throw new Exception("Saved temp file could not be verified.", e);
             }
-            // otherwise, something went wrong and we should throw an exception
-            else 
+
+            // if the data can be verified, move it into place and create/update backup
+            if (verifiedGameData != null)
             {
+                if (File.Exists(fullPath))
+                {
+                    // replace existing file and create/update backup atomically where supported
+                    try
+                    {
+                        // If a backup exists already, File.Replace will overwrite it. If not, provide backup path.
+                        File.Replace(tempFilePath, fullPath, backupFilePath, true);
+                    }
+                    catch (PlatformNotSupportedException)
+                    {
+                        // fallback: overwrite with move and create backup manually
+                        if (File.Exists(backupFilePath)) File.Delete(backupFilePath);
+                        File.Copy(fullPath, backupFilePath, true);
+                        File.Delete(fullPath);
+                        File.Move(tempFilePath, fullPath);
+                    }
+                }
+                else
+                {
+                    // no existing file - move temp to final location and create a backup copy
+                    File.Move(tempFilePath, fullPath);
+                    try
+                    {
+                        File.Copy(fullPath, backupFilePath, true);
+                    }
+                    catch (Exception) { /* non-fatal if backup can't be created */ }
+                }
+            }
+            else
+            {
+                // verification failed
+                File.Delete(tempFilePath);
                 throw new Exception("Save file could not be verified and backup could not be created.");
             }
 
@@ -130,6 +186,14 @@ public class FileDataHandler
         catch (Exception e) 
         {
             Debug.LogError("Error occured when trying to save data to file: " + fullPath + "\n" + e);
+        }
+        finally
+        {
+            // ensure temp file is cleaned up
+            if (File.Exists(tempFilePath))
+            {
+                try { File.Delete(tempFilePath); } catch { }
+            }
         }
     }
 
@@ -165,6 +229,8 @@ public class FileDataHandler
     public Dictionary<string, GameData> LoadAllProfiles() 
     {
         Dictionary<string, GameData> profileDictionary = new Dictionary<string, GameData>();
+
+        if (!Directory.Exists(dataDirPath)) return profileDictionary;
 
         // loop over all directory names in the data directory path
         IEnumerable<DirectoryInfo> dirInfos = new DirectoryInfo(dataDirPath).EnumerateDirectories();
@@ -235,15 +301,58 @@ public class FileDataHandler
         return mostRecentProfileId;
     }
 
-    // the below is a simple implementation of XOR encryption
-    private string EncryptDecrypt(string data) 
+    // AES encryption helpers (using passphrase-derived key). Not perfect for production; consider platform keystore.
+    private byte[] EncryptToBytes(string plainText)
     {
-        string modifiedData = "";
-        for (int i = 0; i < data.Length; i++) 
+        byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
+        using (Aes aes = Aes.Create())
         {
-            modifiedData += (char) (data[i] ^ encryptionCodeWord[i % encryptionCodeWord.Length]);
+            aes.Key = SHA256Hash(encryptionCodeWord);
+            aes.GenerateIV();
+            using (var ms = new MemoryStream())
+            {
+                // prepend IV
+                ms.Write(aes.IV, 0, aes.IV.Length);
+                using (var crypto = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                {
+                    crypto.Write(plainBytes, 0, plainBytes.Length);
+                    crypto.FlushFinalBlock();
+                }
+                return ms.ToArray();
+            }
         }
-        return modifiedData;
+    }
+
+    private string DecryptBytes(byte[] bytes)
+    {
+        using (Aes aes = Aes.Create())
+        {
+            aes.Key = SHA256Hash(encryptionCodeWord);
+            int ivSize = aes.BlockSize / 8; // usually 16
+            if (bytes.Length < ivSize) throw new Exception("Invalid encrypted data");
+            byte[] iv = new byte[ivSize];
+            Array.Copy(bytes, 0, iv, 0, ivSize);
+            aes.IV = iv;
+
+            using (var ms = new MemoryStream())
+            {
+                ms.Write(bytes, ivSize, bytes.Length - ivSize);
+                ms.Position = 0;
+                using (var crypto = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                using (var sr = new StreamReader(crypto, Encoding.UTF8))
+                {
+                    return sr.ReadToEnd();
+                }
+            }
+        }
+    }
+
+    private byte[] SHA256Hash(string input)
+    {
+        using (SHA256 sha = SHA256.Create())
+        {
+            return sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+        }
     }
 
     private bool AttemptRollback(string fullPath) 
@@ -252,17 +361,16 @@ public class FileDataHandler
         string backupFilePath = fullPath + backupExtension;
         try 
         {
-            // if the file exists, attempt to roll back to it by overwriting the original file
+            // if the backup exists, attempt to roll back to it by overwriting the original file
             if (File.Exists(backupFilePath))
             {
                 File.Copy(backupFilePath, fullPath, true);
                 success = true;
                 Debug.LogWarning("Had to roll back to backup file at: " + backupFilePath);
             }
-            // otherwise, we don't yet have a backup file - so there's nothing to roll back to
             else 
             {
-                throw new Exception("Tried to roll back, but no backup file exists to roll back to.");
+                Debug.LogWarning("Tried to roll back, but no backup file exists to roll back to.");
             }
         }
         catch (Exception e) 

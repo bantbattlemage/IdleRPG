@@ -8,8 +8,12 @@ public class PlayerData : Data
 	[SerializeField] private int credits;
 	public int Credits => credits;
 
-	[SerializeField] private BetLevelDefinition currentBet;
-	public BetLevelDefinition CurrentBet => currentBet;
+	[SerializeField] private string currentBetKey;
+	[System.NonSerialized] private BetLevelDefinition currentBet;
+	public BetLevelDefinition CurrentBet
+	{
+		get { EnsureResolved(); return currentBet; }
+	}
 
 	[SerializeField] private List<SlotsData> currentSlots;
 	public List<SlotsData> CurrentSlots => currentSlots;
@@ -18,7 +22,16 @@ public class PlayerData : Data
 	{
 		credits = c;
 		currentBet = bet;
+		currentBetKey = bet != null ? bet.name : null;
 		currentSlots = new List<SlotsData>();
+	}
+
+	private void EnsureResolved()
+	{
+		if (currentBet == null && !string.IsNullOrEmpty(currentBetKey))
+		{
+			currentBet = DefinitionResolver.Resolve<BetLevelDefinition>(currentBetKey);
+		}
 	}
 
 	public void AddSlots(SlotsData slots)
@@ -39,12 +52,11 @@ public class PlayerData : Data
 	public void SetCurrentBet(BetLevelDefinition bet)
 	{
 		currentBet = bet;
-		DataPersistenceManager.Instance.SaveGame();
+		currentBetKey = bet != null ? bet.name : null;
 	}
 
 	public void SetCurrentCredits(int c)
 	{
 		credits = c;
-		DataPersistenceManager.Instance.SaveGame();
 	}
 }

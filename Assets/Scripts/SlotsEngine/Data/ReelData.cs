@@ -9,19 +9,34 @@ public class ReelData : Data
 	[SerializeField] private int symbolCount;
 	[SerializeField] private int symbolSize = 170;
 	[SerializeField] private int symbolSpacing = 15;
-	[SerializeField] private ReelStripDefinition defaultReelStrip;
-	[SerializeField] private ReelStripData currentReelStrip;
-	[SerializeField] private ReelDefinition baseDefinition;
-	[SerializeField] private List<SymbolData> currentSymbolData;
+	[SerializeField] private string defaultReelStripKey;
+	[SerializeField] private string baseDefinitionKey;
+	[SerializeField] private string[] currentSymbolKeys;
+
+	[System.NonSerialized] private ReelStripData currentReelStrip;
+	[System.NonSerialized] private ReelDefinition baseDefinition;
+	[System.NonSerialized] private List<SymbolData> currentSymbolData;
 
 	public float ReelSpinDuration => reelSpinDuration;
 	public int SymbolCount => symbolCount;
 	public int SymbolSize => symbolSize;
 	public int SymbolSpacing => symbolSpacing;
-	public ReelStripDefinition DefaultReelStrip => defaultReelStrip;
-	public ReelDefinition BaseDefinition => baseDefinition;
-	public List<SymbolData> CurrentSymbolData => currentSymbolData;
-	public ReelStripData CurrentReelStrip => currentReelStrip;
+	public ReelStripData CurrentReelStrip
+	{
+		get { EnsureResolved(); return currentReelStrip; }
+	}
+
+	// Compatibility: previous code referenced DefaultReelStrip. Return the resolved current strip.
+	public ReelStripData DefaultReelStrip => CurrentReelStrip;
+
+	public ReelDefinition BaseDefinition
+	{
+		get { EnsureResolved(); return baseDefinition; }
+	}
+	public List<SymbolData> CurrentSymbolData
+	{
+		get { EnsureResolved(); return currentSymbolData; }
+	}
 
 	public ReelData(float duration, int count, int size, int spacing, ReelStripDefinition defaultStrip, ReelDefinition def, ReelStripData existingStripData = null)
 	{
@@ -29,7 +44,6 @@ public class ReelData : Data
 		symbolCount = count;
 		symbolSize = size;
 		symbolSpacing = spacing;
-		defaultReelStrip = defaultStrip;
 		baseDefinition = def;
 		currentSymbolData = new List<SymbolData>();
 
@@ -39,23 +53,59 @@ public class ReelData : Data
 		}
 		else
 		{
-			SetReelStrip(defaultReelStrip.CreateInstance());
+			SetReelStrip(defaultStrip.CreateInstance());
 		}
 	}
 
 	public void SetReelStrip(ReelStripData reelStrip)
 	{
 		currentReelStrip = reelStrip;
+		if (reelStrip != null)
+		{
+			defaultReelStripKey = reelStrip.Definition != null ? reelStrip.Definition.name : null;
+		}
 	}
 
 	public void SetCurrentSymbolData(List<SymbolData> symbolDatas)
 	{
 		currentSymbolData = symbolDatas;
+		if (symbolDatas != null)
+		{
+			currentSymbolKeys = new string[symbolDatas.Count];
+			for (int i = 0; i < symbolDatas.Count; i++)
+			{
+				currentSymbolKeys[i] = symbolDatas[i] != null ? symbolDatas[i].Name : null;
+			}
+		}
 	}
 
 	public void SetSymbolSize(float size, float spacing)
 	{
 		symbolSize = (int)size;
 		symbolSpacing = (int)spacing;
+	}
+
+	private void EnsureResolved()
+	{
+		if (baseDefinition == null && !string.IsNullOrEmpty(baseDefinitionKey))
+		{
+			baseDefinition = DefinitionResolver.Resolve<ReelDefinition>(baseDefinitionKey);
+		}
+
+		if (currentReelStrip == null && !string.IsNullOrEmpty(defaultReelStripKey))
+		{
+			currentReelStrip = DefinitionResolver.Resolve<ReelStripDefinition>(defaultReelStripKey)?.CreateInstance();
+		}
+
+		if ((currentSymbolData == null || currentSymbolData.Count == 0) && currentSymbolKeys != null)
+		{
+			currentSymbolData = new List<SymbolData>();
+			for (int i = 0; i < currentSymbolKeys.Length; i++)
+			{
+				// Resolve by name: this assumes symbol name is unique and used as key
+				Sprite sprite = AssetResolver.ResolveSprite(currentSymbolKeys[i]);
+				currentSymbolData.Add(new SymbolData(currentSymbolKeys[i], sprite, new int[0], 1f));
+			}
+		}
 	}
 }

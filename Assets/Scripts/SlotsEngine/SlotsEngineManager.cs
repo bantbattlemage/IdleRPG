@@ -132,9 +132,60 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 			throw new Exception("Tried to remove slots that engine doesn't have! Something has gone wrong");
 		}
 
+		// Remove from any display page that contains this slots instance
+		foreach (var page in slotsDisplayPages.ToList())
+		{
+			if (page.slotsToDisplay != null && page.slotsToDisplay.Contains(slotsToDestroy))
+			{
+				page.RemoveSlotsFromPage(slotsToDestroy);
+
+				// If page is now empty, remove/destroy the page
+				if (page.slotsToDisplay.Count == 0)
+				{
+					slotsDisplayPages.Remove(page);
+					Destroy(page.gameObject);
+
+					// Adjust current page index if needed
+					if (currentSlotPageIndex >= slotsDisplayPages.Count)
+					{
+						currentSlotPageIndex = Mathf.Max(0, slotsDisplayPages.Count - 1);
+					}
+				}
+				break; // a slotsEngine will only be on a single page
+			}
+		}
+
+		// Remove from the master engines list and destroy the engine + its reels root
 		slotsEngines.Remove(slotsToDestroy);
-		Destroy(slotsToDestroy.gameObject);
-		Destroy(slotsToDestroy.ReelsRootTransform.gameObject);
+		if (slotsToDestroy != null)
+		{
+			if (slotsToDestroy.ReelsRootTransform != null)
+			{
+				Destroy(slotsToDestroy.ReelsRootTransform.gameObject);
+			}
+			Destroy(slotsToDestroy.gameObject);
+		}
+
+		// Update UI and layout state
+		if (slotsDisplayPages.Count == 0)
+		{
+			// Ensure buttons state
+			nextPageButton.gameObject.SetActive(false);
+			prevPageButton.gameObject.SetActive(false);
+		}
+		else
+		{
+			// Clamp current index and ensure visible page renderers are updated
+			currentSlotPageIndex = Mathf.Clamp(currentSlotPageIndex, 0, slotsDisplayPages.Count - 1);
+			foreach (SlotsDisplayPage p in slotsDisplayPages)
+			{
+				p.ToggleRenderers(p == currentSlotsDisplayPage);
+			}
+
+			// Update prev/next buttons
+			nextPageButton.gameObject.SetActive(currentSlotPageIndex != slotsDisplayPages.Count - 1);
+			prevPageButton.gameObject.SetActive(currentSlotPageIndex != 0);
+		}
 
 		AdjustSlotsCanvases();
 	}

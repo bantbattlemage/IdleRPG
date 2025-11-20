@@ -5,12 +5,29 @@ using UnityEngine;
 public class SymbolData : Data
 {
 	[SerializeField] private string name;
-	[SerializeField] private Sprite sprite;
+	// Sprite must not be serialized into save data. Store a key instead and resolve at runtime.
+	[NonSerialized] private Sprite sprite;
+	[SerializeField] private string spriteKey;
 	[SerializeField] private int[] baseValueMultiplier;
 	[SerializeField] private float weight = 1;
 
 	public string Name => name;
-	public Sprite Sprite => sprite;
+	public Sprite Sprite
+	{
+		get
+		{
+			if (sprite == null && !string.IsNullOrEmpty(spriteKey))
+			{
+				sprite = AssetResolver.ResolveSprite(spriteKey);
+			}
+			return sprite;
+		}
+		set
+		{
+			sprite = value;
+			spriteKey = value != null ? value.name : null;
+		}
+	}
 	public int MinWinDepth
 	{
 		get
@@ -30,6 +47,7 @@ public class SymbolData : Data
 	{
 		name = symbolName;
 		sprite = symbolSprite;
+		spriteKey = symbolSprite != null ? symbolSprite.name : null;
 		baseValueMultiplier = values;
 		weight = symbolWeight;
 	}

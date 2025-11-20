@@ -13,7 +13,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private List<SlotsEngine> playerSlots = new List<SlotsEngine>();
 
-	private SlotsEngine primarySlots => playerSlots[0];
+	private SlotsEngine primarySlots => playerSlots.Count > 0 ? playerSlots[0] : null;
 
 	public bool CheckAllSlotsState(State state)
 	{
@@ -61,19 +61,6 @@ public class GamePlayer : Singleton<GamePlayer>
 			GlobalEventManager.Instance.BroadcastEvent("PlayerInputPressed");
 		}
 
-		//	testing save data
-		if (Input.GetKeyDown(KeyCode.F1))
-		{
-			SlotsDataManager.Instance.ClearSlotsData();
-
-			foreach (SlotsEngine slots in playerSlots)
-			{
-				slots.SaveSlotsData();
-			}
-
-			Debug.LogWarning("Saving slot data");
-		}
-
 		//	Testing add slots
 		if (Input.GetKeyDown(KeyCode.R))
 		{
@@ -83,7 +70,10 @@ public class GamePlayer : Singleton<GamePlayer>
 		//	Testing kill slots
 		if (Input.GetKeyDown(KeyCode.X))
 		{
-			RemoveSlots(playerSlots.Last());
+			if (playerSlots.Count > 0)
+			{
+				RemoveSlots(playerSlots.Last());
+			}
 		}
 
 		//	Testing add credits
@@ -138,13 +128,33 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void RemoveSlots(SlotsEngine slotsToRemove)
 	{
+		if (slotsToRemove == null)
+		{
+			throw new ArgumentNullException(nameof(slotsToRemove));
+		}
+
 		if (!playerSlots.Contains(slotsToRemove))
 		{
 			throw new Exception("Tried to remove slots that player doesn't have!");
 		}
 
-		playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
+		// Prevent removal while the slot is actively spinning
+		if (slotsToRemove.CurrentState == State.Spinning)
+		{
+			Debug.LogWarning("Cannot remove slots while spinning.");
+			return;
+		}
+
+		// Remove player data entry if present
+		if (slotsToRemove.CurrentSlotsData != null)
+		{
+			playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
+		}
+
+		// Remove from our active list first to avoid callers accessing it during destroy
 		playerSlots.Remove(slotsToRemove);
+
+		// Destroy visual/engine objects
 		SlotsEngineManager.Instance.DestroySlots(slotsToRemove);
 	}
 
@@ -186,6 +196,8 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetDownPressed(object obj)
 	{
+		if (primarySlots == null || primarySlots.CurrentSlotsData == null) return;
+
 		var betLevels = primarySlots.CurrentSlotsData.BetLevelDefinitions;
 
 		int targetLevel = -1;
@@ -208,6 +220,8 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void OnBetUpPressed(object obj)
 	{
+		if (primarySlots == null || primarySlots.CurrentSlotsData == null) return;
+
 		var betLevels = primarySlots.CurrentSlotsData.BetLevelDefinitions;
 
 		int targetLevel = -1;
