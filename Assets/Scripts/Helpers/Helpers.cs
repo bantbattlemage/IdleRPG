@@ -3,7 +3,7 @@ using System;
 using System.Linq;
 using UnityEngine;
 
-public class Helpers : MonoBehaviour
+public static class Helpers
 {
 	public static T[] CombineColumnsToGrid<T>(List<T[]> columns)
 	{
@@ -11,7 +11,7 @@ public class Helpers : MonoBehaviour
 			return Array.Empty<T>();
 
 		int colCount = columns.Count;
-		int rowCount = columns.Max(col => col.Length);
+		int rowCount = columns.Max(col => (col != null) ? col.Length : 0);
 
 		// total cells in the rectangular grid
 		T[] result = new T[rowCount * colCount];
@@ -25,7 +25,7 @@ public class Helpers : MonoBehaviour
 				int srcRow = r;
 				int dstIndex = r * colCount + c;
 
-				if (srcRow < columns[c].Length)
+				if (columns[c] != null && srcRow < columns[c].Length)
 					result[dstIndex] = columns[c][srcRow];
 				else
 					result[dstIndex] = default;

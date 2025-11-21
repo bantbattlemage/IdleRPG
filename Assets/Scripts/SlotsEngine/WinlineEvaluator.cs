@@ -23,7 +23,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 {
     // Simple public toggle visible in the inspector so it can be enabled/disabled in the Scene Editor.
     [Tooltip("Enable detailed winline logging (clear console at spin start when enabled).")]
-    public bool LoggingEnabled = true;
+    public bool LoggingEnabled = false; // default to false to avoid noisy logs in builds
 
     private List<WinData> currentSpinWinData;
     private bool clearedConsoleForCurrentSpin;
@@ -51,8 +51,10 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
             string filename = $"spin_{DateTime.Now:yyyyMMdd_HHmmss_fff}_{spinCounter}.log";
             currentSpinLogFilePath = Path.Combine(dir, filename);
 
-            // create empty file
+            // create empty file (write once)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             File.WriteAllText(currentSpinLogFilePath, $"Spin log started: {DateTime.Now:O}{Environment.NewLine}");
+#endif
 
             // Prune old logs in persistent dir, keep only the 5 most recent
             PruneOldSpinLogs(dir, 5);
@@ -86,7 +88,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
             if (files == null || files.Length <= keep) return;
 
             var ordered = files.Select(p => new FileInfo(p))
-                               .OrderByDescending(fi => fi.CreationTimeUtc)
+                               .OrderByDescending(fi => fi.LastWriteTimeUtc)
                                .ToList();
 
             for (int i = keep; i < ordered.Count; i++)
@@ -95,10 +97,16 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 {
                     ordered[i].Delete();
                 }
-                catch { /* best-effort cleanup */ }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"Failed to delete old spin log '{ordered[i].FullName}': {ex.Message}");
+                }
             }
         }
-        catch { /* ignore prune failures */ }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"PruneOldSpinLogs failed: {ex.Message}");
+        }
     }
 
     private void ClearConsole()
@@ -119,29 +127,26 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 #endif
     }
 
-    private void AppendToCurrentSpinLog(string text)
+    private void AppendToCurrentSpinLog(StringBuilder builder)
     {
+        if (builder == null) return;
+
         if (string.IsNullOrEmpty(currentSpinLogFilePath))
         {
-            // ensure a file exists
-            try
-            {
-                NotifySpinStarted();
-            }
-            catch { }
+            try { NotifySpinStarted(); } catch { }
             if (string.IsNullOrEmpty(currentSpinLogFilePath)) return;
         }
 
-        // Append to persistent data path log
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         try
         {
-            if (!string.IsNullOrEmpty(currentSpinLogFilePath))
-                File.AppendAllText(currentSpinLogFilePath, text + Environment.NewLine, Encoding.UTF8);
+            File.AppendAllText(currentSpinLogFilePath, builder.ToString(), Encoding.UTF8);
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"Failed to write to persistent spin log file: {ex.Message}");
         }
+#endif
     }
 
     /// <summary>
@@ -150,14 +155,36 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
     /// </summary>
     public void LogSpinResult(GameSymbol[] grid, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines, List<WinData> winData)
     {
+        // If logging is disabled, do nothing to avoid creating log files or printing paths.
+        if (!LoggingEnabled)
+            return;
+
         try
         {
-            AppendToCurrentSpinLog("---- Spin Result ----");
-            AppendToCurrentSpinLog($"Timestamp: {DateTime.Now:O}");
-            AppendToCurrentSpinLog($"Columns: {columns}");
-            AppendToCurrentSpinLog($"RowsPerColumn: [{(rowsPerColumn != null ? string.Join(",", rowsPerColumn) : string.Empty)}]");
+            var sb = new StringBuilder();
 
-            AppendToCurrentSpinLog("\nGrid contents (index => name | baseValue | minWinDepth | isWild | allowWildMatch):");
+            sb.AppendLine("---- Spin Result ----");
+            sb.AppendLine($"Timestamp: {DateTime.Now:O}");
+            sb.AppendLine($"Columns: {columns}");
+
+            if (rowsPerColumn != null)
+            {
+                sb.Append("RowsPerColumn: [");
+                for (int i = 0; i < rowsPerColumn.Length; i++)
+                {
+                    if (i > 0) sb.Append(",");
+                    sb.Append(rowsPerColumn[i]);
+                }
+                sb.AppendLine("]");
+            }
+            else
+            {
+                sb.AppendLine("RowsPerColumn: []");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("Grid contents (index => name | baseValue | minWinDepth | isWild | allowWildMatch):");
+
             if (grid != null)
             {
                 for (int i = 0; i < grid.Length; i++)
@@ -165,7 +192,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                     var gs = grid[i];
                     if (gs == null)
                     {
-                        AppendToCurrentSpinLog($"[{i}] => null");
+                        sb.AppendLine($"[{i}] => null");
                         continue;
                     }
 
@@ -175,15 +202,16 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                     int min = sd != null ? sd.MinWinDepth : -999;
                     bool isWild = sd != null ? sd.IsWild : false;
                     bool allowWild = sd != null ? sd.AllowWildMatch : false;
-                    AppendToCurrentSpinLog($"[{i}] => {name} | base={baseVal} | minWin={min} | isWild={isWild} | allowWild={allowWild}");
+                    sb.AppendLine($"[{i}] => {name} | base={baseVal} | minWin={min} | isWild={isWild} | allowWild={allowWild}");
                 }
             }
             else
             {
-                AppendToCurrentSpinLog("Grid is null");
+                sb.AppendLine("Grid is null");
             }
 
-            AppendToCurrentSpinLog("\nEvaluated Winlines (asset name / generated indexes):");
+            sb.AppendLine();
+            sb.AppendLine("Evaluated Winlines (asset name / generated indexes):");
             if (winlines != null)
             {
                 for (int wi = 0; wi < winlines.Count; wi++)
@@ -191,11 +219,19 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                     var wl = winlines[wi];
                     int[] concrete = wl.GenerateIndexes(columns, rowsPerColumn ?? new int[columns]);
                     if (concrete == null) concrete = new int[0];
-                    AppendToCurrentSpinLog($"Winline[{wi}] '{wl.name}' pattern={wl.Pattern} concrete=[{string.Join(",", concrete)}]");
+
+                    sb.Append("Winline["); sb.Append(wi); sb.Append("] '"); sb.Append(wl.name); sb.Append("' pattern="); sb.Append(wl.Pattern); sb.Append(" concrete=[");
+                    for (int c = 0; c < concrete.Length; c++)
+                    {
+                        if (c > 0) sb.Append(","); sb.Append(concrete[c]);
+                    }
+                    sb.AppendLine("]");
                 }
             }
 
-            AppendToCurrentSpinLog("\nWin evaluation results:");
+            sb.AppendLine();
+            sb.AppendLine("Win evaluation results:");
+
             if (winData != null && winData.Count > 0)
             {
                 int total = 0;
@@ -203,19 +239,41 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 {
                     var w = winData[i];
                     total += w.WinValue;
-                    var names = (w.WinningSymbolIndexes ?? new int[0]).Select(idx => (idx >= 0 && idx < (grid?.Length ?? 0) && grid[idx] != null) ? grid[idx].CurrentSymbolData?.Name ?? "(null)" : "null").ToArray();
-                    AppendToCurrentSpinLog($"Win[{i}] LineIndex={w.LineIndex} WinValue={w.WinValue} Indexes=[{(w.WinningSymbolIndexes != null ? string.Join(",", w.WinningSymbolIndexes) : "")} ] names=[{string.Join(",", names)}]");
+
+                    // Build names array without LINQ allocations
+                    var idxs = w.WinningSymbolIndexes ?? new int[0];
+                    sb.Append($"Win[{i}] LineIndex={w.LineIndex} WinValue={w.WinValue} Indexes=[");
+                    for (int x = 0; x < idxs.Length; x++)
+                    {
+                        if (x > 0) sb.Append(",");
+                        sb.Append(idxs[x]);
+                    }
+                    sb.Append("] names=[");
+
+                    for (int x = 0; x < idxs.Length; x++)
+                    {
+                        if (x > 0) sb.Append(",");
+                        int idx = idxs[x];
+                        if (idx >= 0 && grid != null && idx < grid.Length && grid[idx] != null && grid[idx].CurrentSymbolData != null)
+                            sb.Append(grid[idx].CurrentSymbolData.Name ?? "(null)");
+                        else
+                            sb.Append("null");
+                    }
+                    sb.AppendLine("]");
                 }
-                AppendToCurrentSpinLog($"TotalWin={total}");
+                sb.AppendLine($"TotalWin={total}");
             }
             else
             {
-                AppendToCurrentSpinLog("No wins");
+                sb.AppendLine("No wins");
             }
 
-            AppendToCurrentSpinLog("---- End Spin ----\n\n");
+            sb.AppendLine("---- End Spin ----\n\n");
 
-            // Also print location for convenience
+            // Persist to file in one operation
+            AppendToCurrentSpinLog(sb);
+
+            // Also print location for convenience (editor/log)
             if (!string.IsNullOrEmpty(currentSpinLogFilePath))
             {
                 Debug.Log($"Spin log written to: {currentSpinLogFilePath}");
@@ -228,8 +286,8 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
     }
 
     /// <summary>
-    /// Evaluate wins for a rectangular grid represented in column-major layout.
-    /// Grid indexing: index = row * columns + column (row 0 = bottom, column 0 = left).
+    /// Evaluate wins for a rectangular grid represented in row-major layout.
+    /// Grid indexing used across the project: index = row * columns + column (row 0 = bottom, column 0 = left).
     /// 
     /// Rules:
     /// 1. Wins must start at column 0 (leftmost reel)
@@ -238,7 +296,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
     /// 4. Win is valid if match count >= trigger symbol's MinWinDepth
     /// 5. Wild symbols match according to SymbolData.Matches() logic
     /// </summary>
-    /// <param name="grid">Column-major symbol grid (size = maxRows * columns)</param>
+    /// <param name="grid">Row-major symbol grid (size = maxRows * columns)</param>
     /// <param name="columns">Number of columns (reels)</param>
     /// <param name="rowsPerColumn">Actual rows available in each column (handles varying reel sizes)</param>
     /// <param name="winlines">List of winline patterns to evaluate</param>
@@ -260,7 +318,8 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
             return winData;
         }
 
-        int maxRows = rowsPerColumn.Max();
+        int maxRows = 0;
+        for (int i = 0; i < rowsPerColumn.Length; i++) if (rowsPerColumn[i] > maxRows) maxRows = rowsPerColumn[i];
         int expectedGridSize = maxRows * columns;
 
         // grid returned by CombineColumnsToGrid will use maxRows * columns layout; if caller provided such grid, accept it.
@@ -412,7 +471,11 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 }
 
                 // Apply line multiplier and credit cost
-                long total = scaled * winlineDef.WinMultiplier * (long)GamePlayer.Instance.CurrentBet.CreditCost;
+                long creditCost = 1;
+                if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
+                    creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
+
+                long total = scaled * winlineDef.WinMultiplier * creditCost;
                 if (total > int.MaxValue) total = int.MaxValue;
                 int finalValue = (int)total;
 
@@ -450,7 +513,11 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 {
                     if (cell.BaseValue <= 0) continue;
 
-                    long total = (long)cell.BaseValue * (long)GamePlayer.Instance.CurrentBet.CreditCost;
+                    long creditCost = 1;
+                    if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
+                        creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
+
+                    long total = (long)cell.BaseValue * creditCost;
                     if (total > int.MaxValue) total = int.MaxValue;
                     int finalValue = (int)total;
 
@@ -512,7 +579,11 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                                 break;
                         }
 
-                        long total = scaled * (long)GamePlayer.Instance.CurrentBet.CreditCost;
+                        long creditCost = 1;
+                        if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
+                            creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
+
+                        long total = scaled * creditCost;
                         if (total > int.MaxValue) total = int.MaxValue;
                         int finalValue = (int)total;
 
@@ -562,7 +633,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
         int[] rowsPerColumn = new int[cols];
         for (int c = 0; c < cols; c++) rowsPerColumn[c] = columns[c] != null ? columns[c].Length : 0;
 
-        // Build column-major grid using helper
+        // Build row-major grid using helper
         GameSymbol[] gridSymbols = Helpers.CombineColumnsToGrid(columns);
 
         return EvaluateWinsFromGameSymbols(gridSymbols, cols, rowsPerColumn, winlines);

@@ -7135,6 +7135,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 51f645173120a004f8d8e1128afcf595, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WinlineEvaluator
+  LoggingEnabled: 0
 --- !u!1 &1853545767
 GameObject:
   m_ObjectHideFlags: 0
@@ -7395,6 +7396,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DataPersistenceManager
   disableDataPersistence: 0
   initializeDataIfNull: 1
+  autoSaveOnQuitAndPause: 1
   fileName: slotsgame
   useEncryption: 0
 --- !u!114 &1907970463
