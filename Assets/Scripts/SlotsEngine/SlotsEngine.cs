@@ -116,7 +116,7 @@ public class SlotsEngine : MonoBehaviour
 		}
 		else
 		{
-			Debug.Log("SpinOrStopReels called but no action could be taken.");
+			//Debug.Log("SpinOrStopReels called but no action could be taken.");
 
 			if (GamePlayer.Instance.CurrentCredits < GamePlayer.Instance.CurrentBet.CreditCost)
 			{

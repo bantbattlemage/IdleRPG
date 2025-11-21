@@ -5,7 +5,9 @@ public static class Extensions
 {
 	public static T GetRandom<T>(this IEnumerable<T> list)
 	{
-		int randomIndex = UnityEngine.Random.Range(0, list.Count());
+		int count = list.Count();
+		if (count == 0) return default;
+		int randomIndex = RNGManager.Range(0, count);
 		return list.ElementAt(randomIndex);
 	}
 
