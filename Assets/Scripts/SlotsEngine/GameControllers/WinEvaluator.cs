@@ -19,7 +19,7 @@ using UnityEditor;
 /// • Supports Wild symbols that substitute for other symbols
 /// • Dynamic - handles reel additions/removals gracefully
 /// </summary>
-public class WinlineEvaluator : Singleton<WinlineEvaluator>
+public class WinEvaluator : Singleton<WinEvaluator>
 {
     // Simple public toggle visible in the inspector so it can be enabled/disabled in the Scene Editor.
     [Tooltip("Enable detailed winline logging (clear console at spin start when enabled).")]

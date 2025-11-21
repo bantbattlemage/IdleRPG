@@ -10,13 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 18c30a28fe3d53d468d52a4a287ef3c4, type: 3}
-  m_Name: Symbol0
+  m_Name: Symbol2
   m_EditorClassIdentifier: Assembly-CSharp::SymbolDefinition
-  symbolName: 0
-  symbolSprite: {fileID: 21300000, guid: 0883b9c930cd6054a85a0c58cf2bf97d, type: 3}
-  baseValue: 1
+  symbolName: 2
+  symbolSprite: {fileID: 21300000, guid: fa7d5d101b753fe4a82f40f1159fd7e4, type: 3}
+  baseValue: 3
   minWinDepth: 3
-  payScaling: 0
+  payScaling: 1
   weight: 1
   isWild: 0
   allowWildMatch: 1
+  winMode: 0
+  totalCountTrigger: -1
+  maxPerReel: -1
+  matchGroupId: 0

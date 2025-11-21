@@ -24,11 +24,11 @@ public class WinlineTestWindow : EditorWindow
         winlineDefs = Resources.LoadAll<WinlineDefinition>("SlotsEngine/WinlineDefinitions");
 
         // Ensure a runtime WinlineEvaluator instance exists in the scene so we can call EvaluateWins
-        if (WinlineEvaluator.Instance == null)
+        if (WinEvaluator.Instance == null)
         {
             var go = new GameObject("WinlineEvaluator_TestRuntime");
             go.hideFlags = HideFlags.HideAndDontSave;
-            go.AddComponent<WinlineEvaluator>();
+            go.AddComponent<WinEvaluator>();
         }
 
         // Ensure a GamePlayer exists and has a minimal PlayerData/BetLevel so evaluator can read CurrentBet
@@ -143,7 +143,7 @@ public class WinlineTestWindow : EditorWindow
             ? new List<WinlineDefinition>(slotsDef.WinlineDefinitions)
             : (winlineDefs != null ? winlineDefs.ToList() : new List<WinlineDefinition>());
 
-        var wins = WinlineEvaluator.Instance.EvaluateWins(grid, columns, rowsPerColumn, winlines);
+        var wins = WinEvaluator.Instance.EvaluateWins(grid, columns, rowsPerColumn, winlines);
 
         Debug.Log($"Pattern test '{string.Join(" ", fullPattern)}' on '{slotsDefName}': found {wins?.Count ?? 0} wins");
         if (wins != null && wins.Count > 0)
@@ -167,14 +167,14 @@ public class WinlineTestWindow : EditorWindow
         // Ensure GamePlayer exists and is initialized before calling evaluator
         EnsureGamePlayerInitialized();
 
-        if (WinlineEvaluator.Instance == null)
+        if (WinEvaluator.Instance == null)
         {
             Debug.LogError("WinlineEvaluator instance not present.");
             return;
         }
 
         var winlines = new List<WinlineDefinition>(winlineDefs);
-        var wins = WinlineEvaluator.Instance.EvaluateWins(grid, columns, rowsPerColumn, winlines);
+        var wins = WinEvaluator.Instance.EvaluateWins(grid, columns, rowsPerColumn, winlines);
 
         Debug.Log($"Evaluation result: {wins?.Count ?? 0} wins");
         if (wins != null)

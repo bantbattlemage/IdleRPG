@@ -40,7 +40,7 @@ public class ReelStripData : Data
 		var weighted = new (SymbolDefinition, float)[symbolDefinitions.Length];
 		for (int i = 0; i < symbolDefinitions.Length; i++) weighted[i] = (symbolDefinitions[i], symbolDefinitions[i].Weight / stripSize);
 		var def = WeightedRandom.Pick(weighted);
-		if (WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"ReelStripData.GetWeightedSymbol(): picked '{def?.SymbolName ?? def?.name ?? "(null)"}' (no existingSelections)");
+		if (WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"ReelStripData.GetWeightedSymbol(): picked '{def?.SymbolName ?? def?.name ?? "(null)"}' (no existingSelections)");
 		return def.CreateInstance();
 	}
 
@@ -48,7 +48,7 @@ public class ReelStripData : Data
 	{
 		EnsureResolved();
 		var candidates = new System.Collections.Generic.List<(SymbolDefinition, float)>();
-		bool doLog = WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled && (Application.isEditor || Debug.isDebugBuild);
+		bool doLog = WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled && (Application.isEditor || Debug.isDebugBuild);
 		if (doLog)
 		{
 			string existingNames = existingSelections == null ? "(null)" : string.Join(",", existingSelections.Select(s => s == null ? "(null)" : s.Name));

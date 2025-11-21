@@ -414,7 +414,7 @@ public class GameReel : MonoBehaviour
 			spinning = false;
 
 			// Debug: dump final symbols for this reel to help verify ordering/mapping
-			if ((Application.isEditor || Debug.isDebugBuild) && WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled)
+			if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled)
 			{
 				var names = symbols.Select(s => s != null && s.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray();
 				Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]");

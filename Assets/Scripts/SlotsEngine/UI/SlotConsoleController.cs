@@ -110,7 +110,7 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 			{
 				if (AutoSpinToggle.isOn && GamePlayer.Instance.CheckAllSlotsState(State.Idle))
 				{
-					var currentWinData = WinlineEvaluator.Instance.CurrentSpinWinData;
+					var currentWinData = WinEvaluator.Instance.CurrentSpinWinData;
 
 					if (AutoStopToggle.isOn && currentWinData is { Count: > 0 })
 					{

@@ -60,7 +60,7 @@ public class PresentationController : Singleton<PresentationController>
 		GameSymbol[] currentSymbolGrid = Helpers.CombineColumnsToGrid(visualColumns);
 
 		// Debug logging to help diagnose presentation-time mismatches
-		if ((Application.isEditor || Debug.isDebugBuild) && WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled)
+		if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled)
 		{
 			Debug.Log($"Presentation: columns={columns}, rowsPerColumn=[{string.Join(",", rowsPerColumn)}]");
 
@@ -117,12 +117,12 @@ public class PresentationController : Singleton<PresentationController>
 				if (multField != null) multField.SetValue(temp, 1);
 				temp.name = $"__auto_Straight_row_{r}";
 				evalWinlines.Add(temp);
-				if ((Application.isEditor || Debug.isDebugBuild) && WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled) Debug.Log($"Added temporary StraightAcross winline for row {r}");
+				if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) Debug.Log($"Added temporary StraightAcross winline for row {r}");
 			}
 		}
 
 		// Evaluate using the per-column visual arrays (handles varying column lengths)
-		List<WinData> winData = WinlineEvaluator.Instance.EvaluateWinsFromColumns(visualColumns, evalWinlines);
+		List<WinData> winData = WinEvaluator.Instance.EvaluateWinsFromColumns(visualColumns, evalWinlines);
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
 		slotsData.SetCurrentWinData(winData);
 

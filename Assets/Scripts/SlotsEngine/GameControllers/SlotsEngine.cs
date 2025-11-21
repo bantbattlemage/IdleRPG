@@ -140,9 +140,9 @@ public class SlotsEngine : MonoBehaviour
 		// once per spin when logging is enabled. This keeps editor logs focused per-spin.
 		try
 		{
-			if (WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled)
+			if (WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled)
 			{
-				WinlineEvaluator.Instance.NotifySpinStarted();
+				WinEvaluator.Instance.NotifySpinStarted();
 			}
 		}
 		catch (Exception)
@@ -688,14 +688,14 @@ public class SlotsEngine : MonoBehaviour
 			}
 
 			// Evaluate wins using the evaluator and then write a detailed log
-			if (WinlineEvaluator.Instance != null)
+			if (WinEvaluator.Instance != null)
 			{
 				try
 				{
-					var wins = WinlineEvaluator.Instance.EvaluateWinsFromGameSymbols(grid, columns, rowsPerColumn, winlineDefs);
-					if (WinlineEvaluator.Instance.LoggingEnabled)
+					var wins = WinEvaluator.Instance.EvaluateWinsFromGameSymbols(grid, columns, rowsPerColumn, winlineDefs);
+					if (WinEvaluator.Instance.LoggingEnabled)
 					{
-						WinlineEvaluator.Instance.LogSpinResult(grid, columns, rowsPerColumn, winlineDefs ?? new List<WinlineDefinition>(), wins);
+						WinEvaluator.Instance.LogSpinResult(grid, columns, rowsPerColumn, winlineDefs ?? new List<WinlineDefinition>(), wins);
 					}
 				}
 				catch (Exception ex)

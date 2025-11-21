@@ -4970,7 +4970,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameSymbolPool
   symbolPrefab: {fileID: 2079734847969802515, guid: a1f3f567cc845364e986f00b0bb2c706, type: 3}
   poolParent: {fileID: 1071032704}
-  initialSize: 32
+  initialSize: 36
   expansionSize: 12
   maxSize: 0
 --- !u!1 &1115741503
