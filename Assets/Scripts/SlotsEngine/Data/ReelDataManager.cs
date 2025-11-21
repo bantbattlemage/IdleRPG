@@ -27,6 +27,19 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 	public void RemoveDataIfExists(ReelData data)
 	{
 		if (data == null) return;
+
+		// Remove contained symbol data entries first
+		if (data.CurrentSymbolData != null)
+		{
+			foreach (var sym in data.CurrentSymbolData.ToList())
+			{
+				if (sym != null)
+				{
+					SymbolDataManager.Instance.RemoveDataIfExists(sym);
+				}
+			}
+		}
+
 		if (LocalData != null && LocalData.ContainsKey(data.AccessorId))
 		{
 			LocalData.Remove(data.AccessorId);

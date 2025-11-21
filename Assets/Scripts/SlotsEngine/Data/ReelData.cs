@@ -43,6 +43,7 @@ public class ReelData : Data
 		reelSpinDuration = duration;
 		symbolCount = count;
 		baseDefinition = def;
+		baseDefinitionKey = def != null ? def.name : null;
 		currentSymbolData = new List<SymbolData>();
 
 		if (existingStripData != null)

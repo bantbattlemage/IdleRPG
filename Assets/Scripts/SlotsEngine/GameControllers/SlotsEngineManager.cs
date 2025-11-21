@@ -111,6 +111,19 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 			newSlots.InitializeSlotsEngine(newReelsGroup.transform, testDefinition);
 		}
 
+		// Register or update the runtime slots data so it receives a unique AccessorId
+		try
+		{
+			if (SlotsDataManager.Instance != null && newSlots.CurrentSlotsData != null)
+			{
+				SlotsDataManager.Instance.UpdateSlotsData(newSlots.CurrentSlotsData);
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogException(ex);
+		}
+
 		// Subscribe to runtime reel add/remove so manager can adjust layout
 		// Old native events replaced with EventManager-backed API
 		newSlots.RegisterReelChanged(OnSlotReelChangedEvent);
@@ -166,6 +179,8 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		slotsEngines.Remove(slotsToDestroy);
 		if (slotsToDestroy != null)
 		{
+			// Ensure console clears any buffered messages for this slot to avoid referencing destroyed objects
+			try { SlotConsoleController.Instance?.ClearMessagesForSlot(slotsToDestroy); } catch { }
 			if (slotsToDestroy.ReelsRootTransform != null)
 			{
 				Destroy(slotsToDestroy.ReelsRootTransform.gameObject);

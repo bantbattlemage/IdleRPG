@@ -24,6 +24,12 @@ public class PresentationController : Singleton<PresentationController>
 	{
 		SlotsEngine slotsToPresent = (SlotsEngine)obj;
 
+		// Begin a grouped presentation session on the console. Use ref-counting in the console controller.
+		if (SlotConsoleController.Instance != null)
+		{
+			SlotConsoleController.Instance.BeginPresentationSession();
+		}
+
 		// Build per-column visual arrays from the runtime reels
 		var reels = slotsToPresent.CurrentReels;
 		if (reels == null || reels.Count == 0)
@@ -149,23 +155,45 @@ public class PresentationController : Singleton<PresentationController>
 			{
 				slotsToPresent.BroadcastSlotsEvent(SlotsEvent.SymbolWin, grid[index]);
 			}
+
+			// Build and append a message for this specific win entry so multiple wins in the same spin don't overwrite each other.
+			string individualMsg;
+			if (w.LineIndex >= 0)
+			{
+				individualMsg = $"Won {w.WinValue} on line {w.LineIndex}!";
+			}
+			else
+			{
+				int count = (w.WinningSymbolIndexes != null) ? w.WinningSymbolIndexes.Length : 0;
+				if (count <= 1) individualMsg = $"Won {w.WinValue}!"; else individualMsg = $"Won {w.WinValue} ({count} symbols)!";
+			}
+
+			if (SlotConsoleController.Instance != null)
+			{
+				SlotConsoleController.Instance.AppendPresentationMessage(slotsToPresent, individualMsg);
+			}
 		}
 
 		int totalWin = winData.Sum((x => x.WinValue));
 		GamePlayer.Instance.AddCredits(totalWin);
-		SlotConsoleController.Instance.SetWinText(totalWin);
+		if (SlotConsoleController.Instance != null) SlotConsoleController.Instance.SetWinText(totalWin);
 
-		string winMessage = string.Empty;
+		// Also add an overall summary so players see total win per slot
+		string summary = string.Empty;
 		if (winData.Count == 1)
 		{
-			winMessage = $"Won {winData[0].WinValue} on line {winData[0].LineIndex}!";
+			summary = $"Won {winData[0].WinValue} on line {winData[0].LineIndex}!";
 		}
 		else
 		{
-			winMessage = $"Won {totalWin} on {winData.Count} lines!";
+			summary = $"Won {totalWin} on {winData.Count} line(s)!";
 		}
 
-		SlotConsoleController.Instance.SetConsoleMessage(winMessage);
+		if (SlotConsoleController.Instance != null)
+		{
+			// Append the summary after individual entries for readability
+			SlotConsoleController.Instance.AppendPresentationMessage(slotsToPresent, summary);
+		}
 	}
 
 	private void ClearAllCurrentWinData()
@@ -183,14 +211,20 @@ public class PresentationController : Singleton<PresentationController>
 		slotsToComplete.slotsEngine.BroadcastSlotsEvent(SlotsEvent.PresentationComplete);
 		slotsToComplete.ClearCurrentWinData();
 
+		// End one presentation session unit for this slot (ref-counted)
+		if (SlotConsoleController.Instance != null)
+		{
+			SlotConsoleController.Instance.EndPresentationSession();
+		}
+
 		if (slots.TrueForAll(x => x.presentationCompleted))
 		{
-
+			// Reset any additional state if needed when all presentations complete
 		}
 	}
 }
 
-struct SlotsPresentationData
+class SlotsPresentationData
 {
 	public EventManager slotsEventManager;
 	public SlotsEngine slotsEngine;

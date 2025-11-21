@@ -1,4 +1,7 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -21,6 +24,12 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	private EventManager eventManager;
 
+	// Presentation buffering: when multiple SlotsEngine instances present wins together
+	// buffer messages per-slot and display them one-slot-at-a-time when the group completes.
+	private int presentationSessionDepth = 0;
+	private Dictionary<SlotsEngine, List<string>> presentationMessagesBySlot = new Dictionary<SlotsEngine, List<string>>();
+	private Sequence presentationSequence;
+
 	public void InitializeConsole()
 	{
 		SpinButton.onClick.AddListener(OnSpinPressed);
@@ -30,6 +39,9 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetChanged, OnBetChanged);
 		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.CreditsChanged, OnCreditsChanged);
+
+		// Clear console when a new spin begins
+		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.SpinButtonPressed, OnAnySpinStarted);
 
 		WinText.text = string.Empty;
 		SetConsoleMessage(string.Empty);
@@ -79,14 +91,203 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		BetDownButton.interactable = state;
 	}
 
+	/// <summary>
+	/// Set a console message. When a presentation session is active, messages are buffered (per-slot) and
+	/// will be cycled when the session ends to avoid different slots overwriting the console.
+	/// </summary>
 	public void SetConsoleMessage(string message)
 	{
+		if (presentationSessionDepth > 0)
+		{
+			// when in presentation mode, treat SetConsoleMessage as general (no slot) append
+			AppendGeneralPresentationMessage(message);
+			return;
+		}
+
 		ConsoleMessageText.text = message;
+	}
+
+	private void AppendGeneralPresentationMessage(string message)
+	{
+		if (string.IsNullOrEmpty(message)) return;
+		SlotsEngine key = null; // null key used for general messages
+		if (!presentationMessagesBySlot.TryGetValue(key, out var list))
+		{
+			list = new List<string>();
+			presentationMessagesBySlot[key] = list;
+		}
+		list.Add(message);
+	}
+
+	/// <summary>
+	/// Append a message tied to a specific slots instance during a presentation session.
+	/// Messages are buffered and will be displayed when the presentation session cycles.
+	/// </summary>
+	public void AppendPresentationMessage(SlotsEngine slot, string message)
+	{
+		if (string.IsNullOrEmpty(message)) return;
+
+		if (presentationSessionDepth > 0)
+		{
+			if (!presentationMessagesBySlot.TryGetValue(slot, out var list))
+			{
+				list = new List<string>();
+				presentationMessagesBySlot[slot] = list;
+			}
+			list.Add(message);
+
+			// Show live concatenated messages during presentation for immediate feedback
+			if (ConsoleMessageText != null)
+			{
+				if (string.IsNullOrEmpty(ConsoleMessageText.text)) ConsoleMessageText.text = message;
+				else ConsoleMessageText.text = ConsoleMessageText.text + "  |  " + message;
+			}
+
+			return;
+		}
+
+		// Not in a presentation session: immediate concatenation
+		if (ConsoleMessageText != null)
+		{
+			if (string.IsNullOrEmpty(ConsoleMessageText.text)) ConsoleMessageText.text = message;
+			else ConsoleMessageText.text = ConsoleMessageText.text + "  |  " + message;
+		}
 	}
 
 	public void SetWinText(int value)
 	{
 		WinText.text = value.ToString();
+	}
+
+	/// <summary>
+	/// Begin buffering messages for a multi-slots presentation. Call when a presentation participant starts.
+	/// Multiple calls are allowed; buffering only begins on the first call and is ended when matching End is called.
+	/// </summary>
+	public void BeginPresentationSession()
+	{
+		presentationSessionDepth++;
+		if (presentationSessionDepth == 1)
+		{
+			presentationMessagesBySlot.Clear();
+			// stop any existing loop
+			StopPresentationLoop();
+			if (ConsoleMessageText != null) ConsoleMessageText.text = string.Empty;
+		}
+	}
+
+	/// <summary>
+	/// End buffering and start cycling per-slot messages when the last participant ends.
+	/// </summary>
+	public void EndPresentationSession()
+	{
+		presentationSessionDepth = Math.Max(0, presentationSessionDepth - 1);
+
+		if (presentationSessionDepth > 0) return; // still active
+
+		if (presentationMessagesBySlot == null || presentationMessagesBySlot.Count == 0)
+		{
+			ConsoleMessageText.text = string.Empty;
+			return;
+		}
+
+		StartPresentationLoop();
+	}
+
+	private void StartPresentationLoop()
+	{
+		StopPresentationLoop();
+
+		// Build deterministic ordered entries
+		var entries = new List<KeyValuePair<SlotsEngine, List<string>>>(presentationMessagesBySlot);
+		entries.Sort((a, b) =>
+		{
+			if (a.Key == b.Key) return 0;
+			if (a.Key == null) return 1;
+			if (b.Key == null) return -1;
+			int ai = a.Key.CurrentSlotsData != null ? a.Key.CurrentSlotsData.Index : int.MaxValue;
+			int bi = b.Key.CurrentSlotsData != null ? b.Key.CurrentSlotsData.Index : int.MaxValue;
+			if (ai != bi) return ai.CompareTo(bi);
+			return string.Compare(a.Key.name, b.Key.name, StringComparison.Ordinal);
+		});
+
+		if (entries.Count == 0) return;
+
+		presentationSequence = DOTween.Sequence();
+		const float perSlotDisplayTime = 1.5f;
+
+		foreach (var kv in entries)
+		{
+			SlotsEngine slot = kv.Key;
+			List<string> messages = kv.Value;
+			if (messages == null || messages.Count == 0) continue;
+
+			// Combine messages for this slot
+			var sb = new StringBuilder();
+			string last = null;
+			for (int i = 0; i < messages.Count; i++)
+			{
+				var m = messages[i];
+				if (string.IsNullOrEmpty(m)) continue;
+				if (m == last) continue;
+				if (sb.Length > 0) sb.Append("  |  ");
+				sb.Append(m);
+				last = m;
+			}
+
+			string header = slot != null ? GetSlotDisplayName(slot) + ": " : string.Empty;
+			string displayText = header + sb.ToString();
+
+			presentationSequence.AppendCallback(() => ConsoleMessageText.text = displayText);
+			presentationSequence.AppendInterval(perSlotDisplayTime);
+		}
+
+		// Loop indefinitely until a spin begins
+		presentationSequence.SetLoops(-1, LoopType.Restart);
+	}
+
+	private void StopPresentationLoop()
+	{
+		if (presentationSequence != null)
+		{
+			presentationSequence.Kill();
+			presentationSequence = null;
+		}
+	}
+
+	/// <summary>
+	/// Remove any buffered messages for the given slot and rebuild the presentation loop if active.
+	/// Call this when a SlotsEngine is destroyed to avoid holding references to destroyed objects.
+	/// </summary>
+	public void ClearMessagesForSlot(SlotsEngine slot)
+	{
+		if (slot == null) return;
+		if (presentationMessagesBySlot.Remove(slot))
+		{
+			// If a loop is running, rebuild it to exclude the removed slot
+			if (presentationSequence != null)
+			{
+				StartPresentationLoop();
+			}
+		}
+	}
+
+	private void OnAnySpinStarted(object obj)
+	{
+		// Stop looping and clear console when a new spin begins
+		StopPresentationLoop();
+		presentationMessagesBySlot.Clear();
+		if (ConsoleMessageText != null) ConsoleMessageText.text = string.Empty;
+	}
+
+	private string GetSlotDisplayName(SlotsEngine slot)
+	{
+		if (slot == null) return "General";
+		try
+		{
+			if (slot.CurrentSlotsData != null) return $"Slot {slot.CurrentSlotsData.Index}";
+		}
+		catch { }
+		return slot.name ?? "Slot";
 	}
 
 	private void OnSpinPurchased(object obj)

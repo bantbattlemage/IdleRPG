@@ -6,7 +6,7 @@ using UnityEngine;
 public class SlotsData : Data
 {
 	[SerializeField] private int index;
-	public int Index => index;
+	public int Index { get => index; set => index = value; }
 
 	[SerializeField] private List<ReelData> currentReelData;
 	public List<ReelData> CurrentReelData => currentReelData;

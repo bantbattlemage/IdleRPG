@@ -11,4 +11,14 @@ public class SymbolDataManager : DataManager<SymbolDataManager, SymbolData>
 	{
 		persistantData.CurrentSymbolData = LocalData;
 	}
+
+	public void RemoveDataIfExists(SymbolData data)
+	{
+		if (data == null) return;
+		if (LocalData != null && LocalData.ContainsKey(data.AccessorId))
+		{
+			LocalData.Remove(data.AccessorId);
+			DataPersistenceManager.Instance.SaveGame();
+		}
+	}
 }

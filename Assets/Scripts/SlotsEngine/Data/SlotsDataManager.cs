@@ -17,6 +17,13 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 	{
 		base.AddNewData(newData);
 
+		// Ensure the SlotsData.Index reflects the assigned AccessorId for display and ordering
+		try
+		{
+			newData.Index = newData.AccessorId;
+		}
+		catch { }
+
 		for (int i = 0; i < newData.CurrentReelData.Count; i++)
 		{
 			ReelDataManager.Instance.AddNewData(newData.CurrentReelData[i]);
@@ -47,6 +54,9 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 					ReelDataManager.Instance.AddNewData(reel);
 				}
 			}
+
+			// Ensure index matches accessor id for consistent display
+			try { slotsData.Index = slotsData.AccessorId; } catch { }
 
 			// Replace stored reference
 			LocalData[slotsData.AccessorId] = slotsData;

@@ -65,6 +65,19 @@ public class SlotsEngine : MonoBehaviour
 	{
 		currentSlotsData = data;
 
+		// Ensure the slots data is registered with SlotsDataManager so it receives a unique AccessorId
+		try
+		{
+			if (SlotsDataManager.Instance != null && currentSlotsData != null)
+			{
+				SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogException(ex);
+		}
+
 		eventManager = new EventManager();
 		// register any pending reel-changed handlers that were added early
 		if (pendingReelChangedHandlers != null && pendingReelChangedHandlers.Count > 0)
@@ -353,13 +366,36 @@ public class SlotsEngine : MonoBehaviour
 
 		var template = currentSlotsData.CurrentReelData[0];
 		var def = template.BaseDefinition;
+
+		// Fallback: if the template lacks a BaseDefinition (may happen after serialization or certain runtime flows),
+		// attempt to resolve a reasonable default ReelDefinition from related data:
+		// 1) the SlotsData.BaseDefinition's ReelDefinitions (use same index if possible)
+		// 2) the template's current reel strip's Definition (if it references a ReelDefinition)
+		if (def == null)
+		{
+			// Try slots base definition
+			try
+			{
+				var slotsDef = currentSlotsData?.BaseDefinition;
+				if (slotsDef != null && slotsDef.ReelDefinitions != null && slotsDef.ReelDefinitions.Length > 0)
+				{
+					// Prefer reel definition matching the template index if available
+					int idx = 0;
+					try { idx = currentSlotsData.CurrentReelData.IndexOf(template); } catch { idx = 0; }
+					if (idx < 0 || idx >= slotsDef.ReelDefinitions.Length) idx = 0;
+					def = slotsDef.ReelDefinitions[idx];
+				}
+			}
+			catch { }
+		}
+
 		if (def != null)
 		{
 			AddReel(def);
 		}
 		else
 		{
-			Debug.LogWarning("Template reel does not have a BaseDefinition. Cannot create new reel.");
+			Debug.LogWarning("Template reel does not have a BaseDefinition and no fallback was found. Cannot create new reel.");
 		}
 	}
 
