@@ -110,7 +110,8 @@ public class ReelData : Data
 			{
 				// Resolve by name: this assumes symbol name is unique and used as key
 				Sprite sprite = AssetResolver.ResolveSprite(currentSymbolKeys[i]);
-				currentSymbolData.Add(new SymbolData(currentSymbolKeys[i], sprite, new int[0], 1f));
+				// Create a runtime SymbolData with default no-win values (BaseValue=0, MinWinDepth=-1)
+				currentSymbolData.Add(new SymbolData(currentSymbolKeys[i], sprite, 0, -1, 1f, PayScaling.DepthSquared, false, true));
 			}
 		}
 	}

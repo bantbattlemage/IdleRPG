@@ -8,8 +8,10 @@ public class SymbolData : Data
 	// Sprite must not be serialized into save data. Store a key instead and resolve at runtime.
 	[NonSerialized] private Sprite sprite;
 	[SerializeField] private string spriteKey;
-	[SerializeField] private int[] baseValueMultiplier;
+	[SerializeField] private int baseValue = 0;
+	[SerializeField] private int minWinDepth = -1;
 	[SerializeField] private float weight = 1;
+	[SerializeField] private PayScaling payScaling = PayScaling.DepthSquared;
 
 	// Wild behavior
 	[SerializeField] private bool isWild = false;
@@ -35,43 +37,26 @@ public class SymbolData : Data
 	
 	/// <summary>
 	/// The minimum number of consecutive matching symbols required for this symbol to trigger a win.
-	/// Returns -1 if this symbol cannot trigger wins (all multipliers are 0).
-	/// Example: if baseValueMultiplier = [0, 0, 5, 10, 20], MinWinDepth returns 3 (need 3+ matches).
+	/// Returns -1 if this symbol cannot trigger wins.
 	/// </summary>
-	public int MinWinDepth
-	{
-		get
-		{
-			for (int i = 0; i < (baseValueMultiplier != null ? baseValueMultiplier.Length : 0); i++)
-			{
-				if (baseValueMultiplier[i] > 0) return i + 1; // Return count (1-based), not index
-			}
-
-			return -1;
-		}
-	}
-	public int[] BaseValueMultiplier => baseValueMultiplier;
+	public int MinWinDepth => minWinDepth;
+	public int BaseValue => baseValue;
+	public PayScaling PayScaling => payScaling;
 	public float Weight => weight;
 
 	public bool IsWild => isWild;
 	public bool AllowWildMatch => allowWildMatch;
 
-	public SymbolData(string symbolName, Sprite symbolSprite, int[] values, float symbolWeight)
+	// New constructor using baseValue/minWinDepth/scaling
+	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true)
 	{
 		name = symbolName;
 		sprite = symbolSprite;
 		spriteKey = symbolSprite != null ? symbolSprite.name : null;
-		baseValueMultiplier = values;
+		baseValue = baseVal;
+		minWinDepth = minDepth;
 		weight = symbolWeight;
-	}
-
-	public SymbolData(string symbolName, Sprite symbolSprite, int[] values, float symbolWeight, bool wild, bool allowWild)
-	{
-		name = symbolName;
-		sprite = symbolSprite;
-		spriteKey = symbolSprite != null ? symbolSprite.name : null;
-		baseValueMultiplier = values;
-		weight = symbolWeight;
+		payScaling = scaling;
 		isWild = wild;
 		allowWildMatch = allowWild;
 	}

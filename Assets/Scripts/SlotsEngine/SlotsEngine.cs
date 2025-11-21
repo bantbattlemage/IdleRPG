@@ -136,6 +136,20 @@ public class SlotsEngine : MonoBehaviour
 			throw new InvalidOperationException("Spin already in progress!");
 		}
 
+		// Notify WinlineEvaluator that a new spin has started so it can clear the console
+		// once per spin when logging is enabled. This keeps editor logs focused per-spin.
+		try
+		{
+			if (WinlineEvaluator.Instance != null)
+			{
+				WinlineEvaluator.Instance.NotifySpinStarted();
+			}
+		}
+		catch (Exception)
+		{
+			// Best-effort; don't let logging failures prevent spins
+		}
+
 		float falloutDelay = 0.025f;
 
 		for (int i = 0; i < reels.Count; i++)

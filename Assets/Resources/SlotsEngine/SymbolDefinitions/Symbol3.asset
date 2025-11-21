@@ -14,5 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SymbolDefinition
   symbolName: 3
   symbolSprite: {fileID: 21300000, guid: d2757d53832056647bf9a56304cb1e1d, type: 3}
-  baseValueMultiplier: 0000000000000000040000000500000006000000
+  baseValue: 4
+  minWinDepth: 3
+  payScaling: 0
   weight: 1
+  isWild: 0
+  allowWildMatch: 1

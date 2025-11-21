@@ -60,7 +60,7 @@ public class PresentationController : Singleton<PresentationController>
 		GameSymbol[] currentSymbolGrid = Helpers.CombineColumnsToGrid(visualColumns);
 
 		// Debug logging to help diagnose presentation-time mismatches
-		if (Application.isEditor || Debug.isDebugBuild)
+		if ((Application.isEditor || Debug.isDebugBuild) && WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled)
 		{
 			Debug.Log($"Presentation: columns={columns}, rowsPerColumn=[{string.Join(",", rowsPerColumn)}]");
 
@@ -76,8 +76,9 @@ public class PresentationController : Singleton<PresentationController>
 				var sd = gs.CurrentSymbolData;
 				string name = sd != null ? sd.Name : "(null)";
 				int min = sd != null ? sd.MinWinDepth : -999;
-				int[] mults = sd != null ? sd.BaseValueMultiplier ?? new int[0] : new int[0];
-				Debug.Log($"Grid idx={i}: name={name} minWin={min} multipliers=[{string.Join(",", mults)}] isWild={(sd!=null?sd.IsWild:false)} allowWild={(sd!=null?sd.AllowWildMatch:false)}");
+				int baseVal = sd != null ? sd.BaseValue : 0;
+				string scaling = sd != null ? sd.PayScaling.ToString() : "(none)";
+				Debug.Log($"Grid idx={i}: name={name} minWin={min} baseValue={baseVal} scaling={scaling} isWild={(sd!=null?sd.IsWild:false)} allowWild={(sd!=null?sd.AllowWildMatch:false)}");
 			}
 
 			// print each winline concrete indexes and corresponding grid names from assets
@@ -98,7 +99,7 @@ public class PresentationController : Singleton<PresentationController>
 		// Prepare evaluation winlines: include asset winlines and add temporary StraightAcross winlines for each visual row if missing
 		List<WinlineDefinition> evalWinlines = new List<WinlineDefinition>();
 		if (slotsToPresent.CurrentSlotsData.WinlineDefinitions != null)
-			evalWinlines.AddRange(slotsToPresent.CurrentSlotsData.WinlineDefinitions);
+			 evalWinlines.AddRange(slotsToPresent.CurrentSlotsData.WinlineDefinitions);
 
 		int maxRows = rowsPerColumn.Max();
 		for (int r = 0; r < maxRows; r++)
@@ -116,7 +117,7 @@ public class PresentationController : Singleton<PresentationController>
 				if (multField != null) multField.SetValue(temp, 1);
 				temp.name = $"__auto_Straight_row_{r}";
 				evalWinlines.Add(temp);
-				if (Application.isEditor || Debug.isDebugBuild) Debug.Log($"Added temporary StraightAcross winline for row {r}");
+				if ((Application.isEditor || Debug.isDebugBuild) && WinlineEvaluator.Instance != null && WinlineEvaluator.Instance.LoggingEnabled) Debug.Log($"Added temporary StraightAcross winline for row {r}");
 			}
 		}
 
