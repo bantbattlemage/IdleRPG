@@ -29,6 +29,11 @@ public class GameReel : MonoBehaviour
 	private List<GameSymbol> topDummySymbols = new List<GameSymbol>();
 	private List<GameSymbol> bottomDummySymbols = new List<GameSymbol>();
 
+	// Buffer lists used while spinning so we don't clobber active lists mid-frame
+	private List<GameSymbol> bufferSymbols = new List<GameSymbol>();
+	private List<GameSymbol> bufferTopDummySymbols = new List<GameSymbol>();
+	private List<GameSymbol> bufferBottomDummySymbols = new List<GameSymbol>();
+
 	// Flag set by StopReel to indicate we should complete/land on next buffer swap
 	private bool completeOnNextSpin = false;
 
@@ -142,8 +147,8 @@ public class GameReel : MonoBehaviour
 		}
 
 		// Spawn dummies (buffer visuals) above and below the active list
-		SpawnDummySymbols(symbolRoot, true, null, true, selectedForThisReel);
-		SpawnDummySymbols(symbolRoot, false, null, true, selectedForThisReel);
+		bottomDummySymbols = SpawnDummySymbols(symbolRoot, true, null, true, selectedForThisReel);
+		topDummySymbols = SpawnDummySymbols(symbolRoot, false, null, true, selectedForThisReel);
 	}
 
 	/// <summary>
@@ -176,8 +181,8 @@ public class GameReel : MonoBehaviour
 			completeOnNextSpin = true;
 
 			//	slam the reels by increasing timeScale on the active tweens
-			activeSpinTweens[0].timeScale = 4f;
-			activeSpinTweens[1].timeScale = 4f;
+			if (activeSpinTweens[0] != null) activeSpinTweens[0].timeScale = 4f;
+			if (activeSpinTweens[1] != null) activeSpinTweens[1].timeScale = 4f;
 		});
 	}
 
@@ -250,13 +255,13 @@ public class GameReel : MonoBehaviour
 			}
 		}
 
-		// Replace current symbol references with the buffered ones. The visual swap will occur on tween completion.
-		symbols = newSymbols;
+		// Store buffer symbols instead of overwriting active list. Swap will commit these.
+		bufferSymbols = newSymbols;
 
 		// Spawn dummies for the buffer. These are created while the reel is already spinning,
 		// so they should remain unfaded (white) when spawned. Pass dim=false to keep them white.
-		SpawnDummySymbols(nextSymbolsRoot, true, null, false, combinedExisting);
-		SpawnDummySymbols(nextSymbolsRoot, false, null, false, combinedExisting);
+		bufferBottomDummySymbols = SpawnDummySymbols(nextSymbolsRoot, true, null, false, combinedExisting);
+		bufferTopDummySymbols = SpawnDummySymbols(nextSymbolsRoot, false, null, false, combinedExisting);
 
 		// nextSymbolsRoot is already the buffer root
 	}
@@ -265,7 +270,7 @@ public class GameReel : MonoBehaviour
 	/// Spawn dummy symbols used to pad the reel visuals above and below the active range.
 	/// `bottom` controls which side to create. When `dim` is true the dummy images are tinted to a dim color.
 	/// </summary>
-	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true, List<SymbolData> existingSelections = null)
+	private List<GameSymbol> SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true, List<SymbolData> existingSelections = null)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
 
@@ -309,14 +314,7 @@ public class GameReel : MonoBehaviour
 			dummies.Add(symbol);
 		}
 
-		if (bottom)
-		{
-			bottomDummySymbols = dummies;
-		}
-		else
-		{
-			topDummySymbols = dummies;
-		}
+		return dummies;
 	}
 
 	private bool sequenceA = false;
@@ -403,6 +401,25 @@ public class GameReel : MonoBehaviour
 		// position the buffer (nextSymbolsRoot) offscreen ready for future spawn
 		float offsetY = ((currentReelData.SymbolSpacing + currentReelData.SymbolSize) * ((currentReelData.SymbolCount - 1) * 3));
 		nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+
+		// Commit buffered lists to active lists now that roots have been swapped
+		if (bufferSymbols != null && bufferSymbols.Count > 0)
+		{
+			symbols = bufferSymbols;
+			bufferSymbols = new List<GameSymbol>();
+		}
+
+		if (bufferTopDummySymbols != null && bufferTopDummySymbols.Count > 0)
+		{
+			topDummySymbols = bufferTopDummySymbols;
+			bufferTopDummySymbols = new List<GameSymbol>();
+		}
+
+		if (bufferBottomDummySymbols != null && bufferBottomDummySymbols.Count > 0)
+		{
+			bottomDummySymbols = bufferBottomDummySymbols;
+			bufferBottomDummySymbols = new List<GameSymbol>();
+		}
 
 		if (!completeOnNextSpin)
 		{
@@ -698,8 +715,8 @@ public class GameReel : MonoBehaviour
 		}
 
 		// Spawn updated dummies under the active root
-		SpawnDummySymbols(symbolRoot, true, null, true, currentReelData.CurrentSymbolData);
-		SpawnDummySymbols(symbolRoot, false, null, true, currentReelData.CurrentSymbolData);
+		bottomDummySymbols = SpawnDummySymbols(symbolRoot, true, null, true, currentReelData.CurrentSymbolData);
+		topDummySymbols = SpawnDummySymbols(symbolRoot, false, null, true, currentReelData.CurrentSymbolData);
 
 		// Clear any buffered symbols in nextSymbolsRoot so future buffer spawn matches new count
 		ReleaseAllSymbolsInRoot(nextSymbolsRoot);
