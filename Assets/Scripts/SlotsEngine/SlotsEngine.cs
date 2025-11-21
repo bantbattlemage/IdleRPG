@@ -155,9 +155,14 @@ public class SlotsEngine : MonoBehaviour
 		for (int i = 0; i < reels.Count; i++)
 		{
 			List<SymbolData> testSolution = new List<SymbolData>();
+			// track selections for this reel so MaxPerReel is enforced while constructing the solution
+			var selectionsForReel = new List<SymbolData>();
 			for (int k = 0; k < reels[i].CurrentReelData.SymbolCount; k++)
 			{
-				testSolution.Add(reels[i].GetRandomSymbolFromStrip());
+				// Use the overload that accepts existing selections so MaxPerReel is honored
+				var symbol = reels[i].GetRandomSymbolFromStrip(selectionsForReel);
+				testSolution.Add(symbol);
+				if (symbol != null) selectionsForReel.Add(symbol);
 			}
 
 			reels[i].CurrentReelData.SetCurrentSymbolData(testSolution);
@@ -652,6 +657,55 @@ public class SlotsEngine : MonoBehaviour
 
 	void OnSpinCompleted(object obj)
 	{
+		try
+		{
+			// Gather current visual grid and slot metadata
+			GameSymbol[] grid = GetCurrentSymbolGrid();
+			int columns = currentSlotsData != null && currentSlotsData.CurrentReelData != null ? currentSlotsData.CurrentReelData.Count : reels.Count;
+			int[] rowsPerColumn = new int[columns];
+
+			// Fill rowsPerColumn defensively
+			for (int i = 0; i < columns; i++)
+			{
+				if (currentSlotsData != null && currentSlotsData.CurrentReelData != null && i < currentSlotsData.CurrentReelData.Count)
+				{
+					rowsPerColumn[i] = currentSlotsData.CurrentReelData[i].SymbolCount;
+				}
+				else if (i < reels.Count && reels[i] != null && reels[i].CurrentReelData != null)
+				{
+					rowsPerColumn[i] = reels[i].CurrentReelData.SymbolCount;
+				}
+				else
+				{
+					rowsPerColumn[i] = 1; // fallback
+				}
+			}
+
+			List<WinlineDefinition> winlineDefs = null;
+			if (currentSlotsData != null)
+			{
+				winlineDefs = currentSlotsData.WinlineDefinitions;
+			}
+
+			// Evaluate wins using the evaluator and then write a detailed log
+			if (WinlineEvaluator.Instance != null)
+			{
+				try
+				{
+					var wins = WinlineEvaluator.Instance.EvaluateWinsFromGameSymbols(grid, columns, rowsPerColumn, winlineDefs);
+					WinlineEvaluator.Instance.LogSpinResult(grid, columns, rowsPerColumn, winlineDefs ?? new List<WinlineDefinition>(), wins);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogWarning($"Winline evaluation/logging failed: {ex.Message}");
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogException(ex);
+		}
+
 		stateMachine.SetState(State.Presentation);
 	}
 

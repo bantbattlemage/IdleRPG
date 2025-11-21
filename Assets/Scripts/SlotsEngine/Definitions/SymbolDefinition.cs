@@ -30,8 +30,38 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 	// For TotalCount mode: how many symbols (anywhere) are required to trigger
 	[SerializeField] private int totalCountTrigger = -1;
 
+	// New: per-reel maximum count allowed within a single spin. -1 to ignore.
+	[SerializeField] private int maxPerReel = -1;
+
+	// New: integer match group identifier. 0 = unset; when unset, a stable hash of the asset name is used at runtime.
+	[SerializeField] private int matchGroupId = 0;
+
 	public string SymbolName => symbolName;
 	public Sprite SymbolSprite => symbolSprite;
+
+	/// <summary>
+	/// Returns an integer identifier used to group symbols for matching. If the serialized id is 0,
+	/// a stable hash of the asset name is returned so symbols match themselves by default.
+	/// </summary>
+	public int MatchGroupId => matchGroupId != 0 ? matchGroupId : ComputeStableHash(this.name);
+
+	/// <summary>
+	/// Compute a deterministic 32-bit hash for a string. Uses a simple FNV-like algorithm to remain stable across runs.
+	/// Public so other runtime code can compute the same stable id for legacy runtime SymbolData instances.
+	/// </summary>
+	public static int ComputeStableHash(string s)
+	{
+		if (string.IsNullOrEmpty(s)) return 0;
+		unchecked
+		{
+			int hash = (int)2166136261u;
+			for (int i = 0; i < s.Length; i++)
+			{
+				hash = (hash ^ s[i]) * 16777619;
+			}
+			return hash == 0 ? 1 : hash; // ensure non-zero when possible
+		}
+	}
 	
 	/// <summary>
 	/// The minimum number of consecutive matching symbols required for this symbol to trigger a win.
@@ -50,9 +80,12 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 	public SymbolWinMode WinMode => winMode;
 	public int TotalCountTrigger => totalCountTrigger;
 
+	public int MaxPerReel => maxPerReel;
+
 	public override SymbolData CreateInstance()
 	{
-		return new SymbolData(symbolName, symbolSprite, BaseValue, MinWinDepth, weight, payScaling, isWild, allowWildMatch, winMode, totalCountTrigger);
+		// pass match group id and definition asset name into runtime SymbolData
+		return new SymbolData(symbolName, symbolSprite, BaseValue, MinWinDepth, weight, payScaling, isWild, allowWildMatch, winMode, totalCountTrigger, maxPerReel, MatchGroupId);
 	}
 
 	public override void InitializeDefaults()
@@ -66,5 +99,7 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 		allowWildMatch = true;
 		winMode = SymbolWinMode.LineMatch;
 		totalCountTrigger = -1;
+		maxPerReel = -1;
+		matchGroupId = 0;
 	}
 }

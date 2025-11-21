@@ -2,7 +2,6 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq;
 
-// Minimal test doubles to exercise WinlineEvaluator logic without Unity runtime
 namespace WinlineEvaluator.Tests
 {
     public enum SymbolWinMode
@@ -22,8 +21,9 @@ namespace WinlineEvaluator.Tests
         public bool AllowWildMatch = true;
         public SymbolWinMode WinMode = SymbolWinMode.LineMatch;
         public int TotalCountTrigger = -1;
+        public int MatchGroupId = 0;
 
-        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, bool allowWild = true, SymbolWinMode winMode = SymbolWinMode.LineMatch, int totalCountTrigger = -1)
+        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, bool allowWild = true, SymbolWinMode winMode = SymbolWinMode.LineMatch, int totalCountTrigger = -1, int matchGroupId = 0)
         {
             Name = name;
             BaseValue = baseValue;
@@ -32,15 +32,19 @@ namespace WinlineEvaluator.Tests
             AllowWildMatch = allowWild;
             WinMode = winMode;
             TotalCountTrigger = totalCountTrigger;
+            MatchGroupId = matchGroupId;
         }
 
         public bool Matches(SymbolData other)
         {
             if (other == null) return false;
-            if (!string.IsNullOrEmpty(Name) && Name == other.Name) return true;
-            if (IsWild && other.IsWild) return true;
-            if (IsWild && other.AllowWildMatch) return true;
-            if (other.IsWild && AllowWildMatch) return true;
+            // Both wild -> match
+            if (this.IsWild && other.IsWild) return true;
+            // Group id equality required (non-zero)
+            if (this.MatchGroupId != 0 && other.MatchGroupId != 0 && this.MatchGroupId == other.MatchGroupId) return true;
+            // Wild substitution rules
+            if (this.IsWild && other.AllowWildMatch) return true;
+            if (other.IsWild && this.AllowWildMatch) return true;
             return false;
         }
     }
@@ -131,7 +135,7 @@ namespace WinlineEvaluator.Tests
 
             // Then: evaluate symbol-level win modes (SingleOnReel, TotalCount)
             const int NonWinlineIndex = -1;
-            var totalProcessed = new HashSet<string>();
+            var totalProcessed = new HashSet<int>();
 
             for (int idx = 0; idx < grid.Length; idx++)
             {
@@ -151,7 +155,7 @@ namespace WinlineEvaluator.Tests
 
                 if (cell.WinMode == SymbolWinMode.TotalCount)
                 {
-                    string key = cell.Name ?? string.Empty;
+                    int key = cell.MatchGroupId;
                     if (totalProcessed.Contains(key)) continue;
                     totalProcessed.Add(key);
 
@@ -164,7 +168,7 @@ namespace WinlineEvaluator.Tests
                         var other = grid[j];
                         if (other == null) continue;
                         if (other.IsWild) continue; // ignore wilds
-                        if (!string.IsNullOrEmpty(other.Name) && other.Name == cell.Name)
+                        if (other.MatchGroupId != 0 && key != 0 && other.MatchGroupId == key)
                         {
                             matching.Add(j);
                             exactMatches++;
@@ -192,11 +196,11 @@ namespace WinlineEvaluator.Tests
 
     public class Tests
     {
-        private SymbolData MakeWild() => new SymbolData("W", baseValue:0, minWinDepth:-1, isWild:true, allowWild:true, winMode: SymbolWinMode.LineMatch);
-        private SymbolData A => new SymbolData("1", baseValue:2, minWinDepth:3, winMode: SymbolWinMode.LineMatch);
-        private SymbolData B => new SymbolData("2", baseValue:4, minWinDepth:4, winMode: SymbolWinMode.LineMatch);
-        private SymbolData C => new SymbolData("C", baseValue:1, minWinDepth:1, winMode: SymbolWinMode.LineMatch);
-        private SymbolData D => new SymbolData("4", baseValue:5, minWinDepth:3, winMode: SymbolWinMode.LineMatch);
+        private SymbolData MakeWild() => new SymbolData("W", baseValue:0, minWinDepth:-1, isWild:true, allowWild:true, winMode: SymbolWinMode.LineMatch, totalCountTrigger:-1, matchGroupId:0);
+        private SymbolData A => new SymbolData("1", baseValue:2, minWinDepth:3, winMode: SymbolWinMode.LineMatch, matchGroupId:1);
+        private SymbolData B => new SymbolData("2", baseValue:4, minWinDepth:4, winMode: SymbolWinMode.LineMatch, matchGroupId:2);
+        private SymbolData C => new SymbolData("C", baseValue:1, minWinDepth:1, winMode: SymbolWinMode.LineMatch, matchGroupId:3);
+        private SymbolData D => new SymbolData("4", baseValue:5, minWinDepth:3, winMode: SymbolWinMode.LineMatch, matchGroupId:4);
 
         [Test]
         public void Test_11111_straight_awards()
@@ -589,7 +593,7 @@ namespace WinlineEvaluator.Tests
         [Test]
         public void TotalCount_Awards_When_Threshold_Met()
         {
-            var t = new SymbolData("T", baseValue: 2, minWinDepth: -1, isWild: false, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 3);
+            var t = new SymbolData("T", baseValue: 2, minWinDepth: -1, isWild: false, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 3, matchGroupId: 10);
             var grid = new SymbolData[] { t, t, t };
             var eval = new WinlineEvaluator();
             var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
@@ -605,7 +609,7 @@ namespace WinlineEvaluator.Tests
         public void Wilds_Do_Not_Trigger_TotalCount_By_Themselves()
         {
             // wilds configured as TotalCount should not self-award; wilds are ignored for non-line modes
-            var w = new SymbolData("W", baseValue: 5, minWinDepth: -1, isWild: true, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 1);
+            var w = new SymbolData("W", baseValue: 5, minWinDepth: -1, isWild: true, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 1, matchGroupId: 11);
             var grid = new SymbolData[] { w, w, w };
             var eval = new WinlineEvaluator();
             var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
@@ -618,8 +622,8 @@ namespace WinlineEvaluator.Tests
         public void NonLineWinMode_Not_Count_As_Line()
         {
             // Leftmost is SingleOnReel and should prevent a line match even if right-hand symbols would form one.
-            var left = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.SingleOnReel);
-            var right = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.LineMatch);
+            var left = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.SingleOnReel, matchGroupId: 20);
+            var right = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.LineMatch, matchGroupId: 20);
             var grid = new SymbolData[] { left, right, right };
             var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
             var winmult = new List<int> { 1 };
@@ -629,6 +633,129 @@ namespace WinlineEvaluator.Tests
             Assert.IsNotNull(wins);
             // Ensure no line wins present (LineIndex >=0). There may be a SingleOnReel win(s) with LineIndex == -1.
             Assert.IsFalse(wins.Any(w => w.LineIndex >= 0));
+        }
+    }
+
+    // Add MaxPerReel tests (independent of Unity types) to validate selection logic
+    public class MaxPerReelTests
+    {
+        private class FakeDef { public string Name; public float Weight; public int MaxPerReel; public FakeDef(string n, float w, int m) { Name = n; Weight = w; MaxPerReel = m; } }
+        private class FakeData { public string Name; public FakeData(string n) { Name = n; } }
+
+        private string PickWeighted(FakeDef[] defs, List<FakeData> existing)
+        {
+            var candidates = new List<(FakeDef def, float weight)>();
+            foreach (var d in defs)
+            {
+                int max = d.MaxPerReel;
+                int already = 0;
+                if (existing != null)
+                {
+                    for (int i = 0; i < existing.Count; i++) if (existing[i] != null && existing[i].Name == d.Name) already++;
+                }
+                if (max >= 0 && already >= max) continue;
+                candidates.Add((d, d.Weight));
+            }
+
+            if (candidates.Count == 0)
+            {
+                // fallback to unconstrained pick
+                candidates.Clear();
+                foreach (var d in defs) candidates.Add((d, d.Weight));
+            }
+
+            // deterministic pick for test: choose highest weight, tie-break by name
+            candidates.Sort((x,y)=> { int c = y.weight.CompareTo(x.weight); if (c!=0) return c; return string.Compare(x.def.Name,y.def.Name, System.StringComparison.Ordinal); });
+            return candidates[0].def.Name;
+        }
+
+        [Test]
+        public void Excludes_When_Max_Reached()
+        {
+            var defs = new FakeDef[] { new FakeDef("A", 1f, 1), new FakeDef("B", 1f, -1) };
+            var existing = new List<FakeData> { new FakeData("A") };
+            var picked = PickWeighted(defs, existing);
+            Assert.AreEqual("B", picked);
+        }
+
+        [Test]
+        public void FallsBack_When_All_Excluded()
+        {
+            var defs = new FakeDef[] { new FakeDef("A", 1f, 0), new FakeDef("B", 1f, 0) };
+            var existing = new List<FakeData>();
+            var picked = PickWeighted(defs, existing);
+            Assert.IsTrue(picked == "A" || picked == "B");
+        }
+
+        [Test]
+        public void Counts_By_Name()
+        {
+            var defs = new FakeDef[] { new FakeDef("A", 1f, 2), new FakeDef("B", 1f, -1) };
+            var existing = new List<FakeData> { new FakeData("A"), new FakeData("A") };
+            var picked = PickWeighted(defs, existing);
+            Assert.AreEqual("B", picked);
+        }
+    }
+
+    // Add MatchGroup / MaxPerReel tests
+    public class MatchGroupAndMaxPerReelTests
+    {
+        private class FakeDefG { public string Name; public float Weight; public int MaxPerReel; public int MatchGroupId; public FakeDefG(string n, float w, int m, int g) { Name = n; Weight = w; MaxPerReel = m; MatchGroupId = g; } }
+        private class FakeDataG { public int MatchGroupId; public FakeDataG(int g) { MatchGroupId = g; } }
+
+        // Selection routine: exclude candidates whose MatchGroupId reached MaxPerReel according to existing selections.
+        private string PickWeightedByGroup(FakeDefG[] defs, List<FakeDataG> existing)
+        {
+            var candidates = new List<(FakeDefG def, float weight)>();
+            foreach (var d in defs)
+            {
+                int max = d.MaxPerReel;
+                int already = 0;
+                if (existing != null)
+                {
+                    for (int i = 0; i < existing.Count; i++) if (existing[i] != null && existing[i].MatchGroupId == d.MatchGroupId) already++;
+                }
+                if (max >= 0 && already >= max) continue;
+                candidates.Add((d, d.Weight));
+            }
+
+            if (candidates.Count == 0)
+            {
+                // fallback to unconstrained pick
+                candidates.Clear();
+                foreach (var d in defs) candidates.Add((d, d.Weight));
+            }
+
+            // deterministic pick for test: choose highest weight, tie-break by name
+            candidates.Sort((x,y)=> { int c = y.weight.CompareTo(x.weight); if (c!=0) return c; return string.Compare(x.def.Name,y.def.Name, System.StringComparison.Ordinal); });
+            return candidates[0].def.Name;
+        }
+
+        [Test]
+        public void Excludes_When_MatchGroup_Max_Reached()
+        {
+            var defs = new FakeDefG[] { new FakeDefG("A", 1f, 1, 100), new FakeDefG("B", 1f, -1, 200) };
+            var existing = new List<FakeDataG> { new FakeDataG(100) };
+            var picked = PickWeightedByGroup(defs, existing);
+            NUnit.Framework.Assert.AreEqual("B", picked);
+        }
+
+        [Test]
+        public void FallsBack_When_All_Excluded_By_Group()
+        {
+            var defs = new FakeDefG[] { new FakeDefG("A", 1f, 0, 1), new FakeDefG("B", 1f, 0, 2) };
+            var existing = new List<FakeDataG>();
+            var picked = PickWeightedByGroup(defs, existing);
+            NUnit.Framework.Assert.IsTrue(picked == "A" || picked == "B");
+        }
+
+        [Test]
+        public void Counts_By_MatchGroup()
+        {
+            var defs = new FakeDefG[] { new FakeDefG("A", 1f, 2, 42), new FakeDefG("B", 1f, -1, 99) };
+            var existing = new List<FakeDataG> { new FakeDataG(42), new FakeDataG(42) };
+            var picked = PickWeightedByGroup(defs, existing);
+            NUnit.Framework.Assert.AreEqual("B", picked);
         }
     }
 }

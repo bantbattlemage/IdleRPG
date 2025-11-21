@@ -22,3 +22,4 @@ MonoBehaviour:
   allowWildMatch: 1
   winMode: 2
   totalCountTrigger: 3
+  maxPerReel: 1

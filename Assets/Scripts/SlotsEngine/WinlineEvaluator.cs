@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-
+using System.IO;
+using System.Text;
 #if UNITY_EDITOR
 using UnityEditor;
-using System.Reflection;
 #endif
 
 /// <summary>
@@ -26,10 +26,13 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
     public bool LoggingEnabled = true;
 
     private List<WinData> currentSpinWinData;
-    public List<WinData> CurrentSpinWinData => currentSpinWinData;
+    private bool clearedConsoleForCurrentSpin;
 
-    // Internal flag to ensure we only clear the console once per spin when logging is enabled.
-    private bool clearedConsoleForCurrentSpin = false;
+    // File logging state
+    private string currentSpinLogFilePath;
+    private static int spinCounter = 0;
+
+    public List<WinData> CurrentSpinWinData => currentSpinWinData ?? (currentSpinWinData = new List<WinData>());
 
     /// <summary>
     /// Notify the evaluator that a new spin has started. When logging is enabled the evaluator
@@ -38,46 +41,190 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
     /// </summary>
     public void NotifySpinStarted()
     {
-        // Reset the cleared flag and immediately clear if logging is enabled.
         clearedConsoleForCurrentSpin = false;
-        if (LoggingEnabled)
+        spinCounter++;
+
+        try
         {
-            ClearConsole();
-            clearedConsoleForCurrentSpin = true;
+            string dir = Path.Combine(Application.persistentDataPath, "SpinLogs");
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            string filename = $"spin_{DateTime.Now:yyyyMMdd_HHmmss_fff}_{spinCounter}.log";
+            currentSpinLogFilePath = Path.Combine(dir, filename);
+
+            // create empty file
+            File.WriteAllText(currentSpinLogFilePath, $"Spin log started: {DateTime.Now:O}{Environment.NewLine}");
+
+            // Prune old logs in persistent dir, keep only the 5 most recent
+            PruneOldSpinLogs(dir, 5);
+
+            if (LoggingEnabled)
+            {
+#if UNITY_EDITOR
+                // Clear editor console once at spin start to make logs easier to follow
+                ClearConsole();
+#endif
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Failed to initialize spin log file: {ex.Message}");
+            currentSpinLogFilePath = null;
         }
     }
 
     /// <summary>
-    /// Editor-only helper to clear the Unity console. No-op in builds.
+    /// Delete older spin log files in the given directory, keeping only the most recent `keep` files.
     /// </summary>
+    /// <param name="directory">Directory to prune</param>
+    /// <param name="keep">Number of most recent files to keep</param>
+    private void PruneOldSpinLogs(string directory, int keep)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return;
+            var files = Directory.GetFiles(directory, "spin_*.log");
+            if (files == null || files.Length <= keep) return;
+
+            var ordered = files.Select(p => new FileInfo(p))
+                               .OrderByDescending(fi => fi.CreationTimeUtc)
+                               .ToList();
+
+            for (int i = keep; i < ordered.Count; i++)
+            {
+                try
+                {
+                    ordered[i].Delete();
+                }
+                catch { /* best-effort cleanup */ }
+            }
+        }
+        catch { /* ignore prune failures */ }
+    }
+
     private void ClearConsole()
     {
 #if UNITY_EDITOR
-        // Attempt to call UnityEditor.LogEntries.Clear() via reflection to avoid internal API access issues.
+        if (clearedConsoleForCurrentSpin) return;
         try
         {
-            var asm = Assembly.GetAssembly(typeof(Editor));
-            if (asm != null)
-            {
-                var logEntriesType = asm.GetType("UnityEditor.LogEntries");
-                if (logEntriesType != null)
-                {
-                    var clearMethod = logEntriesType.GetMethod("Clear", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (clearMethod != null)
-                    {
-                        clearMethod.Invoke(null, null);
-                        return;
-                    }
-                }
-            }
-            // Fallback: use Debug.Log to indicate we couldn't clear programmatically
-            Debug.Log("WinlineEvaluator: (editor) unable to programmatically clear console via reflection.");
+            var logEntries = Type.GetType("UnityEditor.LogEntries, UnityEditor.dll");
+            var clearMethod = logEntries?.GetMethod("Clear", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+            clearMethod?.Invoke(null, null);
+            clearedConsoleForCurrentSpin = true;
         }
         catch (Exception ex)
         {
-            Debug.Log($"WinlineEvaluator: exception while attempting to clear console: {ex.Message}");
+            Debug.LogWarning($"Failed to clear editor console: {ex.Message}");
         }
 #endif
+    }
+
+    private void AppendToCurrentSpinLog(string text)
+    {
+        if (string.IsNullOrEmpty(currentSpinLogFilePath))
+        {
+            // ensure a file exists
+            try
+            {
+                NotifySpinStarted();
+            }
+            catch { }
+            if (string.IsNullOrEmpty(currentSpinLogFilePath)) return;
+        }
+
+        // Append to persistent data path log
+        try
+        {
+            if (!string.IsNullOrEmpty(currentSpinLogFilePath))
+                File.AppendAllText(currentSpinLogFilePath, text + Environment.NewLine, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Failed to write to persistent spin log file: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Write a human-readable record of the presented grid, winlines under evaluation and resulting win data to the current spin log file.
+    /// Safe to call even if logging wasn't enabled; will still create the file if NotifySpinStarted wasn't called.
+    /// </summary>
+    public void LogSpinResult(GameSymbol[] grid, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines, List<WinData> winData)
+    {
+        try
+        {
+            AppendToCurrentSpinLog("---- Spin Result ----");
+            AppendToCurrentSpinLog($"Timestamp: {DateTime.Now:O}");
+            AppendToCurrentSpinLog($"Columns: {columns}");
+            AppendToCurrentSpinLog($"RowsPerColumn: [{(rowsPerColumn != null ? string.Join(",", rowsPerColumn) : string.Empty)}]");
+
+            AppendToCurrentSpinLog("\nGrid contents (index => name | baseValue | minWinDepth | isWild | allowWildMatch):");
+            if (grid != null)
+            {
+                for (int i = 0; i < grid.Length; i++)
+                {
+                    var gs = grid[i];
+                    if (gs == null)
+                    {
+                        AppendToCurrentSpinLog($"[{i}] => null");
+                        continue;
+                    }
+
+                    var sd = gs.CurrentSymbolData;
+                    string name = sd != null ? sd.Name : "(null)";
+                    int baseVal = sd != null ? sd.BaseValue : 0;
+                    int min = sd != null ? sd.MinWinDepth : -999;
+                    bool isWild = sd != null ? sd.IsWild : false;
+                    bool allowWild = sd != null ? sd.AllowWildMatch : false;
+                    AppendToCurrentSpinLog($"[{i}] => {name} | base={baseVal} | minWin={min} | isWild={isWild} | allowWild={allowWild}");
+                }
+            }
+            else
+            {
+                AppendToCurrentSpinLog("Grid is null");
+            }
+
+            AppendToCurrentSpinLog("\nEvaluated Winlines (asset name / generated indexes):");
+            if (winlines != null)
+            {
+                for (int wi = 0; wi < winlines.Count; wi++)
+                {
+                    var wl = winlines[wi];
+                    int[] concrete = wl.GenerateIndexes(columns, rowsPerColumn ?? new int[columns]);
+                    if (concrete == null) concrete = new int[0];
+                    AppendToCurrentSpinLog($"Winline[{wi}] '{wl.name}' pattern={wl.Pattern} concrete=[{string.Join(",", concrete)}]");
+                }
+            }
+
+            AppendToCurrentSpinLog("\nWin evaluation results:");
+            if (winData != null && winData.Count > 0)
+            {
+                int total = 0;
+                for (int i = 0; i < winData.Count; i++)
+                {
+                    var w = winData[i];
+                    total += w.WinValue;
+                    var names = (w.WinningSymbolIndexes ?? new int[0]).Select(idx => (idx >= 0 && idx < (grid?.Length ?? 0) && grid[idx] != null) ? grid[idx].CurrentSymbolData?.Name ?? "(null)" : "null").ToArray();
+                    AppendToCurrentSpinLog($"Win[{i}] LineIndex={w.LineIndex} WinValue={w.WinValue} Indexes=[{(w.WinningSymbolIndexes != null ? string.Join(",", w.WinningSymbolIndexes) : "")} ] names=[{string.Join(",", names)}]");
+                }
+                AppendToCurrentSpinLog($"TotalWin={total}");
+            }
+            else
+            {
+                AppendToCurrentSpinLog("No wins");
+            }
+
+            AppendToCurrentSpinLog("---- End Spin ----\n\n");
+
+            // Also print location for convenience
+            if (!string.IsNullOrEmpty(currentSpinLogFilePath))
+            {
+                Debug.Log($"Spin log written to: {currentSpinLogFilePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Exception while logging spin result: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -223,6 +370,7 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 var cell = grid[symbolIndex];
                 if (cell == null) break;
 
+                // Use new MatchGroup-aware Matches logic (SymbolData.Matches already considers MatchGroup)
                 if (cell.Matches(trigger))
                 {
                     winningIndexes.Add(symbolIndex);
@@ -254,11 +402,6 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 {
                     case PayScaling.DepthSquared:
                     {
-                        // Payout progression: for baseVal = B and MinWinDepth = M
-                        // matches = M -> payout = B (winDepth = 0)
-                        // matches = M+1 -> payout = B * 2 (winDepth = 1)
-                        // matches = M+2 -> payout = B * 4 (winDepth = 2)
-                        // i.e. multiplier = 2^(winDepth)
                         long multiplier = 1L << winDepth; // 2^winDepth
                         scaled = baseVal * multiplier;
                         break;
@@ -291,8 +434,8 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
             // We'll use -1 as the LineIndex to indicate a non-winline award
             const int NonWinlineIndex = -1;
 
-            // Keep track of TotalCount triggers we've already evaluated by symbol name
-            HashSet<string> totalCountProcessed = new HashSet<string>();
+            // Keep track of TotalCount triggers we've already evaluated by matchgroup id
+            HashSet<int> totalCountProcessed = new HashSet<int>();
 
             for (int idx = 0; idx < grid.Length; idx++)
             {
@@ -319,17 +462,17 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                     // continue; allow multiple SingleOnReel instances across grid
                 }
 
-                // TotalCount: evaluate once per symbol name (ignore wilds)
+                // TotalCount: evaluate once per match-group id rather than per symbol name
                 if (cell.WinMode == SymbolWinMode.TotalCount)
                 {
-                    string key = cell.Name ?? string.Empty;
-                    if (totalCountProcessed.Contains(key)) continue;
-                    totalCountProcessed.Add(key);
+                    int groupId = cell.MatchGroupId;
+                    if (totalCountProcessed.Contains(groupId)) continue;
+                    totalCountProcessed.Add(groupId);
 
                     if (cell.TotalCountTrigger <= 0) continue;
                     if (cell.BaseValue <= 0) continue;
 
-                    // Gather all indexes in the grid that match this symbol name but ignore wilds entirely
+                    // Gather all indexes in the grid that match this symbol by MatchGroupId. Ignore wilds entirely.
                     var matching = new List<int>();
                     int exactMatches = 0;
                     for (int j = 0; j < grid.Length; j++)
@@ -337,19 +480,19 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                         var other = grid[j];
                         if (other == null) continue;
                         if (other.IsWild) continue; // explicitly ignore wilds for TotalCount
-                        // Use exact name equality for TotalCount matching to avoid wild substitution
-                        if (!string.IsNullOrEmpty(other.Name) && other.Name == cell.Name)
+
+                        // Use MatchGroupId equality for TotalCount matching to count grouped symbols together
+                        if (other.MatchGroupId != 0 && other.MatchGroupId == groupId)
                         {
                             matching.Add(j);
-                            exactMatches++;
+                            if (!string.IsNullOrEmpty(other.Name)) exactMatches++;
                         }
                     }
 
-                    // If no exact symbol instances exist, do not award
                     if (exactMatches == 0)
                     {
                         if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"SymbolWin: TotalCount trigger '{cell.Name}' skipped because no exact symbol instances were present (wilds ignored).");
+                            Debug.Log($"SymbolWin: TotalCount trigger '{cell.Name}' skipped because no exact symbol instances were present (wilds ignored). GroupId={groupId}");
                         continue;
                     }
 
@@ -376,12 +519,12 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                         winData.Add(new WinData(NonWinlineIndex, finalValue, matching.ToArray()));
 
                         if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"SymbolWin: TotalCount WIN! trigger={cell.Name} count={count} required={cell.TotalCountTrigger} baseValue={cell.BaseValue} scaled={scaled} totalValue={finalValue}");
+                            Debug.Log($"SymbolWin: TotalCount WIN! trigger={cell.Name} count={count} required={cell.TotalCountTrigger} baseValue={cell.BaseValue} scaled={scaled} totalValue={finalValue} GroupId={groupId}");
                     }
                     else
                     {
                         if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"SymbolWin: TotalCount '{cell.Name}' not reached ({count}/{cell.TotalCountTrigger}).");
+                            Debug.Log($"SymbolWin: TotalCount '{cell.Name}' not reached ({count}/{cell.TotalCountTrigger}). GroupId={groupId}");
                     }
                 }
             }

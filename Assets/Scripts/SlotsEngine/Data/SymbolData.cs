@@ -21,7 +21,14 @@ public class SymbolData : Data
 	[SerializeField] private SymbolWinMode winMode = SymbolWinMode.LineMatch;
 	[SerializeField] private int totalCountTrigger = -1;
 
+	// New: optional per-reel cap for this symbol during a single spin. -1 to ignore.
+	[SerializeField] private int maxPerReel = -1;
+
+	// New: integer match group identifier (set by definition). 0 indicates unknown/unset.
+	[SerializeField] private int matchGroupId = 0;
+
 	public string Name => name;
+	public int MatchGroupId => matchGroupId;
 	public Sprite Sprite
 	{
 		get
@@ -54,14 +61,16 @@ public class SymbolData : Data
 	public SymbolWinMode WinMode => winMode;
 	public int TotalCountTrigger => totalCountTrigger;
 
+	public int MaxPerReel => maxPerReel;
+
 	// Backwards-compatible constructor (previous signature)
 	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true)
-		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1)
+		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1, -1, 0)
 	{
 	}
 
 	// New constructor using baseValue/minWinDepth/scaling and explicit mode/totalTrigger
-	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true, SymbolWinMode mode = SymbolWinMode.LineMatch, int totalTrigger = -1)
+	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true, SymbolWinMode mode = SymbolWinMode.LineMatch, int totalTrigger = -1, int maxPerReelParam = -1, int matchGroup = 0)
 	{
 		name = symbolName;
 		sprite = symbolSprite;
@@ -74,31 +83,28 @@ public class SymbolData : Data
 		allowWildMatch = allowWild;
 		winMode = mode;
 		totalCountTrigger = totalTrigger;
+		maxPerReel = maxPerReelParam;
+		matchGroupId = matchGroup;
 	}
 
 	/// <summary>
 	/// Determines if this symbol should be considered a match with <paramref name="other"/>.
 	/// Matching rules:
-	/// - Exact name equality matches
-	/// - A wild symbol matches another symbol if the other symbol allows being matched by wilds
-	/// - A non-wild symbol matches a wild symbol if this symbol allows being matched by wilds
-	/// - Two wilds always match
-	/// This method centralizes matching rules so different Symbol implementations can alter behavior via properties.
+	/// - Group id equality (non-zero) indicates match
+	/// - Wild symbol rules remain: two wilds match; wild matches non-wild when allowed
 	/// </summary>
 	public bool Matches(SymbolData other)
 	{
 		if (other == null) return false;
 
-		// Exact name match
-		if (!string.IsNullOrEmpty(this.Name) && this.Name == other.Name) return true;
-
 		// Both wild -> match
 		if (this.IsWild && other.IsWild) return true;
 
-		// This is wild and other allows being matched by wilds
-		if (this.IsWild && other.AllowWildMatch) return true;
+		// Group match: if both have a non-zero MatchGroupId and they are equal
+		if (this.MatchGroupId != 0 && other.MatchGroupId != 0 && this.MatchGroupId == other.MatchGroupId) return true;
 
-		// Other is wild and this allows being matched by wilds
+		// Wild substitution rules
+		if (this.IsWild && other.AllowWildMatch) return true;
 		if (other.IsWild && this.AllowWildMatch) return true;
 
 		return false;

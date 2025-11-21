@@ -69,6 +69,11 @@ public class GameReel : MonoBehaviour
 		return reelStrip.GetWeightedSymbol();
 	}
 
+	public SymbolData GetRandomSymbolFromStrip(List<SymbolData> existingSelections)
+	{
+		return reelStrip.GetWeightedSymbol(existingSelections);
+	}
+
 	/// <summary>
 	/// Ensure the two persistent roots used for active and buffered symbols exist. These roots are
 	/// reused across spins to avoid creating/destroying many GameObjects every spin.
@@ -109,6 +114,9 @@ public class GameReel : MonoBehaviour
 
 		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
 
+		// Track selections for per-reel MaxPerReel enforcement when generating symbols
+		var selectedForThisReel = new List<SymbolData>();
+
 		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
 			GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot);
@@ -121,7 +129,7 @@ public class GameReel : MonoBehaviour
 			}
 			else
 			{
-				newSymbol = GetRandomSymbolFromStrip();
+				newSymbol = reelStrip.GetWeightedSymbol(selectedForThisReel);
 			}
 
 			sym.InitializeSymbol(newSymbol, eventManager);
@@ -130,11 +138,12 @@ public class GameReel : MonoBehaviour
 			sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 
 			symbols.Add(sym);
+			if (newSymbol != null) selectedForThisReel.Add(newSymbol);
 		}
 
 		// Spawn dummies (buffer visuals) above and below the active list
-		SpawnDummySymbols(symbolRoot);
-		SpawnDummySymbols(symbolRoot, false);
+		SpawnDummySymbols(symbolRoot, true, null, true, selectedForThisReel);
+		SpawnDummySymbols(symbolRoot, false, null, true, selectedForThisReel);
 	}
 
 	/// <summary>
@@ -193,6 +202,25 @@ public class GameReel : MonoBehaviour
 		List<GameSymbol> newSymbols = new List<GameSymbol>();
 		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
 
+		// Track picks for MaxPerReel enforcement in buffer generation
+		var pickedForBuffer = new List<SymbolData>();
+
+		// Build combined existing selections that include current active symbols so buffer generation respects MaxPerReel
+		var combinedExisting = new List<SymbolData>();
+		// include any already-picked buffer symbols as we build
+		if (pickedForBuffer != null && pickedForBuffer.Count > 0) combinedExisting.AddRange(pickedForBuffer);
+		// include currently active landed symbols from `symbols` list
+		if (symbols != null)
+		{
+			for (int s = 0; s < symbols.Count; s++)
+			{
+				var gs = symbols[s];
+				if (gs == null) continue;
+				var sd = gs.CurrentSymbolData;
+				if (sd != null) combinedExisting.Add(sd);
+			}
+		}
+
 		for (int i = 0; i < currentReelData.SymbolCount; i++)
 		{
 			GameSymbol symbol = GameSymbolPool.Instance.Get(nextSymbolsRoot);
@@ -205,7 +233,8 @@ public class GameReel : MonoBehaviour
 			}
 			else
 			{
-				def = reelStrip.GetWeightedSymbol();
+				// Use combinedExisting so MaxPerReel counts include current active symbols as well as picks in the buffer
+				def = reelStrip.GetWeightedSymbol(combinedExisting);
 			}
 
 			symbol.InitializeSymbol(def, eventManager);
@@ -214,6 +243,11 @@ public class GameReel : MonoBehaviour
 			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 
 			newSymbols.Add(symbol);
+			if (def != null)
+			{
+				pickedForBuffer.Add(def);
+				combinedExisting.Add(def); // keep combined up to date for subsequent picks
+			}
 		}
 
 		// Replace current symbol references with the buffered ones. The visual swap will occur on tween completion.
@@ -221,8 +255,8 @@ public class GameReel : MonoBehaviour
 
 		// Spawn dummies for the buffer. These are created while the reel is already spinning,
 		// so they should remain unfaded (white) when spawned. Pass dim=false to keep them white.
-		SpawnDummySymbols(nextSymbolsRoot, true, null, dim: false);
-		SpawnDummySymbols(nextSymbolsRoot, false, null, dim: false);
+		SpawnDummySymbols(nextSymbolsRoot, true, null, false, combinedExisting);
+		SpawnDummySymbols(nextSymbolsRoot, false, null, false, combinedExisting);
 
 		// nextSymbolsRoot is already the buffer root
 	}
@@ -231,7 +265,7 @@ public class GameReel : MonoBehaviour
 	/// Spawn dummy symbols used to pad the reel visuals above and below the active range.
 	/// `bottom` controls which side to create. When `dim` is true the dummy images are tinted to a dim color.
 	/// </summary>
-	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true)
+	private void SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true, List<SymbolData> existingSelections = null)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
 
@@ -254,7 +288,7 @@ public class GameReel : MonoBehaviour
 			}
 			else
 			{
-				def = reelStrip.GetWeightedSymbol();
+				def = reelStrip.GetWeightedSymbol(existingSelections);
 			}
 
 			symbol.InitializeSymbol(def, eventManager);
@@ -605,7 +639,7 @@ public class GameReel : MonoBehaviour
 			// append random symbols from strip to fill
 			for (int i = dataList.Count; i < newCount; i++)
 			{
-				dataList.Add(reelStrip.GetWeightedSymbol());
+				dataList.Add(reelStrip.GetWeightedSymbol(dataList));
 			}
 		}
 
@@ -632,7 +666,7 @@ public class GameReel : MonoBehaviour
 				GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot);
 				SymbolData def = (currentReelData.CurrentSymbolData != null && currentReelData.CurrentSymbolData.Count > i)
 					? currentReelData.CurrentSymbolData[i]
-					: reelStrip.GetWeightedSymbol();
+					: reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData);
 				sym.InitializeSymbol(def, eventManager);
 				sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 				symbols.Add(sym);
@@ -664,8 +698,8 @@ public class GameReel : MonoBehaviour
 		}
 
 		// Spawn updated dummies under the active root
-		SpawnDummySymbols(symbolRoot);
-		SpawnDummySymbols(symbolRoot, false);
+		SpawnDummySymbols(symbolRoot, true, null, true, currentReelData.CurrentSymbolData);
+		SpawnDummySymbols(symbolRoot, false, null, true, currentReelData.CurrentSymbolData);
 
 		// Clear any buffered symbols in nextSymbolsRoot so future buffer spawn matches new count
 		ReleaseAllSymbolsInRoot(nextSymbolsRoot);
