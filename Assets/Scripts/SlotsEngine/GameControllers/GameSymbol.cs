@@ -63,7 +63,29 @@ public class GameSymbol : MonoBehaviour
 		}
 
 		if (cachedImage == null) cachedImage = GetComponent<Image>();
-		cachedImage.color = Color.green;
+
+		// Choose highlight color based on this symbol's win mode.
+		Color highlight = Color.green; // default for line wins
+		if (currentSymbolData != null)
+		{
+			switch (currentSymbolData.WinMode)
+			{
+				case SymbolWinMode.LineMatch:
+				highlight = Color.green;
+				break;
+				case SymbolWinMode.SingleOnReel:
+				highlight = Color.yellow;
+				break;
+				case SymbolWinMode.TotalCount:
+				highlight = Color.red;
+				break;
+				default:
+				highlight = Color.green;
+				break;
+			}
+		}
+
+		cachedImage.color = highlight;
 		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
 	}
 

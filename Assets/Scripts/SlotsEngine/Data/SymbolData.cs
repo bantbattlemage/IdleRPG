@@ -17,6 +17,10 @@ public class SymbolData : Data
 	[SerializeField] private bool isWild = false;
 	[SerializeField] private bool allowWildMatch = true;
 
+	// New: win mode and total count trigger
+	[SerializeField] private SymbolWinMode winMode = SymbolWinMode.LineMatch;
+	[SerializeField] private int totalCountTrigger = -1;
+
 	public string Name => name;
 	public Sprite Sprite
 	{
@@ -47,8 +51,17 @@ public class SymbolData : Data
 	public bool IsWild => isWild;
 	public bool AllowWildMatch => allowWildMatch;
 
-	// New constructor using baseValue/minWinDepth/scaling
+	public SymbolWinMode WinMode => winMode;
+	public int TotalCountTrigger => totalCountTrigger;
+
+	// Backwards-compatible constructor (previous signature)
 	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true)
+		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1)
+	{
+	}
+
+	// New constructor using baseValue/minWinDepth/scaling and explicit mode/totalTrigger
+	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true, SymbolWinMode mode = SymbolWinMode.LineMatch, int totalTrigger = -1)
 	{
 		name = symbolName;
 		sprite = symbolSprite;
@@ -59,6 +72,8 @@ public class SymbolData : Data
 		payScaling = scaling;
 		isWild = wild;
 		allowWildMatch = allowWild;
+		winMode = mode;
+		totalCountTrigger = totalTrigger;
 	}
 
 	/// <summary>

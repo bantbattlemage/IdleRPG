@@ -1,9 +1,17 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.Linq;
 
 // Minimal test doubles to exercise WinlineEvaluator logic without Unity runtime
 namespace WinlineEvaluator.Tests
 {
+    public enum SymbolWinMode
+    {
+        LineMatch = 0,
+        SingleOnReel = 1,
+        TotalCount = 2
+    }
+
     // Simplified SymbolData duplicate (matches production shape used by evaluator)
     public class SymbolData
     {
@@ -12,14 +20,18 @@ namespace WinlineEvaluator.Tests
         public int MinWinDepth;
         public bool IsWild;
         public bool AllowWildMatch = true;
+        public SymbolWinMode WinMode = SymbolWinMode.LineMatch;
+        public int TotalCountTrigger = -1;
 
-        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, bool allowWild = true)
+        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, bool allowWild = true, SymbolWinMode winMode = SymbolWinMode.LineMatch, int totalCountTrigger = -1)
         {
             Name = name;
             BaseValue = baseValue;
             MinWinDepth = minWinDepth;
             IsWild = isWild;
             AllowWildMatch = allowWild;
+            WinMode = winMode;
+            TotalCountTrigger = totalCountTrigger;
         }
 
         public bool Matches(SymbolData other)
@@ -38,12 +50,13 @@ namespace WinlineEvaluator.Tests
     {
         public class WinData { public int LineIndex; public int Value; public int[] Indexes; public WinData(int l, int v, int[] i) { LineIndex = l; Value = v; Indexes = i; } }
 
-        // Evaluator now includes leftmost-wild fallback logic similar to production.
+        // Evaluator now includes leftmost-wild fallback logic similar to production and symbol win modes
         public List<WinData> EvaluateWins(SymbolData[] grid, int columns, int[] rowsPerColumn, List<int[]> winlines, List<int> winMultipliers, int creditCost = 1)
         {
             var winData = new List<WinData>();
             if (grid == null) return winData;
 
+            // First: evaluate traditional line winlines
             for (int i = 0; i < winlines.Count; i++)
             {
                 var concrete = winlines[i];
@@ -51,22 +64,14 @@ namespace WinlineEvaluator.Tests
 
                 // leftmost concrete cell
                 int firstIndex = concrete[0];
-                if (firstIndex < 0 || firstIndex >= grid.Length)
-                {
-                    continue;
-                }
+                if (firstIndex < 0 || firstIndex >= grid.Length) continue;
 
                 var trigger = grid[firstIndex];
-                if (trigger == null)
-                {
-                    // if leftmost null, try to find a viable trigger further along
-                    trigger = null;
-                }
+                if (trigger == null) continue;
 
-                // If leftmost cannot trigger (MinWinDepth < 0), and is wild, search for a viable non-wild trigger later in the line
-                if ((trigger == null || trigger.MinWinDepth < 0) && (trigger != null && trigger.IsWild || trigger == null))
+                // If leftmost cannot trigger (MinWinDepth < 0) or isn't LineMatch-capable, and is wild, search for a viable non-wild LineMatch trigger later in the line
+                if ((trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch) && trigger.IsWild)
                 {
-                    // search for first candidate that can trigger and has positive base value
                     int alt = -1;
                     for (int s = 1; s < concrete.Length; s++)
                     {
@@ -80,21 +85,19 @@ namespace WinlineEvaluator.Tests
                         }
                         var cand = grid[si];
                         if (cand == null) continue;
-                        if (!cand.IsWild && cand.MinWinDepth >= 0 && cand.BaseValue > 0)
+                        if (!cand.IsWild && cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
                         {
                             alt = si;
                             trigger = cand;
                             break;
                         }
                     }
-                    if (alt == -1 && (trigger == null || trigger.MinWinDepth < 0))
-                    {
-                        // nothing viable
-                        continue;
-                    }
+                    if (alt == -1 && (trigger == null || trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch)) continue;
                 }
 
-                if (trigger == null) continue;
+                // If the resolved trigger isn't LineMatch-capable, skip line evaluation
+                if (trigger.WinMode != SymbolWinMode.LineMatch) continue;
+
                 if (trigger.BaseValue <= 0) continue;
 
                 // build winning sequence starting from the leftmost position in the concrete pattern
@@ -126,17 +129,74 @@ namespace WinlineEvaluator.Tests
                 }
             }
 
+            // Then: evaluate symbol-level win modes (SingleOnReel, TotalCount)
+            const int NonWinlineIndex = -1;
+            var totalProcessed = new HashSet<string>();
+
+            for (int idx = 0; idx < grid.Length; idx++)
+            {
+                var cell = grid[idx];
+                if (cell == null) continue;
+
+                // Ignore wild symbols for non-line win modes entirely
+                if (cell.IsWild) continue;
+
+                if (cell.WinMode == SymbolWinMode.SingleOnReel)
+                {
+                    if (cell.BaseValue <= 0) continue;
+                    long total = (long)cell.BaseValue * creditCost;
+                    if (total > int.MaxValue) total = int.MaxValue;
+                    winData.Add(new WinData(NonWinlineIndex, (int)total, new int[] { idx }));
+                }
+
+                if (cell.WinMode == SymbolWinMode.TotalCount)
+                {
+                    string key = cell.Name ?? string.Empty;
+                    if (totalProcessed.Contains(key)) continue;
+                    totalProcessed.Add(key);
+
+                    if (cell.TotalCountTrigger <= 0 || cell.BaseValue <= 0) continue;
+
+                    var matching = new List<int>();
+                    int exactMatches = 0;
+                    for (int j = 0; j < grid.Length; j++)
+                    {
+                        var other = grid[j];
+                        if (other == null) continue;
+                        if (other.IsWild) continue; // ignore wilds
+                        if (!string.IsNullOrEmpty(other.Name) && other.Name == cell.Name)
+                        {
+                            matching.Add(j);
+                            exactMatches++;
+                        }
+                    }
+
+                    if (exactMatches == 0) continue;
+
+                    int count = matching.Count;
+                    if (count >= cell.TotalCountTrigger)
+                    {
+                        int winDepth = count - cell.TotalCountTrigger;
+                        long scaled = cell.BaseValue;
+                        if (winDepth > 0) scaled = cell.BaseValue * (1L << winDepth);
+                        long total = scaled * creditCost;
+                        if (total > int.MaxValue) total = int.MaxValue;
+                        winData.Add(new WinData(NonWinlineIndex, (int)total, matching.ToArray()));
+                    }
+                }
+            }
+
             return winData;
         }
     }
 
     public class Tests
     {
-        private SymbolData MakeWild() => new SymbolData("W", baseValue:0, minWinDepth:-1, isWild:true, allowWild:true);
-        private SymbolData A => new SymbolData("1", baseValue:2, minWinDepth:3);
-        private SymbolData B => new SymbolData("2", baseValue:4, minWinDepth:4);
-        private SymbolData C => new SymbolData("C", baseValue:1, minWinDepth:1);
-        private SymbolData D => new SymbolData("4", baseValue:5, minWinDepth:3);
+        private SymbolData MakeWild() => new SymbolData("W", baseValue:0, minWinDepth:-1, isWild:true, allowWild:true, winMode: SymbolWinMode.LineMatch);
+        private SymbolData A => new SymbolData("1", baseValue:2, minWinDepth:3, winMode: SymbolWinMode.LineMatch);
+        private SymbolData B => new SymbolData("2", baseValue:4, minWinDepth:4, winMode: SymbolWinMode.LineMatch);
+        private SymbolData C => new SymbolData("C", baseValue:1, minWinDepth:1, winMode: SymbolWinMode.LineMatch);
+        private SymbolData D => new SymbolData("4", baseValue:5, minWinDepth:3, winMode: SymbolWinMode.LineMatch);
 
         [Test]
         public void Test_11111_straight_awards()
@@ -510,5 +570,65 @@ namespace WinlineEvaluator.Tests
             Assert.AreEqual(256, wins[0].Value);
         }
 
+        // New tests for symbol win modes
+
+        [Test]
+        public void SingleOnReel_Awards_PerInstance()
+        {
+            // three single-on-reel symbols should each award their base value
+            var s = new SymbolData("S", baseValue: 5, minWinDepth: -1, isWild: false, allowWild: true, winMode: SymbolWinMode.SingleOnReel);
+            var grid = new SymbolData[] { s, s, s };
+            var eval = new WinlineEvaluator();
+            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
+            Assert.IsNotNull(wins);
+            // three separate wins (one per landed symbol)
+            Assert.AreEqual(3, wins.Count);
+            Assert.AreEqual(15, wins.Sum(w => w.Value));
+        }
+
+        [Test]
+        public void TotalCount_Awards_When_Threshold_Met()
+        {
+            var t = new SymbolData("T", baseValue: 2, minWinDepth: -1, isWild: false, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 3);
+            var grid = new SymbolData[] { t, t, t };
+            var eval = new WinlineEvaluator();
+            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
+            Assert.IsNotNull(wins);
+            // one total-count win
+            var totalWins = wins.Where(w => w.LineIndex == -1).ToList();
+            Assert.AreEqual(1, totalWins.Count);
+            Assert.AreEqual(2, totalWins[0].Value);
+            Assert.AreEqual(3, totalWins[0].Indexes.Length);
+        }
+
+        [Test]
+        public void Wilds_Do_Not_Trigger_TotalCount_By_Themselves()
+        {
+            // wilds configured as TotalCount should not self-award; wilds are ignored for non-line modes
+            var w = new SymbolData("W", baseValue: 5, minWinDepth: -1, isWild: true, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 1);
+            var grid = new SymbolData[] { w, w, w };
+            var eval = new WinlineEvaluator();
+            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
+            Assert.IsNotNull(wins);
+            // no wins should be produced from wild-only totalcount entries
+            Assert.AreEqual(0, wins.Count);
+        }
+
+        [Test]
+        public void NonLineWinMode_Not_Count_As_Line()
+        {
+            // Leftmost is SingleOnReel and should prevent a line match even if right-hand symbols would form one.
+            var left = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.SingleOnReel);
+            var right = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.LineMatch);
+            var grid = new SymbolData[] { left, right, right };
+            var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
+            var winmult = new List<int> { 1 };
+            var eval = new WinlineEvaluator();
+            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, winlines, winmult);
+
+            Assert.IsNotNull(wins);
+            // Ensure no line wins present (LineIndex >=0). There may be a SingleOnReel win(s) with LineIndex == -1.
+            Assert.IsFalse(wins.Any(w => w.LineIndex >= 0));
+        }
     }
 }

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WinlineEvaluator.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+62ca87f67dfb612a404878489e1d303bb2f2a92e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6b57cc8ae511ccd48309012831445ab393693b22")]
 [assembly: System.Reflection.AssemblyProductAttribute("WinlineEvaluator.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WinlineEvaluator.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

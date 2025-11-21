@@ -154,11 +154,10 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 continue;
             }
 
-            // Only -1 indicates "cannot trigger"; 0 and positive are valid minimums (0 shouldn't occur by design)
-            if (trigger.MinWinDepth < 0)
+            // If the trigger isn't a LineMatch-capable symbol, skip line evaluation.
+            // However allow wild leftmost to hand off to a LineMatch candidate further along the line.
+            if (trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch)
             {
-                // If the leftmost symbol is a wild with no multipliers, attempt to find the
-                // first viable non-wild symbol along the winline to serve as the trigger.
                 if (trigger.IsWild)
                 {
                     int altIndex = -1;
@@ -172,8 +171,8 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
 
                         var candidate = grid[si];
                         if (candidate == null) continue;
-                        // Prefer the first non-wild symbol that can trigger wins and has a positive BaseValue
-                        if (!candidate.IsWild && candidate.MinWinDepth >= 0 && candidate.BaseValue > 0)
+                        // Prefer the first non-wild symbol that can trigger line wins and has a positive BaseValue
+                        if (!candidate.IsWild && candidate.MinWinDepth >= 0 && candidate.BaseValue > 0 && candidate.WinMode == SymbolWinMode.LineMatch)
                         {
                             altIndex = si;
                             break;
@@ -189,14 +188,14 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                     else
                     {
                         if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger wins (MinWinDepth={trigger.MinWinDepth}).");
+                            Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger line wins (MinWinDepth={trigger.MinWinDepth}, WinMode={trigger.WinMode}).");
                         continue;
                     }
                 }
                 else
                 {
                     if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                        Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger wins (MinWinDepth={trigger.MinWinDepth}).");
+                        Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger line wins (MinWinDepth={trigger.MinWinDepth}, WinMode={trigger.WinMode}).");
                     continue;
                 }
             }
@@ -284,6 +283,112 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                 if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
                     Debug.Log($"Winline {i}: insufficient matches - found={matchCount} required={trigger.MinWinDepth}.");
             }
+        }
+
+        // --- New: evaluate symbol-level win modes (SingleOnReel, TotalCount) ---
+        try
+        {
+            // We'll use -1 as the LineIndex to indicate a non-winline award
+            const int NonWinlineIndex = -1;
+
+            // Keep track of TotalCount triggers we've already evaluated by symbol name
+            HashSet<string> totalCountProcessed = new HashSet<string>();
+
+            for (int idx = 0; idx < grid.Length; idx++)
+            {
+                var cell = grid[idx];
+                if (cell == null) continue;
+
+                // Ignore wild symbols for non-line win modes entirely
+                if (cell.IsWild) continue;
+
+                // SingleOnReel: award per landed non-wild symbol instance
+                if (cell.WinMode == SymbolWinMode.SingleOnReel)
+                {
+                    if (cell.BaseValue <= 0) continue;
+
+                    long total = (long)cell.BaseValue * (long)GamePlayer.Instance.CurrentBet.CreditCost;
+                    if (total > int.MaxValue) total = int.MaxValue;
+                    int finalValue = (int)total;
+
+                    winData.Add(new WinData(NonWinlineIndex, finalValue, new int[] { idx }));
+
+                    if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
+                        Debug.Log($"SymbolWin: SingleOnReel trigger={cell.Name} at idx={idx} value={finalValue}");
+
+                    // continue; allow multiple SingleOnReel instances across grid
+                }
+
+                // TotalCount: evaluate once per symbol name (ignore wilds)
+                if (cell.WinMode == SymbolWinMode.TotalCount)
+                {
+                    string key = cell.Name ?? string.Empty;
+                    if (totalCountProcessed.Contains(key)) continue;
+                    totalCountProcessed.Add(key);
+
+                    if (cell.TotalCountTrigger <= 0) continue;
+                    if (cell.BaseValue <= 0) continue;
+
+                    // Gather all indexes in the grid that match this symbol name but ignore wilds entirely
+                    var matching = new List<int>();
+                    int exactMatches = 0;
+                    for (int j = 0; j < grid.Length; j++)
+                    {
+                        var other = grid[j];
+                        if (other == null) continue;
+                        if (other.IsWild) continue; // explicitly ignore wilds for TotalCount
+                        // Use exact name equality for TotalCount matching to avoid wild substitution
+                        if (!string.IsNullOrEmpty(other.Name) && other.Name == cell.Name)
+                        {
+                            matching.Add(j);
+                            exactMatches++;
+                        }
+                    }
+
+                    // If no exact symbol instances exist, do not award
+                    if (exactMatches == 0)
+                    {
+                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
+                            Debug.Log($"SymbolWin: TotalCount trigger '{cell.Name}' skipped because no exact symbol instances were present (wilds ignored).");
+                        continue;
+                    }
+
+                    int count = matching.Count;
+                    if (count >= cell.TotalCountTrigger)
+                    {
+                        int winDepth = count - cell.TotalCountTrigger;
+                        long scaled = cell.BaseValue;
+                        switch (cell.PayScaling)
+                        {
+                            case PayScaling.DepthSquared:
+                                long mult = 1L << winDepth;
+                                scaled = cell.BaseValue * mult;
+                                break;
+                            default:
+                                scaled = cell.BaseValue;
+                                break;
+                        }
+
+                        long total = scaled * (long)GamePlayer.Instance.CurrentBet.CreditCost;
+                        if (total > int.MaxValue) total = int.MaxValue;
+                        int finalValue = (int)total;
+
+                        winData.Add(new WinData(NonWinlineIndex, finalValue, matching.ToArray()));
+
+                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
+                            Debug.Log($"SymbolWin: TotalCount WIN! trigger={cell.Name} count={count} required={cell.TotalCountTrigger} baseValue={cell.BaseValue} scaled={scaled} totalValue={finalValue}");
+                    }
+                    else
+                    {
+                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
+                            Debug.Log($"SymbolWin: TotalCount '{cell.Name}' not reached ({count}/{cell.TotalCountTrigger}).");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"SymbolWin evaluation exception: {ex.Message}");
         }
 
         currentSpinWinData = winData;
