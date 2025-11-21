@@ -2,7 +2,8 @@ using UnityEngine;
 
 public enum PayScaling
 {
-	DepthSquared = 0
+	DepthSquared = 0,
+	PerSymbol = 1
 }
 
 public enum SymbolWinMode

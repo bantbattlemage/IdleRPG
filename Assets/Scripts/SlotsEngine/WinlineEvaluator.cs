@@ -465,6 +465,12 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                         scaled = baseVal * multiplier;
                         break;
                     }
+                    case PayScaling.PerSymbol:
+                    {
+                        // Pay base value times number of matched symbols for line wins
+                        scaled = (long)baseVal * matchCount;
+                        break;
+                    }
                     default:
                         scaled = baseVal;
                         break;
@@ -517,7 +523,20 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                     if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
                         creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
 
-                    long total = (long)cell.BaseValue * creditCost;
+                    // Apply PayScaling for SingleOnReel; PerSymbol == baseValue * 1, DepthSquared has no extra depth for single instance
+                    long scaled = cell.BaseValue;
+                    switch (cell.PayScaling)
+                    {
+                        case PayScaling.PerSymbol:
+                            scaled = cell.BaseValue * 1L;
+                            break;
+                        case PayScaling.DepthSquared:
+                        default:
+                            scaled = cell.BaseValue;
+                            break;
+                    }
+
+                    long total = scaled * creditCost;
                     if (total > int.MaxValue) total = int.MaxValue;
                     int finalValue = (int)total;
 
@@ -573,6 +592,10 @@ public class WinlineEvaluator : Singleton<WinlineEvaluator>
                             case PayScaling.DepthSquared:
                                 long mult = 1L << winDepth;
                                 scaled = cell.BaseValue * mult;
+                                break;
+                            case PayScaling.PerSymbol:
+                                // Pay baseValue times the number of matched symbols for TotalCount wins
+                                scaled = (long)cell.BaseValue * count;
                                 break;
                             default:
                                 scaled = cell.BaseValue;

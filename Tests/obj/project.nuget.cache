@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "oCpwo31uyrw=",
+  "dgSpecHash": "QUPbjx3FJO0=",
   "success": true,
-  "projectFilePath": "D:\\GitHub\\IdleRPG\\Tests\\WinlineEvaluator.Tests\\WinlineEvaluator.Tests.csproj",
+  "projectFilePath": "D:\\GitHub\\IdleRPG\\Tests\\Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\andrew\\.nuget\\packages\\microsoft.codecoverage\\17.9.0\\microsoft.codecoverage.17.9.0.nupkg.sha512",
     "C:\\Users\\andrew\\.nuget\\packages\\microsoft.net.test.sdk\\17.9.0\\microsoft.net.test.sdk.17.9.0.nupkg.sha512",
