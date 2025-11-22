@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System;
-using System.Linq;
 using UnityEngine;
 
 public static class Helpers
@@ -11,24 +10,30 @@ public static class Helpers
 			return Array.Empty<T>();
 
 		int colCount = columns.Count;
-		int rowCount = columns.Max(col => (col != null) ? col.Length : 0);
+		int rowCount = 0;
+		// Find max row length without LINQ allocations
+		for (int i = 0; i < colCount; i++)
+		{
+			var col = columns[i];
+			int len = col != null ? col.Length : 0;
+			if (len > rowCount) rowCount = len;
+		}
 
 		// total cells in the rectangular grid
 		T[] result = new T[rowCount * colCount];
 
 		for (int r = 0; r < rowCount; r++)
 		{
+			int rowOffset = r * colCount;
 			for (int c = 0; c < colCount; c++)
 			{
-				// bottom-left origin:
-				// row 0 = bottom row
-				int srcRow = r;
-				int dstIndex = r * colCount + c;
-
-				if (columns[c] != null && srcRow < columns[c].Length)
-					result[dstIndex] = columns[c][srcRow];
-				else
-					result[dstIndex] = default;
+				int dstIndex = rowOffset + c;
+				var srcCol = columns[c];
+				if (srcCol != null && r < srcCol.Length)
+				{
+					result[dstIndex] = srcCol[r];
+				}
+				// else leave default(T)
 			}
 		}
 

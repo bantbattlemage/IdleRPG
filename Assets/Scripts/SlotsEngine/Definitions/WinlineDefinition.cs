@@ -3,58 +3,93 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/WinlineDefinition")]
 public class WinlineDefinition : ScriptableObject
 {
-    public enum PatternType
-    {
-        StraightAcross,
-        DiagonalDown,
-        DiagonalUp,
-        Custom
-    }
+    public enum PatternType { StraightAcross, DiagonalDown, DiagonalUp, Custom }
 
     [SerializeField] private PatternType pattern = PatternType.StraightAcross;
     [SerializeField] private int winMultiplier = 1;
+    [SerializeField] private int rowIndex = 0; // 0 = bottom visual row
+    [SerializeField] private int rowOffset = 0; // diagonal start offset
+    [SerializeField] private int[] customRowOffsets; // per-column rows (Custom pattern)
+    [SerializeField] private bool runtimeTransient = false; // identifies runtime-created temporary lines
 
-    // For StraightAcross: rowIndex (0 = bottom row)
-    // For Diagonal variants: rowOffset shifts the diagonal start
-    // For Custom: customRowOffsets length should match columns and specify row for each column
-    [HideInInspector][SerializeField] private int rowIndex = 0;
-    [SerializeField] private int rowOffset = 0;
-    [SerializeField] private int[] customRowOffsets;
-
+    // Public accessors (unchanged external API expectations)
     public PatternType Pattern => pattern;
     public int WinMultiplier => winMultiplier;
     public int RowIndex => rowIndex;
     public int RowOffset => rowOffset;
     public int[] CustomRowOffsets => customRowOffsets;
+    public bool IsRuntimeTransient => runtimeTransient;
+
+    // Mutators (replace reflection usage)
+    public void SetRowIndex(int r) { rowIndex = r; }
+    public void SetRowOffset(int o) { rowOffset = o; }
+    public void SetCustomRowOffsets(int[] offsets) { customRowOffsets = offsets; }
+    public void SetWinMultiplier(int m) { winMultiplier = m; }
+
+    // Runtime configuration (replaces previous reflection setting of private fields)
+    public void ConfigureRuntime(PatternType newPattern, int multiplier, int newRowIndex, int newRowOffset, int[] newCustomOffsets)
+    {
+        pattern = newPattern;
+        winMultiplier = multiplier;
+        rowIndex = newRowIndex;
+        rowOffset = newRowOffset;
+        customRowOffsets = newCustomOffsets;
+        runtimeTransient = true;
+    }
+
+    public static WinlineDefinition CreateRuntimeStraightAcross(int row, int multiplier = 1)
+    {
+        var inst = CreateInstance<WinlineDefinition>();
+        inst.ConfigureRuntime(PatternType.StraightAcross, multiplier, row, 0, null);
+        inst.name = $"__runtime_Straight_row_{row}";
+        return inst;
+    }
+
+    public static WinlineDefinition CreateRuntimeCustom(int[] perColumnRows, int multiplier = 1)
+    {
+        var inst = CreateInstance<WinlineDefinition>();
+        int[] copy = null;
+        if (perColumnRows != null)
+        {
+            copy = new int[perColumnRows.Length];
+            System.Array.Copy(perColumnRows, copy, perColumnRows.Length);
+        }
+        inst.ConfigureRuntime(PatternType.Custom, multiplier, 0, 0, copy);
+        inst.name = "__runtime_Custom";
+        return inst;
+    }
 
     /// <summary>
-    /// Legacy signature kept for compatibility: generates indexes using a uniform row count across columns.
+    /// Clone this definition into a runtime-transient instance (replaces prior reflection mutation approach).
     /// </summary>
+    public WinlineDefinition CloneForRuntime()
+    {
+        var clone = CreateInstance<WinlineDefinition>();
+        int[] offsetsCopy = customRowOffsets != null ? (int[])customRowOffsets.Clone() : null;
+        clone.ConfigureRuntime(pattern, winMultiplier, rowIndex, rowOffset, offsetsCopy);
+        clone.name = name + "_runtimeClone";
+        return clone;
+    }
+
+    // Legacy overload retained
     public int[] GenerateIndexes(int columns, int rows)
     {
-        // Delegate to per-column overload using uniform counts
         int[] perCol = new int[columns];
         for (int i = 0; i < columns; i++) perCol[i] = rows;
         return GenerateIndexes(columns, perCol);
     }
 
     /// <summary>
-    /// Generate concrete symbol indexes for a grid with given columns (reels) and per-column rows.
-    /// Grid indexing is column-major with bottom-left origin: index = row * columns + column.
-    /// This method produces an index array with one entry per column. If a column does not contain
-    /// a valid cell for the pattern the corresponding entry will be -1. This makes missing/truncated
-    /// columns explicit for the evaluator.
+    /// Generates one index per column (or -1 if invalid) using column-major indexing (row * columns + column).
+    /// StraightAcross matches original behavior by anchoring column 0 with clamped row when requested row exceeds its height.
+    /// This reproduces previous reflection-based semantics so existing evaluation logic continues to function.
     /// </summary>
     public int[] GenerateIndexes(int columns, int[] rowsPerColumn)
     {
-        if (columns <= 0 || rowsPerColumn == null || rowsPerColumn.Length != columns)
-            return System.Array.Empty<int>();
-
-        int maxRows = 0;
-        for (int i = 0; i < rowsPerColumn.Length; i++) if (rowsPerColumn[i] > maxRows) maxRows = rowsPerColumn[i];
+        if (columns <= 0 || rowsPerColumn == null || rowsPerColumn.Length != columns) return System.Array.Empty<int>();
+        int maxRows = 0; for (int i = 0; i < rowsPerColumn.Length; i++) if (rowsPerColumn[i] > maxRows) maxRows = rowsPerColumn[i];
         if (maxRows <= 0) return System.Array.Empty<int>();
 
-        // Initialize result with -1 placeholders (one slot per column)
         var result = new int[columns];
         for (int i = 0; i < columns; i++) result[i] = -1;
 
@@ -62,60 +97,35 @@ public class WinlineDefinition : ScriptableObject
         {
             case PatternType.StraightAcross:
             {
-                int r = rowIndex;
-                // anchor base to column 0 available rows
-                int base0 = Mathf.Clamp(r, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-                // column 0 always anchored
-                if (base0 >= 0 && base0 < rowsPerColumn[0]) result[0] = base0 * columns + 0;
-
+                int requested = rowIndex;
+                // Anchor behavior: clamp for column0 then place column0 using clamped row, others use requested row (legacy semantics)
+                int base0 = ClampRow(requested, rowsPerColumn[0]);
+                if (rowsPerColumn[0] > 0 && base0 >= 0) result[0] = base0 * columns + 0;
                 for (int c = 1; c < columns; c++)
                 {
-                    if (r >= 0 && r < rowsPerColumn[c])
-                    {
-                        result[c] = r * columns + c;
-                    }
-                    else
-                    {
-                        result[c] = -1; // explicit missing
-                    }
+                    if (requested >= 0 && requested < rowsPerColumn[c]) result[c] = requested * columns + c; else result[c] = -1;
                 }
                 return result;
             }
             case PatternType.DiagonalDown:
             {
                 int desiredBase = (maxRows - 1 - rowOffset);
-                int base0 = Mathf.Clamp(desiredBase, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-
+                int base0 = ClampRow(desiredBase, rowsPerColumn[0]);
                 for (int c = 0; c < columns; c++)
                 {
-                    int row = base0 - c; // step down to the right
-                    if (row >= 0 && row < rowsPerColumn[c])
-                    {
-                        result[c] = row * columns + c;
-                    }
-                    else
-                    {
-                        result[c] = -1;
-                    }
+                    int row = base0 - c;
+                    if (row >= 0 && row < rowsPerColumn[c]) result[c] = row * columns + c; else result[c] = -1;
                 }
                 return result;
             }
             case PatternType.DiagonalUp:
             {
                 int desiredBase = rowOffset;
-                int base0 = Mathf.Clamp(desiredBase, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-
+                int base0 = ClampRow(desiredBase, rowsPerColumn[0]);
                 for (int c = 0; c < columns; c++)
                 {
-                    int rowUp = base0 + c; // step up to the right
-                    if (rowUp >= 0 && rowUp < rowsPerColumn[c])
-                    {
-                        result[c] = rowUp * columns + c;
-                    }
-                    else
-                    {
-                        result[c] = -1;
-                    }
+                    int rowUp = base0 + c;
+                    if (rowUp >= 0 && rowUp < rowsPerColumn[c]) result[c] = rowUp * columns + c; else result[c] = -1;
                 }
                 return result;
             }
@@ -123,48 +133,35 @@ public class WinlineDefinition : ScriptableObject
             {
                 if (customRowOffsets != null && customRowOffsets.Length == columns)
                 {
-                    int base0 = Mathf.Clamp(customRowOffsets[0], 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-                    // include column0 anchored
-                    if (base0 >= 0 && base0 < rowsPerColumn[0]) result[0] = base0 * columns + 0;
-                    else result[0] = -1;
-
-                    for (int c = 1; c < columns; c++)
+                    for (int c = 0; c < columns; c++)
                     {
                         int rc = customRowOffsets[c];
-                        if (rc >= 0 && rc < rowsPerColumn[c])
-                        {
-                            result[c] = rc * columns + c;
-                        }
-                        else
-                        {
-                            result[c] = -1;
-                        }
+                        if (rc >= 0 && rc < rowsPerColumn[c]) result[c] = rc * columns + c; else result[c] = -1;
                     }
                     return result;
                 }
-
+                // Fallback: center row selection (existing legacy fallback)
                 int mid = maxRows / 2;
-                int baseMid = Mathf.Clamp(mid, 0, rowsPerColumn[0] > 0 ? rowsPerColumn[0] - 1 : 0);
-                if (baseMid >= 0 && baseMid < rowsPerColumn[0]) result[0] = baseMid * columns + 0;
-                else result[0] = -1;
-
-                for (int c2 = 1; c2 < columns; c2++)
+                for (int c2 = 0; c2 < columns; c2++)
                 {
-                    if (mid < rowsPerColumn[c2])
-                        result[c2] = mid * columns + c2;
-                    else
-                        result[c2] = -1;
+                    if (mid < rowsPerColumn[c2]) result[c2] = mid * columns + c2; else result[c2] = -1;
                 }
                 return result;
             }
             default:
-                return System.Array.Empty<int>();
+                return result;
         }
     }
 
+    private int ClampRow(int desired, int available) => Mathf.Clamp(desired, 0, available > 0 ? available - 1 : 0);
+
+    /// <summary>
+    /// Depth retains original semantics: returns number of columns in pattern (including -1 placeholders)
+    /// so evaluators relying on length continue to behave consistently.
+    /// </summary>
     public int Depth(int columns, int rows)
     {
         var idx = GenerateIndexes(columns, rows);
-        return idx?.Length ?? 0;
+        return idx?.Length ?? 0; // legacy behavior (do not count only valid entries)
     }
 }

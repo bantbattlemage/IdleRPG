@@ -73,7 +73,6 @@ public class SlotsEngine : MonoBehaviour
 		if (!spinInProgress)
 		{
 			spinInProgress = true; stateMachine.SetState(State.Spinning);
-			try { eventManager.BroadcastEvent(State.Spinning, "Enter"); } catch (Exception ex) { Debug.LogException(ex); throw; }
 		}
 	}
 

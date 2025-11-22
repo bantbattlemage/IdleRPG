@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -39,7 +38,7 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		foreach (SlotsDisplayPage page in slotsDisplayPages) page.ToggleRenderers(page == currentSlotsDisplayPage);
 	}
 
-	public SlotsEngine CreateSlots(SlotsData existingData = null, bool useGrid = false)
+	public SlotsEngine CreateSlots(SlotsData existingData = null)
 	{
 		SlotsDisplayPage pageToUse;
 		if ((slotsDisplayPages == null || !slotsDisplayPages.Any() || slotsDisplayPages.Last().slotsToDisplay.Count >= 4))

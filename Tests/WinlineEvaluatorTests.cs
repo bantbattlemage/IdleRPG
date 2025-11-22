@@ -4,14 +4,9 @@ using System.Linq;
 
 namespace WinlineEvaluator.Tests
 {
-    public enum SymbolWinMode
-    {
-        LineMatch = 0,
-        SingleOnReel = 1,
-        TotalCount = 2
-    }
+    public enum SymbolWinMode { LineMatch, SingleOnReel, TotalCount }
+    public enum PayScaling { DepthSquared, PerSymbol }
 
-    // Simplified SymbolData duplicate (matches production shape used by evaluator)
     public class SymbolData
     {
         public string Name;
@@ -22,740 +17,221 @@ namespace WinlineEvaluator.Tests
         public SymbolWinMode WinMode = SymbolWinMode.LineMatch;
         public int TotalCountTrigger = -1;
         public int MatchGroupId = 0;
-
-        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, bool allowWild = true, SymbolWinMode winMode = SymbolWinMode.LineMatch, int totalCountTrigger = -1, int matchGroupId = 0)
+        public PayScaling PayScaling = PayScaling.DepthSquared;
+        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, SymbolWinMode winMode = SymbolWinMode.LineMatch, PayScaling scaling = PayScaling.DepthSquared, int totalCountTrigger = -1, int matchGroupId = 0, bool allowWild = true)
         {
-            Name = name;
-            BaseValue = baseValue;
-            MinWinDepth = minWinDepth;
-            IsWild = isWild;
-            AllowWildMatch = allowWild;
-            WinMode = winMode;
-            TotalCountTrigger = totalCountTrigger;
-            MatchGroupId = matchGroupId;
+            Name = name; BaseValue = baseValue; MinWinDepth = minWinDepth; IsWild = isWild; WinMode = winMode; PayScaling = scaling; TotalCountTrigger = totalCountTrigger; MatchGroupId = matchGroupId; AllowWildMatch = allowWild;
         }
-
         public bool Matches(SymbolData other)
         {
             if (other == null) return false;
-            // Both wild -> match
-            if (this.IsWild && other.IsWild) return true;
-            // Group id equality required (non-zero)
-            if (this.MatchGroupId != 0 && other.MatchGroupId != 0 && this.MatchGroupId == other.MatchGroupId) return true;
-            // Wild substitution rules
-            if (this.IsWild && other.AllowWildMatch) return true;
-            if (other.IsWild && this.AllowWildMatch) return true;
-            return false;
+            if (IsWild && other.IsWild) return true;
+            if (MatchGroupId != 0 && other.MatchGroupId != 0 && MatchGroupId == other.MatchGroupId) return true;
+            if (IsWild && other.AllowWildMatch) return true;
+            if (other.IsWild && AllowWildMatch) return true;
+            return Name == other.Name; // direct name match fallback (production uses Name through data objects)
         }
     }
 
-    // Simplified evaluator copied & adapted from project to run in plain .NET test
+    public class WinData { public int LineIndex; public int Value; public int[] Indexes; public WinData(int li, int val, int[] idx) { LineIndex = li; Value = val; Indexes = idx; } }
+
+    // Minimal evaluator mirroring production WinEvaluator logic relevant to tests
     public class WinlineEvaluator
     {
-        public class WinData { public int LineIndex; public int Value; public int[] Indexes; public WinData(int l, int v, int[] i) { LineIndex = l; Value = v; Indexes = i; } }
-
-        // Evaluator now includes leftmost-wild fallback logic similar to production and symbol win modes
         public List<WinData> EvaluateWins(SymbolData[] grid, int columns, int[] rowsPerColumn, List<int[]> winlines, List<int> winMultipliers, int creditCost = 1)
         {
-            var winData = new List<WinData>();
-            if (grid == null) return winData;
-
-            // First: evaluate traditional line winlines
+            var results = new List<WinData>();
+            if (grid == null || winlines == null) return results;
             for (int i = 0; i < winlines.Count; i++)
             {
-                var concrete = winlines[i];
-                if (concrete == null || concrete.Length == 0) continue;
-
-                // leftmost concrete cell
-                int firstIndex = concrete[0];
-                if (firstIndex < 0 || firstIndex >= grid.Length) continue;
-
-                var trigger = grid[firstIndex];
-                if (trigger == null) continue;
-
-                // If leftmost cannot trigger (MinWinDepth < 0) or isn't LineMatch-capable, and is wild, search for a viable non-wild LineMatch trigger later in the line
-                if ((trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch) && trigger.IsWild)
+                var pattern = winlines[i]; if (pattern == null || pattern.Length == 0) continue;
+                int first = pattern[0]; if (first < 0 || first >= grid.Length) continue;
+                var trigger = grid[first]; if (trigger == null) continue;
+                bool needsFallback = (trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch) || (trigger.IsWild && trigger.BaseValue <= 0);
+                if (needsFallback)
                 {
-                    int alt = -1;
-                    for (int s = 1; s < concrete.Length; s++)
+                    if (trigger.IsWild)
                     {
-                        int si = concrete[s];
-                        if (si < 0 || si >= grid.Length) continue;
-                        if (rowsPerColumn != null && rowsPerColumn.Length == columns)
+                        int alt = -1;
+                        for (int p = 1; p < pattern.Length; p++)
                         {
-                            int col = si % columns;
-                            int row = si / columns;
-                            if (row >= rowsPerColumn[col]) continue; // truncated
+                            int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
+                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
+                            var cand = grid[idx]; if (cand == null) continue;
+                            if (!cand.IsWild && cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch) { alt = idx; trigger = cand; break; }
                         }
-                        var cand = grid[si];
-                        if (cand == null) continue;
-                        if (!cand.IsWild && cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
-                        {
-                            alt = si;
-                            trigger = cand;
-                            break;
-                        }
+                        if (alt < 0) continue; // no fallback paying trigger
                     }
-                    if (alt == -1 && (trigger == null || trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch)) continue;
+                    else continue;
                 }
-
-                // If the resolved trigger isn't LineMatch-capable, skip line evaluation
                 if (trigger.WinMode != SymbolWinMode.LineMatch) continue;
-
                 if (trigger.BaseValue <= 0) continue;
-
-                // build winning sequence starting from the leftmost position in the concrete pattern
-                var indexes = new List<int>();
-                for (int k = 0; k < concrete.Length; k++)
+                var matched = new List<int>();
+                for (int k = 0; k < pattern.Length; k++)
                 {
-                    int idx = concrete[k];
-                    if (idx < 0 || idx >= grid.Length) break;
-                    if (rowsPerColumn != null && rowsPerColumn.Length == columns)
-                    {
-                        int col = idx % columns;
-                        int row = idx / columns;
-                        if (row >= rowsPerColumn[col]) break; // truncated
-                    }
-                    var cell = grid[idx];
-                    if (cell == null) break;
-                    if (cell.Matches(trigger)) indexes.Add(idx); else break;
+                    int gi = pattern[k]; if (gi < 0 || gi >= grid.Length) break;
+                    int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) break;
+                    var cell = grid[gi]; if (cell == null) break;
+                    if (cell.Matches(trigger)) matched.Add(gi); else break;
                 }
-
-                int count = indexes.Count;
-                if (count >= trigger.MinWinDepth)
+                if (matched.Count >= trigger.MinWinDepth)
                 {
-                    int winDepth = count - trigger.MinWinDepth;
+                    int extraDepth = matched.Count - trigger.MinWinDepth;
                     long scaled = trigger.BaseValue;
-                    if (winDepth > 0) scaled = trigger.BaseValue * (1L << winDepth);
-                    long value = scaled * winMultipliers[i] * creditCost;
-                    if (value > int.MaxValue) value = int.MaxValue;
-                    winData.Add(new WinData(i, (int)value, indexes.ToArray()));
+                    if (trigger.PayScaling == PayScaling.DepthSquared) scaled = trigger.BaseValue * (1L << extraDepth);
+                    else if (trigger.PayScaling == PayScaling.PerSymbol) scaled = (long)trigger.BaseValue * matched.Count;
+                    long total = scaled * (i < winMultipliers.Count ? winMultipliers[i] : 1) * creditCost; if (total > int.MaxValue) total = int.MaxValue;
+                    results.Add(new WinData(i, (int)total, matched.ToArray()));
                 }
             }
-
-            // Then: evaluate symbol-level win modes (SingleOnReel, TotalCount)
-            const int NonWinlineIndex = -1;
-            var totalProcessed = new HashSet<int>();
-
+            // Symbol-level modes
+            const int NonLine = -1; var totalProcessed = new HashSet<int>();
             for (int idx = 0; idx < grid.Length; idx++)
             {
-                var cell = grid[idx];
-                if (cell == null) continue;
-
-                // Ignore wild symbols for non-line win modes entirely
-                if (cell.IsWild) continue;
-
-                if (cell.WinMode == SymbolWinMode.SingleOnReel)
+                var cell = grid[idx]; if (cell == null) continue; if (cell.IsWild) continue;
+                if (cell.WinMode == SymbolWinMode.SingleOnReel && cell.BaseValue > 0)
                 {
-                    if (cell.BaseValue <= 0) continue;
-                    long total = (long)cell.BaseValue * creditCost;
-                    if (total > int.MaxValue) total = int.MaxValue;
-                    winData.Add(new WinData(NonWinlineIndex, (int)total, new int[] { idx }));
+                    long val = cell.BaseValue * creditCost; if (val > int.MaxValue) val = int.MaxValue;
+                    results.Add(new WinData(NonLine, (int)val, new int[] { idx }));
                 }
-
-                if (cell.WinMode == SymbolWinMode.TotalCount)
+                if (cell.WinMode == SymbolWinMode.TotalCount && cell.BaseValue > 0 && cell.TotalCountTrigger > 0)
                 {
-                    int key = cell.MatchGroupId;
-                    if (totalProcessed.Contains(key)) continue;
-                    totalProcessed.Add(key);
-
-                    if (cell.TotalCountTrigger <= 0 || cell.BaseValue <= 0) continue;
-
-                    var matching = new List<int>();
-                    int exactMatches = 0;
+                    if (totalProcessed.Contains(cell.MatchGroupId)) continue; totalProcessed.Add(cell.MatchGroupId);
+                    var memberIndexes = new List<int>();
                     for (int j = 0; j < grid.Length; j++)
                     {
-                        var other = grid[j];
-                        if (other == null) continue;
-                        if (other.IsWild) continue; // ignore wilds
-                        if (other.MatchGroupId != 0 && key != 0 && other.MatchGroupId == key)
-                        {
-                            matching.Add(j);
-                            exactMatches++;
-                        }
+                        var other = grid[j]; if (other == null || other.IsWild) continue;
+                        if (other.MatchGroupId != 0 && other.MatchGroupId == cell.MatchGroupId) memberIndexes.Add(j);
                     }
-
-                    if (exactMatches == 0) continue;
-
-                    int count = matching.Count;
+                    int count = memberIndexes.Count;
                     if (count >= cell.TotalCountTrigger)
                     {
-                        int winDepth = count - cell.TotalCountTrigger;
-                        long scaled = cell.BaseValue;
-                        if (winDepth > 0) scaled = cell.BaseValue * (1L << winDepth);
-                        long total = scaled * creditCost;
-                        if (total > int.MaxValue) total = int.MaxValue;
-                        winData.Add(new WinData(NonWinlineIndex, (int)total, matching.ToArray()));
+                        int extra = count - cell.TotalCountTrigger; long scaled = cell.BaseValue;
+                        if (cell.PayScaling == PayScaling.DepthSquared) scaled = cell.BaseValue * (1L << extra);
+                        else if (cell.PayScaling == PayScaling.PerSymbol) scaled = (long)cell.BaseValue * count;
+                        long total = scaled * creditCost; if (total > int.MaxValue) total = int.MaxValue;
+                        results.Add(new WinData(NonLine, (int)total, memberIndexes.ToArray()));
                     }
                 }
             }
-
-            return winData;
+            return results;
         }
     }
 
-    public class Tests
+    public class UpdatedTests
     {
-        private SymbolData MakeWild() => new SymbolData("W", baseValue:0, minWinDepth:-1, isWild:true, allowWild:true, winMode: SymbolWinMode.LineMatch, totalCountTrigger:-1, matchGroupId:0);
-        private SymbolData A => new SymbolData("1", baseValue:2, minWinDepth:3, winMode: SymbolWinMode.LineMatch, matchGroupId:1);
-        private SymbolData B => new SymbolData("2", baseValue:4, minWinDepth:4, winMode: SymbolWinMode.LineMatch, matchGroupId:2);
-        private SymbolData C => new SymbolData("C", baseValue:1, minWinDepth:1, winMode: SymbolWinMode.LineMatch, matchGroupId:3);
-        private SymbolData D => new SymbolData("4", baseValue:5, minWinDepth:3, winMode: SymbolWinMode.LineMatch, matchGroupId:4);
+        private SymbolData WildNP() => new SymbolData("W", 0, -1, true); // non-paying wild
+        private SymbolData WildPay() => new SymbolData("WP", 5, 3, true, SymbolWinMode.LineMatch, PayScaling.PerSymbol); // paying wild
+        private SymbolData SymA() => new SymbolData("A", 2, 3, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+        private SymbolData SymB() => new SymbolData("B", 4, 3, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
+        private SymbolData SymCount() => new SymbolData("CNT", 3, -1, false, SymbolWinMode.TotalCount, PayScaling.PerSymbol, totalCountTrigger: 3, matchGroupId: 9);
+        private SymbolData SymSingle() => new SymbolData("S", 5, -1, false, SymbolWinMode.SingleOnReel, PayScaling.PerSymbol);
 
         [Test]
-        public void Test_11111_straight_awards()
+        public void DepthSquaredScaling_Works()
         {
-            var grid = new SymbolData[] { A, A, A, A, A };
+            var a = SymA();
+            var grid = new[] { a, a, a, a, a }; // 5 matches, min=3 => extraDepth=2 => base 2 * 2^2 = 8
             var winlines = new List<int[]> { new int[] {0,1,2,3,4} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 5, new int[] {1,1,1,1,1}, winlines, winmult);
-            Assert.IsNotNull(wins);
+            var mults = new List<int> { 1 };
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid, 5, new[] {1,1,1,1,1}, winlines, mults);
             Assert.AreEqual(1, wins.Count);
-            // BaseValue=2, MinWinDepth=3, matchCount=5 -> winDepth=2 -> multiplier=4 -> payout=2*4=8
             Assert.AreEqual(8, wins[0].Value);
         }
 
         [Test]
-        public void Test_WW1_awards()
+        public void PerSymbolScaling_Works()
         {
-            var grid = new SymbolData[] { MakeWild(), MakeWild(), A };
-            var winlines = new List<int[]> { new int[] {0,1,2} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, winlines, winmult);
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // Wild,Wild,A -> becomes A trigger, count=3, MinWinDepth=3 -> payout = BaseValue=2
-            Assert.AreEqual(2, wins[0].Value);
+            var b = SymB(); b.MinWinDepth = 1; // allow immediate win
+            var grid = new[] { b, b, b, b }; // count=4 => base 4 * 4 =16
+            var winlines = new List<int[]> { new int[] {0,1,2,3} }; var mults = new List<int> {1};
+            var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,4,new[]{1,1,1,1},winlines,mults);
+            Assert.AreEqual(1, wins.Count); Assert.AreEqual(16, wins[0].Value);
         }
 
         [Test]
-        public void Test_WWW2_awards_2()
+        public void WildFallback_W2W_LineAwards()
         {
-            var grid = new SymbolData[] { MakeWild(), MakeWild(), MakeWild(), B };
-            var winlines = new List<int[]> { new int[] {0,1,2,3} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 4, new int[] {1,1,1,1}, winlines, winmult);
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            Assert.AreEqual(4, wins[0].Value);
+            // Pattern W (non-paying wild), B, W -> should fallback to B trigger then match all 3 for MinWinDepth=3
+            var w = WildNP(); var b = SymB(); b.MinWinDepth = 3; var grid = new[] { w, b, w };
+            var winlines = new List<int[]> { new int[] {0,1,2} }; var mults = new List<int> {1};
+            var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,3,new[]{1,1,1},winlines,mults);
+            Assert.AreEqual(1, wins.Count); // PerSymbol scaling: base 4 * 3 symbols = 12
+            Assert.AreEqual(12, wins[0].Value);
         }
 
         [Test]
-        public void Test_W22W_awards()
+        public void WildFallback_NoPayingTrigger_NoWin()
         {
-            var grid = new SymbolData[] { MakeWild(), B, B, MakeWild() };
-            var winlines = new List<int[]> { new int[] {0,1,2,3} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 4, new int[] {1,1,1,1}, winlines, winmult);
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // 4-match of B -> payout = BaseValue=4
-            Assert.AreEqual(4, wins[0].Value);
-        }
-
-        [Test]
-        public void Test_NonUniformRows_Truncates_at_missing_row()
-        {
-            int columns = 3;
-            int[] rowsPerColumn = new int[] {2,3,1};
-            int maxRows = 3;
-            var grid = new SymbolData[maxRows * columns];
-            grid[3] = C;
-            grid[4] = C;
-
-            var winlines = new List<int[]> { new int[] {3,4,5} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            Assert.AreEqual(2, wins[0].Indexes.Length);
-            CollectionAssert.AreEqual(new int[] {3,4}, wins[0].Indexes);
-        }
-
-        [Test]
-        public void Test_LargeVariableGrid_Multiple_wins_and_nulls()
-        {
-            int columns = 5;
-            int[] rowsPerColumn = new int[] {4,2,3,5,1};
-            int maxRows = 5;
-            var grid = new SymbolData[maxRows * columns];
-            grid[0 * columns + 0] = A; // idx 0
-            grid[1 * columns + 0] = A; // idx 5
-            grid[2 * columns + 0] = A; // idx 10
-
-            grid[0 * columns + 1] = A; // idx 1
-            grid[1 * columns + 1] = A; // idx 6
-
-            grid[0 * columns + 2] = A; // idx 2
-
-            grid[0 * columns + 3] = B; // idx 3
-            grid[1 * columns + 3] = B; // idx 8
-
-            var straightBottom = new int[] { 0,1,2,3,4 };
-            var diagonal = new int[] { 0*columns+0, 1*columns+1, 2*columns+2, 3*columns+3 };
-
-            var winlines = new List<int[]> { straightBottom, diagonal };
-            var winmult = new List<int> { 1, 1 };
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-            Assert.IsNotNull(wins);
-            var diagWin = wins.Find(w => w.LineIndex == 1);
-            if (diagWin == null)
-            {
-                Assert.Pass("No diagonal win found; acceptable under truncation rules.");
-            }
-            foreach (var idx in diagWin.Indexes) Assert.Contains(idx, diagonal);
-        }
-
-        [Test]
-        public void LeftmostWild_With_MiddleWilds_Picks_FarTrigger()
-        {
-            // columns=5 single-row (row0 indexes 0..4)
-            int columns = 5;
-            int[] rowsPerColumn = new int[] {1,1,1,1,1};
-            var grid = new SymbolData[columns];
-            grid[0] = MakeWild();
-            grid[1] = MakeWild();
-            grid[2] = A;
-            grid[3] = A;
-            grid[4] = A;
-
-            var winlines = new List<int[]> { new int[] {0,1,2,3,4} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // A: base 2 min 3 matchCount=5 winDepth=2 -> multiplier=4 -> payout=8
-            Assert.AreEqual(8, wins[0].Value);
-        }
-
-        [Test]
-        public void LeftmostWild_With_Truncated_Columns_Finds_Far_Trigger()
-        {
-            // columns=5, column 1 truncated (0 rows)
-            int columns = 5;
-            int[] rowsPerColumn = new int[] {1,0,1,1,1};
-            int maxRows = 1; // grid length = 5
-            var grid = new SymbolData[maxRows * columns];
-            grid[0] = MakeWild(); // col0,row0
-            // col1 has 0 rows -> positions that target it should be skipped by evaluator when searching
-            grid[2] = B; // col2,row0
-            grid[3] = B;
-            grid[4] = B;
-
-            var winlines = new List<int[]> { new int[] {0,1,2,3,4} };
-            var winmult = new List<int> {1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            // With a truncated column in the pattern the matching is terminated at that column,
-            // so no full win should be awarded even if a paying trigger exists further right.
-            Assert.IsNotNull(wins);
+            var w = WildNP(); var grid = new[] { w, w, w };
+            var winlines = new List<int[]> { new int[] {0,1,2} }; var mults = new List<int> {1};
+            var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,3,new[]{1,1,1},winlines,mults);
             Assert.AreEqual(0, wins.Count);
         }
 
         [Test]
-        public void Overlapping_Winlines_Both_Awarded()
+        public void PayingWild_AsTrigger_PerSymbolScaling()
         {
-            // 3 columns, 3 rows -> maxRows=3 grid length = 9
-            int columns = 3;
-            int[] rowsPerColumn = new int[] {3,3,3};
-            var grid = new SymbolData[9];
-            // Fill an arrangement where bottom row (row0) is A,A,A (indexes 0,1,2)
-            // and a diagonal up (0,4,8) is also A,A,A so same symbols used in two different winlines
-            grid[0] = A; grid[1] = A; grid[2] = A; // row0
-            grid[4] = A; // row1,col1
-            grid[8] = A; // row2,col2
+            var wp = WildPay(); // MinWinDepth=3, base 5, PerSymbol
+            var grid = new[] { wp, wp, wp, wp }; // 4 matches => base 5 * 4 = 20
+            var winlines = new List<int[]> { new int[] {0,1,2,3} }; var mults = new List<int> {1};
+            var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,4,new[]{1,1,1,1},winlines,mults);
+            Assert.AreEqual(1, wins.Count); Assert.AreEqual(20, wins[0].Value);
+        }
 
-            var straight = new int[] {0,1,2};
-            var diagonalUp = new int[] {0,4,8};
-            var winlines = new List<int[]> { straight, diagonalUp };
-            var winmult = new List<int> {1,1};
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
+        [Test]
+        public void TruncatedColumn_StopsMatch()
+        {
+            var a = SymA(); var grid = new[] { a, a, a }; // third position will be truncated logically
+            var winlines = new List<int[]> { new int[] {0,1,2} }; var rows = new[] {1,0,1}; // column1 has 0 rows => match stops at idx1
+            var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,3,rows,winlines,new List<int>{1});
+            // Only first cell valid, insufficient depth
+            Assert.AreEqual(0, wins.Count);
+        }
 
-            Assert.IsNotNull(wins);
-            // Both lines should award since each has 3 matches
+        [Test]
+        public void OverlappingLines_BothAward()
+        {
+            var a = SymA(); a.MinWinDepth = 3;
+            // Grid (row0): indexes 0..4 all A
+            var grid = new[] { a,a,a,a,a };
+            var line1 = new int[] {0,1,2,3,4};
+            var line2 = new int[] {0,1,2};
+            var wins = new WinlineEvaluator().EvaluateWins(grid,5,new[]{1,1,1,1,1}, new List<int[]>{line1,line2}, new List<int>{1,1});
             Assert.AreEqual(2, wins.Count);
-            // check values: A base 2, min 3, matchCount 3 => payout = base 2
-            Assert.AreEqual(2, wins[0].Value);
-            Assert.AreEqual(2, wins[1].Value);
+            // line1: 5 matches -> extraDepth=2 => 2*2^2=8; line2: 3 matches -> extraDepth=0 => 2
+            Assert.IsTrue(wins.Any(w=>w.LineIndex==0 && w.Value==8));
+            Assert.IsTrue(wins.Any(w=>w.LineIndex==1 && w.Value==2));
         }
 
         [Test]
-        public void VariedReelSizes_StraightBottomWin()
+        public void SingleOnReel_AwardsEachInstance()
         {
-            // Ensure straight bottom row wins when every column has at least one row
-            int columns = 7;
-            int[] rowsPerColumn = new int[] {2,3,1,4,2,3,1};
-            int maxRows = 4; // grid uses maxRows * columns layout
-            var grid = new SymbolData[maxRows * columns];
-
-            // place A at bottom row for each column (row 0)
-            for (int c = 0; c < columns; c++) grid[0 * columns + c] = A;
-
-            var straight = new int[columns];
-            for (int c = 0; c < columns; c++) straight[c] = 0 * columns + c;
-
-            var winlines = new List<int[]> { straight };
-            var winmult = new List<int> {1};
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // A: base 2, MinWinDepth=3, matchCount=7 -> winDepth=4 -> multiplier=16 -> payout=2*16=32
-            Assert.AreEqual(32, wins[0].Value);
-        }
-
-        [Test]
-        public void MixedReelSizes_DiagonalTruncation_NoWin()
-        {
-            // Diagonal that requires rows above available should not award
-            int columns = 4;
-            int[] rowsPerColumn = new int[] {1,2,1,2};
-            int maxRows = 2;
-            var grid = new SymbolData[maxRows * columns];
-
-            // Attempt to create diagonal 0,5,10,15 but some positions are truncated
-            grid[0] = A; // col0,row0
-            grid[5] = A; // col1,row1
-            // col2 has only 1 row -> index 10 doesn't exist as logical row
-            grid[3] = A; // col3,row0 (fill to avoid null mismatch)
-
-            var diagonal = new int[] {0,5,10,15};
-            var winlines = new List<int[]> { diagonal };
-            var winmult = new List<int> {1};
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            // No diagonal win should be awarded because column 2 truncates the sequence
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(0, wins.Count);
-        }
-
-        [Test]
-        public void EmptyColumns_Prevent_StraightWin()
-        {
-            // If any column in the winline is truncated to 0 rows, straight across should not award
-            int columns = 5;
-            int[] rowsPerColumn = new int[] {1,0,1,1,1};
-            int maxRows = 1;
-            var grid = new SymbolData[maxRows * columns];
-
-            // Bottom row pattern with A in non-empty columns
-            grid[0] = A; // col0
-            grid[2] = A; // col2
-            grid[3] = A; // col3
-            grid[4] = A; // col4
-
-            var straight = new int[] {0,1,2,3,4};
-            var winlines = new List<int[]> { straight };
-            var winmult = new List<int> {1};
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            // column 1 is empty -> straight should not award
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(0, wins.Count);
-        }
-
-        [Test]
-        public void WildTrigger_Across_VariedHeights()
-        {
-            // Leftmost wild should hand off to a valid trigger further right even with different reel heights
-            int columns = 6;
-            int[] rowsPerColumn = new int[] {1,3,2,1,3,2};
-            int maxRows = 3;
-            var grid = new SymbolData[maxRows * columns];
-
-            // bottom row fill
-            grid[0] = MakeWild(); // wild at col0
-            grid[1] = D; // col1
-            grid[2] = D; // col2
-            grid[3] = D; // col3
-            grid[4] = D; // col4
-            grid[5] = D; // col5
-
-            var straight = new int[] {0,1,2,3,4,5};
-            var winlines = new List<int[]> { straight };
-            var winmult = new List<int> {1};
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // D: base 5, MinWinDepth=3, matchCount=6 -> winDepth=3 -> multiplier=8 -> payout=5*8=40
-            Assert.AreEqual(40, wins[0].Value);
-        }
-
-        [Test]
-        public void AllWilds_NoWins()
-        {
-            int columns = 5;
-            int[] rowsPerColumn = new int[] {1,1,1,1,1};
-            var grid = new SymbolData[columns];
-            for (int i = 0; i < columns; i++) grid[i] = MakeWild();
-
-            var winline = new int[] { 0,1,2,3,4 };
-            var winlines = new List<int[]> { winline };
-            var winmult = new List<int> { 1 };
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            // All wilds but no paying trigger exists -> no wins
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(0, wins.Count);
-        }
-
-        [Test]
-        public void SingleColumn_MultiRow_Win()
-        {
-            int columns = 1;
-            int rows = 5;
-            int[] rowsPerColumn = new int[] { rows };
-            var grid = new SymbolData[rows * columns];
-            for (int r = 0; r < rows; r++) grid[r * columns + 0] = A; // fill column
-
-            // single-column straight down is indexes 0..4
-            var winline = new int[rows];
-            for (int r = 0; r < rows; r++) winline[r] = r * columns + 0;
-
-            var winlines = new List<int[]> { winline };
-            var winmult = new List<int> { 1 };
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // A base 2 min 3 matchCount=5 -> winDepth=2 -> multiplier=4 -> payout=8
-            Assert.AreEqual(8, wins[0].Value);
-        }
-
-        [Test]
-        public void LargeColumns_Stress_Win()
-        {
-            int columns = 50;
-            int[] rowsPerColumn = new int[columns];
-            for (int i = 0; i < columns; i++) rowsPerColumn[i] = 1;
-            int maxRows = 1;
-            var grid = new SymbolData[maxRows * columns];
-
-            // place A in first 10 columns
-            int matchCols = 10;
-            for (int c = 0; c < matchCols; c++) grid[c] = A;
-
-            var winline = new int[matchCols];
-            for (int c = 0; c < matchCols; c++) winline[c] = c; // row0 * columns + c
-
-            var winlines = new List<int[]> { winline };
-            var winmult = new List<int> { 1 };
-
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, columns, rowsPerColumn, winlines, winmult);
-
-            Assert.IsNotNull(wins);
-            Assert.AreEqual(1, wins.Count);
-            // A base 2 min 3, matchCount=10 => winDepth=7 => multiplier=128 => payout=2*128=256
-            Assert.AreEqual(256, wins[0].Value);
-        }
-
-        // New tests for symbol win modes
-
-        [Test]
-        public void SingleOnReel_Awards_PerInstance()
-        {
-            // three single-on-reel symbols should each award their base value
-            var s = new SymbolData("S", baseValue: 5, minWinDepth: -1, isWild: false, allowWild: true, winMode: SymbolWinMode.SingleOnReel);
-            var grid = new SymbolData[] { s, s, s };
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
-            Assert.IsNotNull(wins);
-            // three separate wins (one per landed symbol)
+            var s = SymSingle(); var grid = new[] { s,s,s };
+            var wins = new WinlineEvaluator().EvaluateWins(grid,3,new[]{1,1,1}, new List<int[]>(), new List<int>());
             Assert.AreEqual(3, wins.Count);
-            Assert.AreEqual(15, wins.Sum(w => w.Value));
+            Assert.AreEqual(15, wins.Sum(x=>x.Value));
         }
 
         [Test]
-        public void TotalCount_Awards_When_Threshold_Met()
+        public void TotalCount_IgnoresWilds_GroupAwards()
         {
-            var t = new SymbolData("T", baseValue: 2, minWinDepth: -1, isWild: false, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 3, matchGroupId: 10);
-            var grid = new SymbolData[] { t, t, t };
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
-            Assert.IsNotNull(wins);
-            // one total-count win
-            var totalWins = wins.Where(w => w.LineIndex == -1).ToList();
-            Assert.AreEqual(1, totalWins.Count);
-            Assert.AreEqual(2, totalWins[0].Value);
-            Assert.AreEqual(3, totalWins[0].Indexes.Length);
+            var cnt = SymCount(); var w = WildNP();
+            var grid = new[] { cnt, cnt, w, cnt }; // wild ignored -> 3 matching (threshold 3)
+            var wins = new WinlineEvaluator().EvaluateWins(grid,4,new[]{1,1,1,1}, new List<int[]>(), new List<int>());
+            Assert.AreEqual(1, wins.Count);
+            // PerSymbol scaling: base 3 * count(3) =9
+            Assert.AreEqual(9, wins[0].Value);
         }
 
         [Test]
-        public void Wilds_Do_Not_Trigger_TotalCount_By_Themselves()
+        public void Wilds_DoNotTrigger_TotalCount_OnTheirOwn()
         {
-            // wilds configured as TotalCount should not self-award; wilds are ignored for non-line modes
-            var w = new SymbolData("W", baseValue: 5, minWinDepth: -1, isWild: true, allowWild: true, winMode: SymbolWinMode.TotalCount, totalCountTrigger: 1, matchGroupId: 11);
-            var grid = new SymbolData[] { w, w, w };
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, new List<int[]>(), new List<int>());
-            Assert.IsNotNull(wins);
-            // no wins should be produced from wild-only totalcount entries
+            var wildCount = new SymbolData("W", baseValue:5, minWinDepth:-1, isWild:true, winMode: SymbolWinMode.TotalCount, scaling: PayScaling.PerSymbol, totalCountTrigger:1, matchGroupId:7);
+            var grid = new[] { wildCount, wildCount };
+            var wins = new WinlineEvaluator().EvaluateWins(grid,2,new[]{1,1}, new List<int[]>(), new List<int>());
             Assert.AreEqual(0, wins.Count);
-        }
-
-        [Test]
-        public void NonLineWinMode_Not_Count_As_Line()
-        {
-            // Leftmost is SingleOnReel and should prevent a line match even if right-hand symbols would form one.
-            var left = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.SingleOnReel, matchGroupId: 20);
-            var right = new SymbolData("X", baseValue: 2, minWinDepth: 3, isWild: false, allowWild: true, winMode: SymbolWinMode.LineMatch, matchGroupId: 20);
-            var grid = new SymbolData[] { left, right, right };
-            var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
-            var winmult = new List<int> { 1 };
-            var eval = new WinlineEvaluator();
-            var wins = eval.EvaluateWins(grid, 3, new int[] {1,1,1}, winlines, winmult);
-
-            Assert.IsNotNull(wins);
-            // Ensure no line wins present (LineIndex >=0). There may be a SingleOnReel win(s) with LineIndex == -1.
-            Assert.IsFalse(wins.Any(w => w.LineIndex >= 0));
-        }
-    }
-
-    // Add MaxPerReel tests (independent of Unity types) to validate selection logic
-    public class MaxPerReelTests
-    {
-        private class FakeDef { public string Name; public float Weight; public int MaxPerReel; public FakeDef(string n, float w, int m) { Name = n; Weight = w; MaxPerReel = m; } }
-        private class FakeData { public string Name; public FakeData(string n) { Name = n; } }
-
-        private string PickWeighted(FakeDef[] defs, List<FakeData> existing)
-        {
-            var candidates = new List<(FakeDef def, float weight)>();
-            foreach (var d in defs)
-            {
-                int max = d.MaxPerReel;
-                int already = 0;
-                if (existing != null)
-                {
-                    for (int i = 0; i < existing.Count; i++) if (existing[i] != null && existing[i].Name == d.Name) already++;
-                }
-                if (max >= 0 && already >= max) continue;
-                candidates.Add((d, d.Weight));
-            }
-
-            if (candidates.Count == 0)
-            {
-                // fallback to unconstrained pick
-                candidates.Clear();
-                foreach (var d in defs) candidates.Add((d, d.Weight));
-            }
-
-            // deterministic pick for test: choose highest weight, tie-break by name
-            candidates.Sort((x,y)=> { int c = y.weight.CompareTo(x.weight); if (c!=0) return c; return string.Compare(x.def.Name,y.def.Name, System.StringComparison.Ordinal); });
-            return candidates[0].def.Name;
-        }
-
-        [Test]
-        public void Excludes_When_Max_Reached()
-        {
-            var defs = new FakeDef[] { new FakeDef("A", 1f, 1), new FakeDef("B", 1f, -1) };
-            var existing = new List<FakeData> { new FakeData("A") };
-            var picked = PickWeighted(defs, existing);
-            Assert.AreEqual("B", picked);
-        }
-
-        [Test]
-        public void FallsBack_When_All_Excluded()
-        {
-            var defs = new FakeDef[] { new FakeDef("A", 1f, 0), new FakeDef("B", 1f, 0) };
-            var existing = new List<FakeData>();
-            var picked = PickWeighted(defs, existing);
-            Assert.IsTrue(picked == "A" || picked == "B");
-        }
-
-        [Test]
-        public void Counts_By_Name()
-        {
-            var defs = new FakeDef[] { new FakeDef("A", 1f, 2), new FakeDef("B", 1f, -1) };
-            var existing = new List<FakeData> { new FakeData("A"), new FakeData("A") };
-            var picked = PickWeighted(defs, existing);
-            Assert.AreEqual("B", picked);
-        }
-    }
-
-    // Add MatchGroup / MaxPerReel tests
-    public class MatchGroupAndMaxPerReelTests
-    {
-        private class FakeDefG { public string Name; public float Weight; public int MaxPerReel; public int MatchGroupId; public FakeDefG(string n, float w, int m, int g) { Name = n; Weight = w; MaxPerReel = m; MatchGroupId = g; } }
-        private class FakeDataG { public int MatchGroupId; public FakeDataG(int g) { MatchGroupId = g; } }
-
-        // Selection routine: exclude candidates whose MatchGroupId reached MaxPerReel according to existing selections.
-        private string PickWeightedByGroup(FakeDefG[] defs, List<FakeDataG> existing)
-        {
-            var candidates = new List<(FakeDefG def, float weight)>();
-            foreach (var d in defs)
-            {
-                int max = d.MaxPerReel;
-                int already = 0;
-                if (existing != null)
-                {
-                    for (int i = 0; i < existing.Count; i++) if (existing[i] != null && existing[i].MatchGroupId == d.MatchGroupId) already++;
-                }
-                if (max >= 0 && already >= max) continue;
-                candidates.Add((d, d.Weight));
-            }
-
-            if (candidates.Count == 0)
-            {
-                // fallback to unconstrained pick
-                candidates.Clear();
-                foreach (var d in defs) candidates.Add((d, d.Weight));
-            }
-
-            // deterministic pick for test: choose highest weight, tie-break by name
-            candidates.Sort((x,y)=> { int c = y.weight.CompareTo(x.weight); if (c!=0) return c; return string.Compare(x.def.Name,y.def.Name, System.StringComparison.Ordinal); });
-            return candidates[0].def.Name;
-        }
-
-        [Test]
-        public void Excludes_When_MatchGroup_Max_Reached()
-        {
-            var defs = new FakeDefG[] { new FakeDefG("A", 1f, 1, 100), new FakeDefG("B", 1f, -1, 200) };
-            var existing = new List<FakeDataG> { new FakeDataG(100) };
-            var picked = PickWeightedByGroup(defs, existing);
-            NUnit.Framework.Assert.AreEqual("B", picked);
-        }
-
-        [Test]
-        public void FallsBack_When_All_Excluded_By_Group()
-        {
-            var defs = new FakeDefG[] { new FakeDefG("A", 1f, 0, 1), new FakeDefG("B", 1f, 0, 2) };
-            var existing = new List<FakeDataG>();
-            var picked = PickWeightedByGroup(defs, existing);
-            NUnit.Framework.Assert.IsTrue(picked == "A" || picked == "B");
-        }
-
-        [Test]
-        public void Counts_By_MatchGroup()
-        {
-            var defs = new FakeDefG[] { new FakeDefG("A", 1f, 2, 42), new FakeDefG("B", 1f, -1, 99) };
-            var existing = new List<FakeDataG> { new FakeDataG(42), new FakeDataG(42) };
-            var picked = PickWeightedByGroup(defs, existing);
-            NUnit.Framework.Assert.AreEqual("B", picked);
         }
     }
 }

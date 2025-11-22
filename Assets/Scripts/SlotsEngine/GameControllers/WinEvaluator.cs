@@ -360,48 +360,34 @@ public class WinEvaluator : Singleton<WinEvaluator>
                 continue;
             }
 
-            // If the trigger isn't a LineMatch-capable symbol, skip line evaluation.
-            // However allow wild leftmost to hand off to a LineMatch candidate further along the line.
-            if (trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch)
+            // Fallback: also treat a leftmost wild with non-positive BaseValue as needing substitution.
+            bool needsFallback = (trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch) || (trigger.IsWild && trigger.BaseValue <= 0);
+            if (needsFallback)
             {
                 if (trigger.IsWild)
                 {
                     int altIndex = -1;
                     for (int s = 1; s < concrete.Length; s++)
                     {
-                        int si = concrete[s];
-                        if (si < 0 || si >= grid.Length) continue; // skip invalid entries, continue searching
-                        int col = si % columns;
-                        int row = si / columns;
-                        if (row >= rowsPerColumn[col]) continue; // truncated column - skip and continue
-
-                        var candidate = grid[si];
-                        if (candidate == null) continue;
-                        // Prefer the first non-wild symbol that can trigger line wins and has a positive BaseValue
-                        if (!candidate.IsWild && candidate.MinWinDepth >= 0 && candidate.BaseValue > 0 && candidate.WinMode == SymbolWinMode.LineMatch)
-                        {
-                            altIndex = si;
-                            break;
-                        }
+                        int si = concrete[s]; if (si < 0 || si >= grid.Length) continue;
+                        int col = si % columns; int row = si / columns; if (row >= rowsPerColumn[col]) continue;
+                        var cand = grid[si]; if (cand == null) continue;
+                        if (!cand.IsWild && cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
+                        { altIndex = si; trigger = cand; break; }
                     }
-
                     if (altIndex >= 0)
                     {
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"Winline {i}: leftmost is wild without multipliers; using symbol at idx={altIndex} ('{grid[altIndex].Name}') as trigger.");
-                        trigger = grid[altIndex];
+                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"Winline {i}: leftmost wild fallback -> using idx={altIndex} '{trigger.Name}' as trigger.");
                     }
                     else
                     {
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger line wins (MinWinDepth={trigger.MinWinDepth}, WinMode={trigger.WinMode}).");
+                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"Winline {i}: no valid fallback trigger found for leading wild '{trigger.Name}'.");
                         continue;
                     }
                 }
                 else
                 {
-                    if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                        Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger line wins (MinWinDepth={trigger.MinWinDepth}, WinMode={trigger.WinMode}).");
+                    if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger line wins (MinWinDepth={trigger.MinWinDepth}, WinMode={trigger.WinMode}).");
                     continue;
                 }
             }

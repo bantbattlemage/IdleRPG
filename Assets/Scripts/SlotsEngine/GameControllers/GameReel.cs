@@ -109,7 +109,6 @@ public class GameReel : MonoBehaviour
         completeOnNextSpin = false; DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() => { BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () => { FallOut(solution, true); spinning = true; eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); }); });
     }
     public void StopReel(float delay = 0f) { DOTween.Sequence().AppendInterval(delay).AppendCallback(() => { completeOnNextSpin = true; if (activeSpinTweens[0] != null) activeSpinTweens[0].timeScale = 4f; if (activeSpinTweens[1] != null) activeSpinTweens[1].timeScale = 4f; }); }
-    public void ApplySolution(List<SymbolDefinition> symbols) { }
 
     private void SpawnNextReel(List<SymbolData> solution = null)
     {
