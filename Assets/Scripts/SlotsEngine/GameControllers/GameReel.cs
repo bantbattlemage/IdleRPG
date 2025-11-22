@@ -20,6 +20,9 @@ public class GameReel : MonoBehaviour
 
 	public List<GameSymbol> Symbols => symbols;
 
+	// Reference to owning SlotsEngine (set by SlotsEngine after creation)
+	public SlotsEngine ParentEngine { get; private set; }
+	public void SetParentEngine(SlotsEngine engine) { ParentEngine = engine; }
 
 	// Persistent roots (no longer created/destroyed each spin)
 	private Transform symbolRoot;
@@ -40,6 +43,36 @@ public class GameReel : MonoBehaviour
 	private Tweener[] activeSpinTweens = new Tweener[2];
 
 	private EventManager eventManager;
+
+	/// <summary>
+	/// Helper: compute the maximum symbol step (size+spacing) among sibling reels in the same SlotsEngine.
+	/// Falls back to this reel's step when ParentEngine is not set.
+	/// </summary>
+	private float GetMaxSiblingStep()
+	{
+		float myStep = currentReelData.SymbolSize + currentReelData.SymbolSpacing;
+		if (ParentEngine == null) return myStep;
+
+		try
+		{
+			var siblings = ParentEngine.CurrentReels;
+			if (siblings == null || siblings.Count == 0) return myStep;
+
+			float max = myStep;
+			foreach (var r in siblings)
+			{
+				if (r == null || r.CurrentReelData == null) continue;
+				float s = r.CurrentReelData.SymbolSize + r.CurrentReelData.SymbolSpacing;
+				if (s > max) max = s;
+			}
+
+			return max;
+		}
+		catch
+		{
+			return myStep; // defensive
+		}
+	}
 
 	/// <summary>
 	/// Initialize using a ReelStripDefinition asset. Creates a runtime strip instance.
@@ -312,52 +345,63 @@ public class GameReel : MonoBehaviour
 	/// <summary>
 	/// Spawn dummy symbols used to pad the reel visuals above and below the active range.
 	/// `bottom` controls which side to create. When `dim` is true the dummy images are tinted to a dim color.
+	/// This version respects sibling reels' step and may repeat the base dummy block so taller sibling reels
+	/// don't cause the top of the dummy array to be visible on smaller reels.
 	/// </summary>
 	private List<GameSymbol> SpawnDummySymbols(Transform root, bool bottom = true, List<SymbolData> symbolData = null, bool dim = true, List<SymbolData> existingSelections = null)
 	{
 		List<GameSymbol> dummies = new List<GameSymbol>();
 
-		int startIndex = !bottom ? currentReelData.SymbolCount : 1;
+		if (currentReelData == null || root == null) return dummies;
+
+		int baseStartIndex = !bottom ? currentReelData.SymbolCount : 1;
 		int flip = bottom ? -1 : 1;
-		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount; 		
+		int baseTotal = bottom ? Math.Max(0, currentReelData.SymbolCount - 1) : currentReelData.SymbolCount;
 		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
 
-		// Color used for initial dimming
+		// Determine repeats based on largest sibling step so visual extents match across reels
+		float maxSiblingStep = GetMaxSiblingStep();
+		int repeats = 1;
+		if (step > 0f)
+		{
+			repeats = Mathf.Max(1, Mathf.CeilToInt(maxSiblingStep / step));
+		}
+		repeats = Mathf.Min(repeats, 8); // cap
+
 		Color dimColor = new Color(0.5f, 0.5f, 0.5f);
 
-		for (int i = 0; i < total; i++)
+		for (int r = 0; r < repeats; r++)
 		{
-			GameSymbol symbol = GameSymbolPool.Instance.Get(root);
-
-			SymbolData def;
-			if (symbolData != null)
+			for (int i = 0; i < baseTotal; i++)
 			{
-				def = symbolData[i];
+				GameSymbol symbol = GameSymbolPool.Instance.Get(root);
+
+				SymbolData def;
+				if (symbolData != null && symbolData.Count > 0)
+				{
+					def = symbolData[i % symbolData.Count];
+				}
+				else
+				{
+					def = reelStrip.GetWeightedSymbol(existingSelections);
+				}
+
+				symbol.InitializeSymbol(def, eventManager);
+
+				float y = (step * (i + baseStartIndex + (r * baseTotal))) * flip;
+				symbol.SetSizeAndLocalY(currentReelData.SymbolSize, y);
+
+				symbol.ApplySymbol(def);
+
+				var img = symbol.CachedImage;
+				if (img != null)
+				{
+					img.DOKill();
+					img.color = dim ? dimColor : Color.white;
+				}
+
+				dummies.Add(symbol);
 			}
-			else
-			{
-				def = reelStrip.GetWeightedSymbol(existingSelections);
-			}
-
-			symbol.InitializeSymbol(def, eventManager);
-
-			// Use helper to set size and Y in one call
-			float y = (step * (i + startIndex)) * flip;
-			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-
-			// Apply sprite after positioning
-			symbol.ApplySymbol(def);
-
-			// Apply initial color according to `dim` flag. If dim==true (default for initialization/adjust),
-			// set to the dim color immediately. If dim==false (used when spawning buffer during spin), keep white.
-			var img = symbol.CachedImage;
-			if (img != null)
-			{
-				img.DOKill();
-				img.color = dim ? dimColor : Color.white;
-			}
-
-			dummies.Add(symbol);
 		}
 
 		return dummies;
@@ -664,6 +708,13 @@ public class GameReel : MonoBehaviour
 		// Ensure dummy symbols reflect dimmed state when resizing outside of a spin.
 		if (!spinning)
 		{
+			// Recreate dummy symbols to ensure counts/padding account for sibling reel sizes immediately.
+			if (topDummySymbols != null) { for (int i = 0; i < topDummySymbols.Count; i++) if (topDummySymbols[i] != null) GameSymbolPool.Instance.Release(topDummySymbols[i]); topDummySymbols.Clear(); }
+			if (bottomDummySymbols != null) { for (int i = 0; i < bottomDummySymbols.Count; i++) if (bottomDummySymbols[i] != null) GameSymbolPool.Instance.Release(bottomDummySymbols[i]); bottomDummySymbols.Clear(); }
+
+			// Spawn updated dummies under the active root using current selections to respect MaxPerReel
+			bottomDummySymbols = SpawnDummySymbols(symbolRoot, true, null, true, currentReelData.CurrentSymbolData);
+			topDummySymbols = SpawnDummySymbols(symbolRoot, false, null, true, currentReelData.CurrentSymbolData);
 			DimDummySymbols();
 		}
 	}

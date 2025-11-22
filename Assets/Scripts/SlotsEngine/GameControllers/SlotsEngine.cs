@@ -249,6 +249,9 @@ public class SlotsEngine : MonoBehaviour
 			GameObject g = Instantiate(reelPrefab, reelsGroup.transform);
 			GameReel reel = g.GetComponent<GameReel>();
 
+			// Ensure the reel knows its parent engine before initialization so it can consult siblings
+			reel.SetParentEngine(this);
+
 			if (data.CurrentReelStrip != null)
 			{
 				reel.InitializeReel(data, i, eventManager, data.CurrentReelStrip);
@@ -319,6 +322,9 @@ public class SlotsEngine : MonoBehaviour
 		GameObject g = Instantiate(reelPrefab, currentReelsGroup);
 		GameReel reel = g.GetComponent<GameReel>();
 		int newIndex = reels.Count;
+
+		// Ensure parent engine is set before initialization
+		reel.SetParentEngine(this);
 
 		if (newReelData.CurrentReelStrip != null)
 		{
@@ -437,6 +443,9 @@ public class SlotsEngine : MonoBehaviour
 		GameObject g = Instantiate(reelPrefab, currentReelsGroup);
 		GameReel reel = g.GetComponent<GameReel>();
 
+		// ensure parent engine set prior to initialization
+		reel.SetParentEngine(this);
+
 		// initialize with provided strip or default
 		if (newReelData.CurrentReelStrip != null)
 		{
@@ -508,7 +517,7 @@ public class SlotsEngine : MonoBehaviour
 
 	/// <summary>
 	/// Reinitialize remaining reels so their IDs and positions match list indices.
-	/// This calls InitializeReel on each reel to update internal ids and layout values.
+	/// This calls InitializeReel on each reel to update internal ids and layout.
 	/// Also refreshes dummy symbols on all reels to handle changes in max symbol count.
 	/// </summary>
 	private void RefreshReelsAfterModification()
@@ -517,6 +526,9 @@ public class SlotsEngine : MonoBehaviour
 		{
 			var r = reels[i];
 			if (r == null) continue;
+
+			// Ensure parent engine is set so reels can compute sibling metrics during initialization
+			r.SetParentEngine(this);
 
 			// Re-initialize reel to update its internal id and layout. Preserve its current strip.
 			ReelData data = r.CurrentReelData;
