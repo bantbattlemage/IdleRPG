@@ -1,6 +1,10 @@
 using System;
 
 [System.Serializable]
+/// <summary>
+/// Root save data container serialized to disk per profile.
+/// Contains dictionaries for all runtime data types keyed by their manager-assigned AccessorIds.
+/// </summary>
 public class GameData
 {
 	public long lastUpdated;

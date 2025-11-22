@@ -4,6 +4,16 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Manages creation and layout of multiple `SlotsEngine` instances across paged UI containers.
+/// Responsibilities:
+/// - Creates/destroys slots, assigns them to display pages and wires up reel-changed handlers.
+/// - Computes responsive GridLayout cell sizes and forwards sizing to individual slots (AdjustReelSize).
+/// - Provides navigation between pages and ensures proper button visibility.
+/// 
+/// Notes:
+/// - Applies layout changes on page/slot count changes via `AdjustSlotsCanvases` and for single-slot changes via `AdjustSlotCanvas`.
+/// </summary>
 public class SlotsEngineManager : Singleton<SlotsEngineManager>
 {
 	[SerializeField] private Transform slotsPagesRoot;
@@ -30,6 +40,9 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 	private void OnNextPageButtonPressed() => OnSlotsPageButtonPressed(1);
 	private void OnPrevPageButtonPressed() => OnSlotsPageButtonPressed(-1);
 
+	/// <summary>
+	/// Navigate the page index by +/- 1 and update visibility/layout.
+	/// </summary>
 	private void OnSlotsPageButtonPressed(object obj)
 	{
 		int adjust = (int)obj; currentSlotPageIndex += adjust; currentSlotsDisplayPage.transform.SetAsLastSibling();
@@ -38,6 +51,10 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		foreach (SlotsDisplayPage page in slotsDisplayPages) page.ToggleRenderers(page == currentSlotsDisplayPage);
 	}
 
+	/// <summary>
+	/// Creates a new `SlotsEngine` and places it on the current (or newly created) display page.
+	/// When `existingData` is provided, the engine is initialized using that data; otherwise a test definition is used.
+	/// </summary>
 	public SlotsEngine CreateSlots(SlotsData existingData = null)
 	{
 		SlotsDisplayPage pageToUse;
@@ -60,6 +77,10 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		return newSlots;
 	}
 
+	/// <summary>
+	/// Destroys an existing slot instance, removes its page entry and cleans up associated data and UI.
+	/// Automatically updates page navigation visibility.
+	/// </summary>
 	public void DestroySlots(SlotsEngine slotsToDestroy)
 	{
 		if (!slotsEngines.Contains(slotsToDestroy)) throw new Exception("Tried to remove slots that engine doesn't have! Something has gone wrong");
@@ -156,6 +177,9 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		s.AdjustReelSize(cellHeight, cellWidth);
 	}
 
+	/// <summary>
+	/// Re-parents all slots on the current page back to the Grid container.
+	/// </summary>
 	public void MovePageSlotsToGrid()
 	{
 		foreach (SlotsEngine slot in currentSlotsDisplayPage.slotsToDisplay) slot.ReelsRootTransform.SetParent(currentSlotsDisplayPage.gridGroup, false);

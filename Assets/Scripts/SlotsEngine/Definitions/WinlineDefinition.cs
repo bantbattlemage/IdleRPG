@@ -10,7 +10,7 @@ public class WinlineDefinition : ScriptableObject
     [SerializeField] private int rowIndex = 0; // 0 = bottom visual row
     [SerializeField] private int rowOffset = 0; // diagonal start offset
     [SerializeField] private int[] customRowOffsets; // per-column rows (Custom pattern)
-    [SerializeField] private bool runtimeTransient = false; // identifies runtime-created temporary lines
+    [HideInInspector][SerializeField] private bool runtimeTransient = false; // identifies runtime-created temporary lines
 
     // Public accessors (unchanged external API expectations)
     public PatternType Pattern => pattern;

@@ -9,6 +9,9 @@ public class ReelDefinition : BaseDefinition<ReelData>
 	public float ReelSpinDuration => reelSpinDuration;
 	public int SymbolCount => symbolCount;
 
+	/// <summary>
+	/// Creates a runtime `ReelData` with the configured spin duration, symbol count and default reel strip.
+	/// </summary>
 	public override ReelData CreateInstance()
 	{
 		return new ReelData(reelSpinDuration, symbolCount, defaultReelStrip, this);

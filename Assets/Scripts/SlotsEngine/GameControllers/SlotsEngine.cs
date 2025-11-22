@@ -13,6 +13,9 @@ public class SlotsEngine : MonoBehaviour
 	public State CurrentState => stateMachine.CurrentState;
 	public void SetState(State state) => stateMachine.SetState(state);
 
+	/// <summary>
+	/// Creates a fresh `SlotsData` instance from the provided definition and initializes the engine.
+	/// </summary>
 	public void InitializeSlotsEngine(Transform canvasTransform, SlotsDefinition definition)
 	{
 		currentSlotsData = definition.CreateInstance();
@@ -25,6 +28,11 @@ public class SlotsEngine : MonoBehaviour
 	}
 
 	private List<Action<object>> pendingReelChangedHandlers = new List<Action<object>>();
+
+	/// <summary>
+	/// Initializes the engine with an existing `SlotsData` instance, wiring events and spawning reels.
+	/// Safe to call with externally loaded data (e.g., after persistence load).
+	/// </summary>
 	public void InitializeSlotsEngine(Transform canvasTransform, SlotsData data)
 	{
 		currentSlotsData = data;
@@ -45,8 +53,15 @@ public class SlotsEngine : MonoBehaviour
 		SpawnReels(reelsRootTransform);
 	}
 
+	/// <summary>
+	/// Starts the state machine; should be called once after initialization.
+	/// </summary>
 	public void BeginSlots() => stateMachine.BeginStateMachine();
 
+	/// <summary>
+	/// High-level spin control used by UI: when <paramref name="spin"/> is true starts a spin, when false attempts to stop reels.
+	/// Also validates player credits before initiating a spin.
+	/// </summary>
 	public void SpinOrStopReels(bool spin)
 	{
 		if (!spinInProgress && spin) SpinAllReels();
@@ -54,6 +69,10 @@ public class SlotsEngine : MonoBehaviour
 		else if (GamePlayer.Instance.CurrentCredits < GamePlayer.Instance.CurrentBet.CreditCost) SlotConsoleController.Instance.SetConsoleMessage("Not enough credits! Switch to a lower bet or add credits.");
 	}
 
+	/// <summary>
+	/// Randomizes each reel's visible symbols based on its strip and begins the spin with a slight stagger.
+	/// Notifies the `WinEvaluator` that a new spin started when logging is enabled.
+	/// </summary>
 	private void SpinAllReels()
 	{
 		if (spinInProgress) throw new InvalidOperationException("Spin already in progress!");
@@ -76,6 +95,10 @@ public class SlotsEngine : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Requests all reels to stop with a staggered delay and broadcasts a StoppingReels event.
+	/// No-op if any reel is already not spinning (prevents mid-spin interruptions).
+	/// </summary>
 	private void StopAllReels()
 	{
 		if (!reels.TrueForAll(x => x.Spinning)) return;
@@ -83,6 +106,9 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.BroadcastEvent(SlotsEvent.StoppingReels);
 	}
 
+	/// <summary>
+	/// Spawns visual reel instances under the provided canvas transform and positions them in a centered grid.
+	/// </summary>
 	private void SpawnReels(Transform gameCanvas)
 	{
 		if (currentReelsGroup != null) { Destroy(currentReelsGroup.gameObject); reels.Clear(); }
@@ -102,6 +128,10 @@ public class SlotsEngine : MonoBehaviour
 		foreach (var r in reels) if (r != null) r.RegenerateDummies();
 	}
 
+	/// <summary>
+	/// Adds a new reel to the right side using the provided `ReelData` and repositions existing reels.
+	/// Broadcasts a ReelAdded event.
+	/// </summary>
 	public void AddReel(ReelData newReelData)
 	{
 		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot add reel while spinning."); return; }
@@ -114,6 +144,9 @@ public class SlotsEngine : MonoBehaviour
 		reels.Add(reel); RepositionReels(); RegenerateAllReelDummies(); eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
 	}
 	public void AddReel(ReelDefinition definition) { if (definition == null) throw new ArgumentNullException(nameof(definition)); AddReel(definition.CreateInstance()); }
+	/// <summary>
+	/// Adds a new reel using a template from current data/definition when available.
+	/// </summary>
 	public void AddReel()
 	{
 		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot add reel while spinning."); return; }
@@ -126,6 +159,9 @@ public class SlotsEngine : MonoBehaviour
 		if (def != null) AddReel(def); else Debug.LogWarning("Template reel does not have a BaseDefinition and no fallback was found. Cannot create new reel.");
 	}
 
+	/// <summary>
+	/// Inserts a reel at the specified index and refreshes reel indices/positions. Broadcasts a ReelAdded event.
+	/// </summary>
 	public void InsertReelAt(int index, ReelData newReelData)
 	{
 		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot insert reel while spinning."); return; }
@@ -138,6 +174,9 @@ public class SlotsEngine : MonoBehaviour
 		reels.Insert(index, reel); RefreshReelsAfterModification(); RegenerateAllReelDummies(); eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
 	}
 
+	/// <summary>
+	/// Removes a reel at the specified index, destroys visuals, and repositions remaining reels. Broadcasts a ReelRemoved event.
+	/// </summary>
 	public void RemoveReelAt(int index)
 	{
 		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot remove reel while spinning."); return; }
@@ -157,6 +196,9 @@ public class SlotsEngine : MonoBehaviour
 		RepositionReels();
 	}
 
+	/// <summary>
+	/// Recomputes X positions for each reel using SymbolSize and SymbolSpacing and re-centers the reels group.
+	/// </summary>
 	private void RepositionReels()
 	{
 		if (reels.Count == 0 || currentSlotsData.CurrentReelData.Count == 0) return; ReelData reelDef = currentSlotsData.CurrentReelData[0];
@@ -164,6 +206,10 @@ public class SlotsEngine : MonoBehaviour
 		int count = reels.Count; float totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidth / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidth / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
 	}
 
+	/// <summary>
+	/// Adjusts reel symbol size and spacing to fit within the provided height/width, preserving aspect and padding.
+	/// Will respawn reels if none exist yet.
+	/// </summary>
 	public void AdjustReelSize(float totalHeight, float totalWidth)
 	{
 		if (stateMachine.CurrentState == State.Spinning) throw new InvalidOperationException("Should not adjust reels while they are spinning!");
@@ -187,6 +233,9 @@ public class SlotsEngine : MonoBehaviour
 		if (reels.TrueForAll(x => !x.Spinning)) { spinInProgress = false; eventManager.BroadcastEvent(SlotsEvent.SpinCompleted); }
 	}
 
+	/// <summary>
+	/// Called when all reels have stopped spinning; evaluates wins through `WinEvaluator` and transitions to Presentation state.
+	/// </summary>
 	void OnSpinCompleted(object obj)
 	{
 		try
@@ -206,16 +255,32 @@ public class SlotsEngine : MonoBehaviour
 	}
 	private void OnPresentationComplete(object obj) => stateMachine.SetState(State.Idle);
 
+	/// <summary>
+	/// Returns a row-major flattened grid of the current visible `GameSymbol`s across all reels.
+	/// </summary>
 	public GameSymbol[] GetCurrentSymbolGrid()
 	{
 		List<GameSymbol[]> reelSymbols = new List<GameSymbol[]>(); foreach (GameReel gameReel in reels) { var newList = new GameSymbol[gameReel.Symbols.Count]; for (int i = 0; i < gameReel.Symbols.Count; i++) newList[i] = gameReel.Symbols[i]; reelSymbols.Add(newList); } return Helpers.CombineColumnsToGrid(reelSymbols);
 	}
+	/// <summary>
+	/// Broadcasts a slot-scoped event to listeners registered on this engine's `EventManager` instance.
+	/// </summary>
 	public void BroadcastSlotsEvent(SlotsEvent eventName, object value = null) => eventManager.BroadcastEvent(eventName, value);
+	/// <summary>
+	/// Saves the current `SlotsData` through the persistence layer.
+	/// </summary>
 	public void SaveSlotsData() { SlotsDataManager.Instance.AddNewData(currentSlotsData); DataPersistenceManager.Instance.SaveGame(); }
+	/// <summary>
+	/// Allows external listeners to receive notifications when reels are added/removed. If called before initialization,
+	/// the handler is cached and registered once the engine is ready.
+	/// </summary>
 	public void RegisterReelChanged(Action<object> handler)
 	{
 		if (handler == null) return; if (eventManager == null) { if (!pendingReelChangedHandlers.Contains(handler)) pendingReelChangedHandlers.Add(handler); return; } eventManager.RegisterEvent(SlotsEvent.ReelAdded, handler); eventManager.RegisterEvent(SlotsEvent.ReelRemoved, handler);
 	}
+	/// <summary>
+	/// Unregisters a handler previously registered via `RegisterReelChanged`.
+	/// </summary>
 	public void UnregisterReelChanged(Action<object> handler)
 	{
 		if (handler == null) return; if (eventManager == null) { if (pendingReelChangedHandlers.Contains(handler)) pendingReelChangedHandlers.Remove(handler); return; } eventManager.UnregisterEvent(SlotsEvent.ReelAdded, handler); eventManager.UnregisterEvent(SlotsEvent.ReelRemoved, handler);

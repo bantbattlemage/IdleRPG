@@ -1,6 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Simple main menu controller wiring UI buttons to start or continue a session.
+/// Hides the menu group once a game begins. Settings/Exit hooks are present for future implementation.
+/// </summary>
 public class MainMenuController : MonoBehaviour
 {
 	public GameObject MainMenuGroup;

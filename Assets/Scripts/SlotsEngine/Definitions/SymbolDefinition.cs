@@ -13,6 +13,10 @@ public enum SymbolWinMode
 	TotalCount = 2
 }
 
+/// <summary>
+/// Authoring-time definition for a symbol's behavior, payout, and matching characteristics.
+/// At runtime, `CreateInstance()` produces a `SymbolData` carrying the same parameters.
+/// </summary>
 public class SymbolDefinition : BaseDefinition<SymbolData>
 {
 	[SerializeField] private string symbolName;
@@ -83,6 +87,9 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 
 	public int MaxPerReel => maxPerReel;
 
+	/// <summary>
+	/// Create the runtime `SymbolData` equivalent of this authoring asset.
+	/// </summary>
 	public override SymbolData CreateInstance()
 	{
 		// pass match group id and definition asset name into runtime SymbolData

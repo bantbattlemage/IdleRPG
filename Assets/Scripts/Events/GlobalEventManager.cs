@@ -1,6 +1,10 @@
 using System;
 using UnityEngine;
 
+/// <summary>
+/// Global event bus built on top of a single internal <see cref="EventManager"/> instance.
+/// Use for application-wide events that are not scoped to a specific `SlotsEngine`.
+/// </summary>
 public class GlobalEventManager : Singleton<GlobalEventManager>
 {
 	private EventManager eventManager;

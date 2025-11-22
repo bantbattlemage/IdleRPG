@@ -13,6 +13,10 @@ public class SlotsDefinition : BaseDefinition<SlotsData>
 	[SerializeField] private BetLevelDefinition[] betLevelDefinitions;
 	public BetLevelDefinition[] BetLevelDefinitions => betLevelDefinitions;
 
+	/// <summary>
+	/// Creates a new runtime `SlotsData` carrying the configured winline and bet level definitions.
+	/// Reel instances should be created separately from `ReelDefinitions` by callers.
+	/// </summary>
 	public override SlotsData CreateInstance()
 	{
 		return new SlotsData(0, winlineDefinitions.ToList(), betLevelDefinitions.ToList());

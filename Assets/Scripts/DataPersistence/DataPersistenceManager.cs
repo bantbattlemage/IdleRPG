@@ -6,6 +6,10 @@ using UnityEngine.SceneManagement;
 using System.IO;
 using System;
 
+	/// <summary>
+	/// Central coordinator for save/load of game data to disk, with per-profile support and optional encryption.
+	/// Provides registration for scene objects implementing <see cref="IDataPersistence"/> so they can receive Load/Save callbacks.
+	/// </summary>
 public class DataPersistenceManager : MonoBehaviour
 {
 	[Header("Debugging")]
@@ -62,6 +66,9 @@ public class DataPersistenceManager : MonoBehaviour
 		// By default we don't auto-load on scene changes. Controlled LoadGame should be used.
 	}
 
+	/// <summary>
+	/// Registers an <see cref="IDataPersistence"/> object to participate in save/load.
+	/// </summary>
 	public void RegisterDataPersistence(IDataPersistence obj)
 	{
 		if (!dataPersistenceObjects.Contains(obj))
@@ -70,6 +77,9 @@ public class DataPersistenceManager : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Unregisters an <see cref="IDataPersistence"/> object from save/load.
+	/// </summary>
 	public void UnregisterDataPersistence(IDataPersistence obj)
 	{
 		if (dataPersistenceObjects.Contains(obj))
@@ -78,6 +88,9 @@ public class DataPersistenceManager : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Irreversibly deletes on-disk data for the given profile id.
+	/// </summary>
 	public void DeleteProfileData(string profileId)
 	{
 		profileId = SanitizeProfileId(profileId);
@@ -97,6 +110,9 @@ public class DataPersistenceManager : MonoBehaviour
 		Debug.Log($"Selected data profile {this.selectedProfileId}");
 	}
 
+	/// <summary>
+	/// Starts a new game profile and immediately saves an initial `GameData` file.
+	/// </summary>
 	public void NewGame(string name = "")
 	{
 		if (string.IsNullOrEmpty(name))
@@ -110,6 +126,10 @@ public class DataPersistenceManager : MonoBehaviour
 		SaveGame();
 	}
 
+	/// <summary>
+	/// Loads the current profile's data from disk and pushes it to all registered `IDataPersistence` objects.
+	/// Optionally initializes new data when none exists and debugging flag is set.
+	/// </summary>
 	public void LoadGame()
 	{
 		// return right away if data persistence is disabled
@@ -148,6 +168,10 @@ public class DataPersistenceManager : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Saves the current in-memory `GameData` to disk after gathering changes from registered `IDataPersistence` objects.
+	/// Adds a timestamp and attempts an atomic file write via <see cref="FileDataHandler"/>.
+	/// </summary>
 	public void SaveGame()
 	{
 		// return right away if data persistence is disabled
@@ -194,6 +218,9 @@ public class DataPersistenceManager : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Returns all profiles and their associated `GameData` loaded from disk.
+	/// </summary>
 	public Dictionary<string, GameData> GetAllProfilesGameData()
 	{
 		return dataHandler.LoadAllProfiles();
@@ -215,6 +242,10 @@ public class DataPersistenceManager : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Sanitizes a profile id so it is safe to use as a file name (strips invalid characters, trims).
+	/// Returns the default profile id if the result would be empty.
+	/// </summary>
 	private string SanitizeProfileId(string profileId)
 	{
 		if (string.IsNullOrEmpty(profileId)) return defaultProfileId;

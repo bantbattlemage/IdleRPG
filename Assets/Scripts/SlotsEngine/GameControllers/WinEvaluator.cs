@@ -9,15 +9,19 @@ using UnityEditor;
 #endif
 
 /// <summary>
-/// Evaluates slot machine winlines across a grid of symbols.
-/// 
-/// Key Features:
-/// • Supports arbitrary number of reels and non-uniform symbols per reel
-/// • Wins always start from the leftmost column (column 0)
-/// • A gap in matching symbols terminates the win (no skipping)
-/// • Respects each symbol's MinWinDepth requirement
-/// • Supports Wild symbols that substitute for other symbols
-/// • Dynamic - handles reel additions/removals gracefully
+/// Evaluates slot machine wins across a grid of symbols and provides optional detailed logging.
+///
+/// Features:
+/// - Supports arbitrary number of reels and non-uniform rows per reel (variable symbol counts per column).
+/// - Line wins always start from the leftmost column (column 0) and cannot skip gaps.
+/// - Respects each symbol's `MinWinDepth`, `PayScaling`, and wild matching behavior (`Matches`).
+/// - Supports additional non-line win modes via `SymbolWinMode`:
+///   - `SingleOnReel`: awards per landed instance of a non-wild symbol.
+///   - `TotalCount`: awards when the total count of a symbol group on the grid reaches a configured threshold (wilds ignored).
+/// - Gracefully handles reel additions/removals and irregular grids.
+/// - Optional editor/development logging to Unity Console and persistent log files when `LoggingEnabled` is true.
+///
+/// Grid indexing used across the project is row-major: index = row * columns + column (row 0 = bottom, column 0 = left).
 /// </summary>
 public class WinEvaluator : Singleton<WinEvaluator>
 {
@@ -32,12 +36,16 @@ public class WinEvaluator : Singleton<WinEvaluator>
     private string currentSpinLogFilePath;
     private static int spinCounter = 0;
 
+    /// <summary>
+    /// The most recent set of win results produced by an evaluation. Never null.
+    /// </summary>
     public List<WinData> CurrentSpinWinData => currentSpinWinData ?? (currentSpinWinData = new List<WinData>());
 
     /// <summary>
     /// Notify the evaluator that a new spin has started. When logging is enabled the evaluator
     /// will clear the Unity console once at the start of the spin to keep logs focused.
-    /// Call this from your spin-start logic (for example SlotsEngine/SpinOrStopReels).
+    /// Call this from your spin-start logic (for example `SlotsEngine.SpinOrStopReels`).
+    /// Also rotates persistent spin log files and initializes a new per-spin log.
     /// </summary>
     public void NotifySpinStarted()
     {
@@ -109,6 +117,9 @@ public class WinEvaluator : Singleton<WinEvaluator>
         }
     }
 
+    /// <summary>
+    /// Clears the Unity Editor console once per spin when logging is enabled (Editor only).
+    /// </summary>
     private void ClearConsole()
     {
 #if UNITY_EDITOR
@@ -127,6 +138,9 @@ public class WinEvaluator : Singleton<WinEvaluator>
 #endif
     }
 
+    /// <summary>
+    /// Appends the provided StringBuilder contents to the current spin log file (Editor/Dev builds only).
+    /// </summary>
     private void AppendToCurrentSpinLog(StringBuilder builder)
     {
         if (builder == null) return;
@@ -152,6 +166,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
     /// <summary>
     /// Write a human-readable record of the presented grid, winlines under evaluation and resulting win data to the current spin log file.
     /// Safe to call even if logging wasn't enabled; will still create the file if NotifySpinStarted wasn't called.
+    /// Only writes when `LoggingEnabled` is true to avoid unnecessary IO.
     /// </summary>
     public void LogSpinResult(GameSymbol[] grid, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines, List<WinData> winData)
     {
@@ -287,13 +302,11 @@ public class WinEvaluator : Singleton<WinEvaluator>
 
     /// <summary>
     /// Evaluate wins for a rectangular grid represented in row-major layout.
-    /// Grid indexing used across the project: index = row * columns + column (row 0 = bottom, column 0 = left).
-    /// 
     /// Rules:
     /// 1. Wins must start at column 0 (leftmost reel)
     /// 2. The leftmost symbol determines what must match along the winline
     /// 3. Matching continues left-to-right until a non-match or grid boundary
-    /// 4. Win is valid if match count >= trigger symbol's MinWinDepth
+    /// 4. Win is valid if match count &gt;= trigger symbol's MinWinDepth
     /// 5. Wild symbols match according to SymbolData.Matches() logic
     /// </summary>
     /// <param name="grid">Row-major symbol grid (size = maxRows * columns)</param>
@@ -483,7 +496,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
             }
         }
 
-        // --- New: evaluate symbol-level win modes (SingleOnReel, TotalCount) ---
+        // --- Evaluate symbol-level win modes (SingleOnReel, TotalCount) ---
         try
         {
             // We'll use -1 as the LineIndex to indicate a non-winline award
@@ -620,8 +633,8 @@ public class WinEvaluator : Singleton<WinEvaluator>
     }
 
     /// <summary>
-    /// Convenience overload to evaluate from visual GameSymbol grid. Converts to SymbolData[] and delegates to EvaluateWins.
-    /// rowsPerColumn should reflect the number of valid rows in each column (may be non-uniform).
+    /// Convenience overload to evaluate from visual `GameSymbol` grid. Converts to `SymbolData[]` and delegates to `EvaluateWins`.
+    /// `rowsPerColumn` should reflect the number of valid rows in each column (may be non-uniform).
     /// </summary>
     public List<WinData> EvaluateWinsFromGameSymbols(GameSymbol[] gameSymbols, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines)
     {
@@ -632,7 +645,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
     }
 
     /// <summary>
-    /// Convenience overload to evaluate from per-column GameSymbol arrays. Handles varying reel sizes and constructs grid.
+    /// Convenience overload to evaluate from per-column `GameSymbol` arrays. Handles varying reel sizes and constructs the row-major grid.
     /// </summary>
     public List<WinData> EvaluateWinsFromColumns(List<GameSymbol[]> columns, List<WinlineDefinition> winlines)
     {
@@ -649,8 +662,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
     }
 
     /// <summary>
-    /// Backwards-compatible overload for uniform rows per column.
-    /// Constructs a per-column array and delegates to the main overload.
+    /// Backwards-compatible overload for uniform rows per column. Constructs a per-column array and delegates to the main overload.
     /// </summary>
     public List<WinData> EvaluateWins(SymbolData[] grid, int columns, int rows, List<WinlineDefinition> winlines)
     {

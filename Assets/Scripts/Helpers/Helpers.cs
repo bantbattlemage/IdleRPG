@@ -4,6 +4,11 @@ using UnityEngine;
 
 public static class Helpers
 {
+	/// <summary>
+	/// Combines a list of column arrays into a rectangular row-major grid.
+	/// For uneven column lengths, missing cells are left as default(T) in the resulting grid.
+	/// Indexing: result[row * columns + column].
+	/// </summary>
 	public static T[] CombineColumnsToGrid<T>(List<T[]> columns)
 	{
 		if (columns == null || columns.Count == 0)

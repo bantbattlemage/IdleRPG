@@ -18,6 +18,10 @@ public enum State
 	MainMenu
 }
 
+/// <summary>
+/// Minimal state machine that maps enum states to `GameState` holders and broadcasts enter/exit events via an `EventManager`.
+/// Consumers should derive and call `RegisterState` per state they intend to use, then drive transitions via `SetState`.
+/// </summary>
 public class StateMachine
 {
 	public State CurrentState => currentState;
@@ -26,16 +30,25 @@ public class StateMachine
 
 	protected Dictionary<State, GameState> states = new Dictionary<State, GameState>();
 
+	/// <summary>
+	/// Assign the `EventManager` used to broadcast state enter/exit.
+	/// </summary>
 	public virtual void InitializeStateMachine(EventManager eventManagerToUse)
 	{
 		eventManager = eventManagerToUse;
 	}
 
+	/// <summary>
+	/// Called by derived classes to kick off the first state; base throws to ensure override.
+	/// </summary>
 	public virtual void BeginStateMachine()
 	{
 		throw new NotImplementedException();
 	}
 
+	/// <summary>
+	/// Registers a state with optional enter/exit callbacks.
+	/// </summary>
 	protected void RegisterState(State state, Action enterAction = null, Action exitAction = null)
 	{
 		GameState newState = new GameState(state, eventManager, enterAction, exitAction);
@@ -43,6 +56,9 @@ public class StateMachine
 		states.Add(state, newState);
 	}
 
+	/// <summary>
+	/// Transition to the provided state, broadcasting Exit/Enter events.
+	/// </summary>
 	public virtual void SetState(State state)
 	{
 		if (currentState == State.None)
@@ -56,6 +72,9 @@ public class StateMachine
 	}
 }
 
+/// <summary>
+/// Holds enter/exit callbacks for a specific state and is responsible for broadcasting state lifecycle events.
+/// </summary>
 public class GameState
 {
 	private State state;

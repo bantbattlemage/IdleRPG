@@ -2,6 +2,15 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Simple generic MonoBehaviour-based singleton.
+/// - Assigns the first instance found in the scene to `Instance` on first access or Awake.
+/// - Logs a warning when duplicates are detected and keeps the first instance.
+/// - Clears the instance reference when the owning object is destroyed.
+///
+/// Notes:
+/// - Does not automatically create or persist itself; consumers are responsible for scene placement.
+/// </summary>
 public abstract class Singleton<T> : MonoBehaviour where T : MonoBehaviour
 {
 	private static T instance;

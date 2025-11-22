@@ -4,7 +4,15 @@ using UnityEngine;
 
 /// <summary>
 /// Lightweight event manager that supports enum-based event channels with optional string suffixes.
-/// Internally it maps composed string keys to lists of handlers.
+/// Internally it maps composed string keys to lists of handlers and provides register/unregister/broadcast operations.
+///
+/// Recommended usage:
+/// - Prefer using enum + optional suffix to create distinct event topics.
+/// - Use <see cref="GlobalEventManager"/> for app-wide events; use a private instance (e.g., in `SlotsEngine`) for scoped events.
+///
+/// Notes:
+/// - Exceptions thrown by handlers are caught and logged to avoid breaking the broadcast loop.
+/// - Logging can be toggled via <see cref="LoggingEnabled"/> for development diagnostics.
 /// </summary>
 public class EventManager
 {
@@ -100,7 +108,7 @@ public class EventManager
 	// -------------------- Public enum-based API --------------------
 	/// <summary>
 	/// Register a handler for an enum-based event channel with an optional suffix.
-	/// The enum and suffix are composed into a single string key using EventKey.Compose.
+	/// The enum and suffix are composed into a single string key using <see cref="EventKey.Compose"/>.
 	/// </summary>
 	public void RegisterEvent(Enum baseEnum, string suffix, Action<object> action)
 	{

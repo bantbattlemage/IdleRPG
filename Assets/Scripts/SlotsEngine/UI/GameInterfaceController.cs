@@ -1,5 +1,9 @@
 using UnityEngine;
 
+/// <summary>
+/// Central UI entry point for overlay messages (e.g., transient toasts).
+/// Provides a simple hotkey (T) to spawn a message for quick testing.
+/// </summary>
 public class GameInterfaceController : Singleton<GameInterfaceController>
 {
 	[SerializeField] private Canvas overlayCanvas;
@@ -14,6 +18,9 @@ public class GameInterfaceController : Singleton<GameInterfaceController>
 		}
 	}
 
+	/// <summary>
+	/// Instantiate an overlay message as a child of the overlay canvas.
+	/// </summary>
 	public void CreateOverlayMessage()
 	{
 		OverlayMessage newMessage = Instantiate(overlayMessagePrefab, overlayCanvas.transform).GetComponent<OverlayMessage>();

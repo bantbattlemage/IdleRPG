@@ -1,5 +1,9 @@
 using System;
 
+/// <summary>
+/// Slot-specific state machine that owns its own `EventManager` and registers the set of states a slot uses.
+/// Initializes console and presentation handlers upon entering Init, then transitions to Idle.
+/// </summary>
 public class SlotsStateMachine : StateMachine
 {
 	private SlotsEngine slotsEngine;
