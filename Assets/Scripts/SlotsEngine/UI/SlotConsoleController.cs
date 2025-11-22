@@ -48,6 +48,12 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 		BetText.text = string.Empty;
 		CreditsText.text = string.Empty;
+
+		// react to AutoSpin toggle changes so disabling AutoSpin during a spin will trigger Stop
+		if (AutoSpinToggle != null)
+		{
+			AutoSpinToggle.onValueChanged.AddListener(OnAutoSpinToggleChanged);
+		}
 	}
 
 	public void RegisterSlotsToConsole(EventManager slotsEventManager)
@@ -353,6 +359,38 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 			DOTween.Sequence().AppendInterval(1f).AppendCallback(() =>
 			{
 				GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.SpinButtonPressed);
+			});
+		}
+	}
+
+	private void OnAutoSpinToggleChanged(bool isOn)
+	{
+		// If AutoSpin is turned off while reels are spinning display Stop button, emulate a Stop press
+		if (!isOn)
+		{
+			// If we currently show the StopButton and it's interactable, trigger stop
+			if (StopButton != null && StopButton.gameObject.activeInHierarchy && StopButton.interactable)
+			{
+				OnStopPressed();
+			}
+		}
+
+		// If AutoSpin turned on while all slots are idle, start a spin (respect AutoStop toggle)
+		else
+		{
+			// small delay to let any UI/state changes complete (matches OnIdleEnter behavior)
+			DOTween.Sequence().AppendInterval(0.05f).AppendCallback(() =>
+			{
+				if (!AutoSpinToggle.isOn) return; // user may have toggled again
+				if (GamePlayer.Instance != null && GamePlayer.Instance.CheckAllSlotsState(State.Idle))
+				{
+					var currentWinData = WinEvaluator.Instance != null ? WinEvaluator.Instance.CurrentSpinWinData : null;
+					if (AutoStopToggle != null && AutoStopToggle.isOn && currentWinData is { Count: > 0 })
+					{
+						return; // don't auto-spin when auto-stop would immediately stop on wins
+					}
+					OnSpinPressed();
+				}
 			});
 		}
 	}

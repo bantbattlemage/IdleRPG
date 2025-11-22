@@ -142,6 +142,9 @@ public class GameReel : MonoBehaviour
 			// Use cached component helper to avoid GetComponent each spin
 			sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 
+			// Apply sprite AFTER positioning to avoid visible sprite swaps; SetSizeAndLocalY already resets color
+			sym.ApplySymbol(newSymbol);
+
 			symbols.Add(sym);
 			if (newSymbol != null) selectedForThisReel.Add(newSymbol);
 		}
@@ -159,6 +162,9 @@ public class GameReel : MonoBehaviour
 	{
 		completeOnNextSpin = false;
 
+		// Ensure all symbols are visible (reset colors) before spin begins to avoid leftover dimming from presentations
+		ResetAllSymbolColors();
+
 		DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() =>
 		{
 			BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () =>
@@ -169,6 +175,40 @@ public class GameReel : MonoBehaviour
 				eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
 			});
 		});
+	}
+
+	/// <summary>
+	/// Reset colors and ensure images are enabled for all tracked symbols (active + dummy + buffered).
+	/// This is called prior to starting a spin to remove any presentation dimming.
+	/// </summary>
+	private void ResetAllSymbolColors()
+	{
+		void ResetForList(IEnumerable<GameSymbol> list)
+		{
+			if (list == null) return;
+			foreach (var gs in list)
+			{
+				if (gs == null) continue;
+				var img = gs.CachedImage;
+				if (img == null) continue;
+				// Re-enable image and canvas renderer
+				img.enabled = true;
+				var cr = img.GetComponent<CanvasRenderer>();
+				if (cr != null) cr.SetAlpha(1f);
+				img.DOKill();
+				img.color = Color.white;
+			}
+		}
+
+		// Active symbols
+		ResetForList(symbols);
+		// Dummy symbols
+		ResetForList(topDummySymbols);
+		ResetForList(bottomDummySymbols);
+		// Buffer lists
+		ResetForList(bufferSymbols);
+		ResetForList(bufferTopDummySymbols);
+		ResetForList(bufferBottomDummySymbols);
 	}
 
 	/// <summary>
@@ -247,6 +287,9 @@ public class GameReel : MonoBehaviour
 			// Use cached setter to avoid GetComponent allocations
 			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
 
+			// Assign sprite after positioning
+			symbol.ApplySymbol(def);
+
 			newSymbols.Add(symbol);
 			if (def != null)
 			{
@@ -276,7 +319,7 @@ public class GameReel : MonoBehaviour
 
 		int startIndex = !bottom ? currentReelData.SymbolCount : 1;
 		int flip = bottom ? -1 : 1;
-		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount;		
+		int total = bottom ? currentReelData.SymbolCount - 1 : currentReelData.SymbolCount; 		
 		float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
 
 		// Color used for initial dimming
@@ -301,6 +344,9 @@ public class GameReel : MonoBehaviour
 			// Use helper to set size and Y in one call
 			float y = (step * (i + startIndex)) * flip;
 			symbol.SetSizeAndLocalY(currentReelData.SymbolSize, y);
+
+			// Apply sprite after positioning
+			symbol.ApplySymbol(def);
 
 			// Apply initial color according to `dim` flag. If dim==true (default for initialization/adjust),
 			// set to the dim color immediately. If dim==false (used when spawning buffer during spin), keep white.
@@ -686,6 +732,8 @@ public class GameReel : MonoBehaviour
 					: reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData);
 				sym.InitializeSymbol(def, eventManager);
 				sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+				// Apply sprite after positioning
+				sym.ApplySymbol(def);
 				symbols.Add(sym);
 			}
 		}

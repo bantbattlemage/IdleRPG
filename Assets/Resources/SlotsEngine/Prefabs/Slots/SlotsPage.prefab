@@ -302,8 +302,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlotsDisplayPage
   slotsToDisplay: []
-  standardGroup: {fileID: 7511775569946633635}
   gridGroup: {fileID: 5310957821657797724}
-  nextPageButton: {fileID: 0}
-  prevPageButton: {fileID: 0}
   placeHolderGroup: {fileID: 8098410155357534871}

@@ -14,7 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SymbolDefinition
   symbolName: Wild
   symbolSprite: {fileID: 21300000, guid: 8436ff63b90bfff4887f19cedcefe14e, type: 3}
-  baseValueMultiplier: 
-  weight: 1
+  baseValue: 0
+  minWinDepth: 3
+  payScaling: 0
+  weight: 0.1
   isWild: 1
   allowWildMatch: 1
+  winMode: 0
+  totalCountTrigger: -1
+  maxPerReel: -1
+  matchGroupId: 0

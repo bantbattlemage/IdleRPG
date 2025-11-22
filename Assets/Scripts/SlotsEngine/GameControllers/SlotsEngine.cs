@@ -509,6 +509,7 @@ public class SlotsEngine : MonoBehaviour
 	/// <summary>
 	/// Reinitialize remaining reels so their IDs and positions match list indices.
 	/// This calls InitializeReel on each reel to update internal ids and layout values.
+	/// Also refreshes dummy symbols on all reels to handle changes in max symbol count.
 	/// </summary>
 	private void RefreshReelsAfterModification()
 	{
