@@ -4,94 +4,211 @@ using System.Collections.Generic;
 
 public class ReelStripData : Data
 {
-	[SerializeField] private int stripSize;
-	[SerializeField] private string[] symbolDefinitionKeys;
-	[SerializeField] private string definitionKey;
+    [SerializeField] private int stripSize;
+    [SerializeField] private string[] symbolDefinitionKeys;
+    [SerializeField] private string definitionKey;
 
-	[System.NonSerialized] private SymbolDefinition[] symbolDefinitions;
-	[System.NonSerialized] private ReelStripDefinition definition;
+    [System.NonSerialized] private SymbolDefinition[] symbolDefinitions;
+    [System.NonSerialized] private ReelStripDefinition definition;
 
-	public int StripSize => stripSize;
-	public SymbolDefinition[] SymbolDefinitions
-	{
-		get { EnsureResolved(); return symbolDefinitions; }
-	}
+    [System.NonSerialized] private int[] fixedCounts; // reserved counts per symbol
+    [System.NonSerialized] private int[] remainingCounts; // remaining reserved counts per symbol for current spin (for depletable ones)
+    [System.NonSerialized] private bool[] countDepletable; // whether corresponding fixedCounts entry depletes
+    [System.NonSerialized] private int internalPicksSoFar;
 
-	public ReelStripDefinition Definition { get { EnsureResolved(); return definition; } }
+    public int StripSize => stripSize;
+    public SymbolDefinition[] SymbolDefinitions { get { EnsureResolved(); return symbolDefinitions; } }
+    public ReelStripDefinition Definition { get { EnsureResolved(); return definition; } }
 
-	public ReelStripData(ReelStripDefinition def, int size, SymbolDefinition[] syms)
-	{
-		stripSize = size;
-		definition = def;
-		symbolDefinitions = syms;
-		definitionKey = def != null ? def.name : null;
-		if (syms != null) { symbolDefinitionKeys = new string[syms.Length]; for (int i = 0; i < syms.Length; i++) symbolDefinitionKeys[i] = syms[i].name; }
-	}
+    public ReelStripData(ReelStripDefinition def, int size, SymbolDefinition[] syms, int[] counts = null, bool[] depletable = null)
+    {
+        stripSize = size;
+        definition = def;
+        symbolDefinitions = syms;
+        fixedCounts = counts != null && syms != null && counts.Length == syms.Length ? (int[])counts.Clone() : null;
+        countDepletable = depletable != null && syms != null && depletable.Length == syms.Length ? (bool[])depletable.Clone() : null;
+        if (fixedCounts != null && countDepletable == null)
+        {
+            countDepletable = new bool[fixedCounts.Length];
+            for (int i = 0; i < countDepletable.Length; i++) countDepletable[i] = true;
+        }
+        remainingCounts = fixedCounts != null ? (int[])fixedCounts.Clone() : null;
+        internalPicksSoFar = 0;
+        definitionKey = def != null ? def.name : null;
+        if (syms != null)
+        {
+            symbolDefinitionKeys = new string[syms.Length];
+            for (int i = 0; i < syms.Length; i++) symbolDefinitionKeys[i] = syms[i].name;
+        }
+    }
 
-	private void EnsureResolved()
-	{
-		if (definition == null && !string.IsNullOrEmpty(definitionKey)) definition = DefinitionResolver.Resolve<ReelStripDefinition>(definitionKey);
-		if ((symbolDefinitions == null || symbolDefinitions.Length == 0) && symbolDefinitionKeys != null) { symbolDefinitions = new SymbolDefinition[symbolDefinitionKeys.Length]; for (int i = 0; i < symbolDefinitionKeys.Length; i++) symbolDefinitions[i] = DefinitionResolver.Resolve<SymbolDefinition>(symbolDefinitionKeys[i]); }
-	}
+    private void EnsureResolved()
+    {
+        if (definition == null && !string.IsNullOrEmpty(definitionKey)) definition = DefinitionResolver.Resolve<ReelStripDefinition>(definitionKey);
+        if ((symbolDefinitions == null || symbolDefinitions.Length == 0) && symbolDefinitionKeys != null)
+        {
+            symbolDefinitions = new SymbolDefinition[symbolDefinitionKeys.Length];
+            for (int i = 0; i < symbolDefinitionKeys.Length; i++) symbolDefinitions[i] = DefinitionResolver.Resolve<SymbolDefinition>(symbolDefinitionKeys[i]);
+        }
+        if (fixedCounts == null && definition != null && definition.SymbolCounts != null && symbolDefinitions != null)
+        {
+            var src = definition.SymbolCounts;
+            if (src.Length == symbolDefinitions.Length)
+            {
+                fixedCounts = (int[])src.Clone();
+                remainingCounts = (int[])fixedCounts.Clone();
+            }
+        }
+        if (countDepletable == null && definition != null && definition.SymbolCountsDepletable != null && symbolDefinitions != null)
+        {
+            var dep = definition.SymbolCountsDepletable;
+            if (dep.Length == symbolDefinitions.Length)
+            {
+                countDepletable = (bool[])dep.Clone();
+            }
+        }
+        if (fixedCounts != null && countDepletable == null)
+        {
+            countDepletable = new bool[fixedCounts.Length]; for (int i = 0; i < countDepletable.Length; i++) countDepletable[i] = true;
+        }
+    }
 
-	public SymbolData GetWeightedSymbol()
-	{
-		EnsureResolved();
-		var weighted = new (SymbolDefinition, float)[symbolDefinitions.Length];
-		for (int i = 0; i < symbolDefinitions.Length; i++) weighted[i] = (symbolDefinitions[i], symbolDefinitions[i].Weight / stripSize);
-		var def = WeightedRandom.Pick(weighted);
-		if (WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"ReelStripData.GetWeightedSymbol(): picked '{def?.SymbolName ?? def?.name ?? "(null)"}' (no existingSelections)");
-		return def.CreateInstance();
-	}
+    public void ResetSpinCounts()
+    {
+        EnsureResolved();
+        if (fixedCounts != null) remainingCounts = (int[])fixedCounts.Clone();
+        internalPicksSoFar = 0;
+    }
 
-	public SymbolData GetWeightedSymbol(System.Collections.Generic.List<SymbolData> existingSelections)
-	{
-		EnsureResolved();
-		var candidates = new System.Collections.Generic.List<(SymbolDefinition, float)>();
-		bool doLog = WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled && (Application.isEditor || Debug.isDebugBuild);
-		if (doLog)
-		{
-			string existingNames = existingSelections == null ? "(null)" : string.Join(",", existingSelections.Select(s => s == null ? "(null)" : s.Name));
-			Debug.Log($"ReelStripData.GetWeightedSymbol(existing): symbolDefinitions={symbolDefinitions?.Length ?? 0} existingSelections=[{existingNames}]");
-			if (existingSelections != null) { for (int ex = 0; ex < existingSelections.Count; ex++) { var es = existingSelections[ex]; if (es == null) { Debug.Log($" existing[{ex}] = (null)"); continue; } int mg = es.MatchGroupId; string sname = es.Name ?? "(null)"; Debug.Log($" existing[{ex}] Name='{sname}' MatchGroupId={mg} Base={es.BaseValue} MinWin={es.MinWinDepth} IsWild={es.IsWild}"); } }
-		}
+    // Simple variant delegates to constrained version without tracking list.
+    public SymbolData GetWeightedSymbol() => GetWeightedSymbol(null);
 
-		if (symbolDefinitions == null || symbolDefinitions.Length == 0) return GetWeightedSymbol();
+    public SymbolData GetWeightedSymbol(List<SymbolData> existingSelections) => GetWeightedSymbol(existingSelections, consumeReserved: true);
 
-		for (int i = 0; i < symbolDefinitions.Length; i++)
-		{
-			var def = symbolDefinitions[i];
-			if (def == null) continue;
-			int max = def.MaxPerReel;
-			int already = 0;
-			if (existingSelections != null && existingSelections.Count > 0)
-			{
-				for (int j = 0; j < existingSelections.Count; j++)
-				{
-					var s = existingSelections[j];
-					if (s == null) continue;
-					int sGroup = s.MatchGroupId;
-					int defGroup = def.MatchGroupId;
-					if (sGroup != 0 && defGroup != 0 && sGroup == defGroup) { already++; continue; }
-				}
-			}
+    /// <summary>
+    /// Core selection overload with ability to skip consuming reserved counts (used for dummy symbols).
+    /// </summary>
+    public SymbolData GetWeightedSymbol(List<SymbolData> existingSelections, bool consumeReserved)
+    {
+        EnsureResolved();
+        if (symbolDefinitions == null || symbolDefinitions.Length == 0) return null;
 
-			if (doLog) Debug.Log($"ReelStripData: candidate='{def.SymbolName ?? def.name}' maxPerReel={def.MaxPerReel} alreadyCount={already} MatchGroupId={def.MatchGroupId}");
+        // Track remaining pulls for this spin step
+        int picksSoFar = existingSelections != null ? existingSelections.Count : internalPicksSoFar;
+        int remainingSpins = Mathf.Max(stripSize - picksSoFar, 0);
 
-			if (max >= 0 && already >= max) { if (doLog) Debug.Log($"ReelStripData: skipping '{def.SymbolName ?? def.name}' because already={already} >= maxPerReel={max}"); continue; }
+        Dictionary<int, int> groupUsage = null;
+        if (existingSelections != null && existingSelections.Count > 0)
+        {
+            groupUsage = new Dictionary<int, int>();
+            for (int i = 0; i < existingSelections.Count; i++)
+            {
+                var s = existingSelections[i]; if (s == null) continue; int g = s.MatchGroupId; if (g != 0) groupUsage[g] = groupUsage.TryGetValue(g, out var c) ? c + 1 : 1;
+            }
+        }
 
-			candidates.Add((def, def.Weight / stripSize));
-		}
+        // Compute reserved remaining: non-depletable uses original count; depletable uses remaining count.
+        int reservedRemaining = 0;
+        if (fixedCounts != null)
+        {
+            for (int i = 0; i < fixedCounts.Length; i++)
+            {
+                int contribution;
+                if (countDepletable != null && !countDepletable[i])
+                {
+                    contribution = Mathf.Max(fixedCounts[i], 0);
+                }
+                else
+                {
+                    int rem = remainingCounts != null && i < remainingCounts.Length ? remainingCounts[i] : 0;
+                    contribution = Mathf.Max(rem, 0);
+                }
+                reservedRemaining += contribution;
+            }
+            if (reservedRemaining > remainingSpins) reservedRemaining = remainingSpins;
+        }
+        int randomPoolSize = Mathf.Max(remainingSpins - reservedRemaining, 0);
 
-		if (candidates.Count == 0)
-		{
-			if (doLog) { Debug.Log("ReelStripData: all candidates excluded by MaxPerReel - falling back to unconstrained selection."); var list = symbolDefinitions.Select(sd => sd != null ? (sd.SymbolName ?? sd.name) : "(null)"); Debug.Log($"ReelStripData: availableDefinitions=[{string.Join(",", list)}]"); }
-			return GetWeightedSymbol();
-		}
+        // Total weight across random-eligible symbols (either non-reserved or depletable with remaining == 0).
+        float totalRandomWeight = 0f; bool[] randomEligible = new bool[symbolDefinitions.Length];
+        for (int i = 0; i < symbolDefinitions.Length; i++)
+        {
+            var def = symbolDefinitions[i]; if (def == null) continue;
+            int rem = remainingCounts != null && i < remainingCounts.Length ? remainingCounts[i] : 0;
+            bool deplete = countDepletable != null && i < countDepletable.Length ? countDepletable[i] : true;
+            bool hasReserve = fixedCounts != null && i < fixedCounts.Length && fixedCounts[i] > 0;
+            bool reservedActive = hasReserve && (deplete ? rem > 0 : fixedCounts[i] > 0);
+            if (!reservedActive)
+            {
+                randomEligible[i] = true; totalRandomWeight += def.Weight;
+            }
+        }
 
-		var arr = candidates.ToArray();
-		SymbolDefinition symbolToReturn = WeightedRandom.Pick(arr);
-		if (doLog) Debug.Log($"ReelStripData: selected '{symbolToReturn.SymbolName ?? symbolToReturn.name}' from candidates count={candidates.Count}");
-		return symbolToReturn.CreateInstance();
-	}
+        var candidates = new List<(SymbolDefinition def, float weight, int index)>();
+        for (int i = 0; i < symbolDefinitions.Length; i++)
+        {
+            var def = symbolDefinitions[i]; if (def == null) continue;
+
+            if (existingSelections != null)
+            {
+                int max = def.MaxPerReel; if (max >= 0)
+                {
+                    int used = 0;
+                    if (def.MatchGroupId != 0) { if (groupUsage != null) groupUsage.TryGetValue(def.MatchGroupId, out used); }
+                    else if (existingSelections != null)
+                    {
+                        for (int e = 0; e < existingSelections.Count; e++) { var s = existingSelections[e]; if (s == null) continue; if (!string.IsNullOrEmpty(def.SymbolName) && def.SymbolName == s.Name) used++; }
+                    }
+                    if (used >= max) continue;
+                }
+            }
+
+            bool depleteFlag = countDepletable != null && i < countDepletable.Length ? countDepletable[i] : true;
+            int fixedRem = remainingCounts != null && i < remainingCounts.Length ? remainingCounts[i] : 0;
+            int fixedOrig = fixedCounts != null && i < fixedCounts.Length ? fixedCounts[i] : 0;
+
+            float weightUnits;
+            if ((depleteFlag && fixedRem > 0) || (!depleteFlag && fixedOrig > 0))
+            {
+                // Reserved portion contributes as weight units equal to remaining (if depletable) or original (if non-depletable)
+                // Clamp to remaining spins to avoid overweighting when more reserves than pulls remain.
+                weightUnits = Mathf.Min(depleteFlag ? fixedRem : fixedOrig, remainingSpins);
+            }
+            else
+            {
+                if (randomPoolSize <= 0 || !randomEligible[i] || totalRandomWeight <= 0f) continue;
+                weightUnits = (def.Weight / totalRandomWeight) * randomPoolSize;
+                if (weightUnits <= 0f) continue;
+            }
+            candidates.Add((def, weightUnits, i));
+        }
+
+        if (candidates.Count == 0)
+        {
+            for (int i = 0; i < symbolDefinitions.Length; i++) { var def = symbolDefinitions[i]; if (def == null) continue; candidates.Add((def, Mathf.Max(def.Weight, 1f), i)); }
+            if (candidates.Count == 0) return null;
+        }
+
+        var picker = new List<(SymbolDefinition, float)>(candidates.Count);
+        for (int i = 0; i < candidates.Count; i++) picker.Add((candidates[i].def, candidates[i].weight));
+        var pickedDef = WeightedRandom.Pick(picker) ?? symbolDefinitions.FirstOrDefault(d => d != null);
+        if (pickedDef == null) return null;
+
+        // Consume only if depletable and requested.
+        if (consumeReserved && remainingCounts != null && fixedCounts != null)
+        {
+            for (int i = 0; i < symbolDefinitions.Length; i++)
+            {
+                if (symbolDefinitions[i] == pickedDef)
+                {
+                    bool deplete = countDepletable != null && i < countDepletable.Length ? countDepletable[i] : true;
+                    if (deplete && remainingCounts[i] > 0) remainingCounts[i]--;
+                    break;
+                }
+            }
+        }
+
+        if (existingSelections == null) internalPicksSoFar++;
+        return pickedDef.CreateInstance();
+    }
 }

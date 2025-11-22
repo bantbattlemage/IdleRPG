@@ -17,9 +17,10 @@ MonoBehaviour:
   baseValue: 5
   minWinDepth: 3
   payScaling: 0
-  weight: 1
+  weight: 0.1
   isWild: 0
   allowWildMatch: 1
   winMode: 2
   totalCountTrigger: 3
   maxPerReel: 1
+  matchGroupId: 0
