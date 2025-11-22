@@ -79,7 +79,20 @@ namespace WinlineEvaluator.Tests
                     int extraDepth = matched.Count - trigger.MinWinDepth;
                     long scaled = trigger.BaseValue;
                     if (trigger.PayScaling == PayScaling.DepthSquared) scaled = trigger.BaseValue * (1L << extraDepth);
-                    else if (trigger.PayScaling == PayScaling.PerSymbol) scaled = (long)trigger.BaseValue * matched.Count;
+                    else if (trigger.PayScaling == PayScaling.PerSymbol)
+                    {
+                        // New behavior: count matching symbols across the entire evaluated winline pattern (pattern), not only the contiguous prefix
+                        int totalMatchesAcrossLine = 0;
+                        for (int k = 0; k < pattern.Length; k++)
+                        {
+                            int gi = pattern[k]; if (gi < 0 || gi >= grid.Length) continue;
+                            int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) continue;
+                            var cell = grid[gi]; if (cell == null) continue;
+                            if (cell.Matches(trigger)) totalMatchesAcrossLine++;
+                        }
+                        if (totalMatchesAcrossLine <= 0) totalMatchesAcrossLine = matched.Count;
+                        scaled = (long)trigger.BaseValue * totalMatchesAcrossLine;
+                    }
                     long total = scaled * (i < winMultipliers.Count ? winMultipliers[i] : 1) * creditCost; if (total > int.MaxValue) total = int.MaxValue;
                     results.Add(new WinData(i, (int)total, matched.ToArray()));
                 }
@@ -148,6 +161,37 @@ namespace WinlineEvaluator.Tests
             var winlines = new List<int[]> { new int[] {0,1,2,3} }; var mults = new List<int> {1};
             var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,4,new[]{1,1,1,1},winlines,mults);
             Assert.AreEqual(1, wins.Count); Assert.AreEqual(16, wins[0].Value);
+        }
+
+        [Test]
+        public void PerSymbol_IncludesLaterMatchesAcrossLine()
+        {
+            // New behavior: PerSymbol payout counts all matches across the winline pattern, even if a gap exists in the contiguous prefix.
+            var a = new SymbolData("A", 10, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
+            var b = new SymbolData("B", 1, -1, false);
+            var grid = new[] { a, b, a };
+            var winlines = new List<int[]> { new int[] {0,1,2} };
+            var mults = new List<int> {1};
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid,3,new[]{1,1,1},winlines,mults);
+            // trigger MinWinDepth=1 satisfied by contiguous prefix (only index 0), but payout should count both index 0 and 2 => 2 * base 10 = 20
+            Assert.AreEqual(1, wins.Count);
+            Assert.AreEqual(20, wins[0].Value);
+        }
+
+        [Test]
+        public void PerSymbol_StillRequiresContiguousTriggerDepth()
+        {
+            // Ensure trigger requirement unchanged: contiguous prefix must meet MinWinDepth even if total matches across line reach the threshold.
+            var a = new SymbolData("A", 5, 3, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol); // MinWinDepth = 3
+            var b = new SymbolData("B", 1, -1, false);
+            // Pattern positions 0,1,2,3 -> matches at 0,2,3 (total 3) but contiguous prefix only 1 -> should NOT award
+            var grid = new[] { a, b, a, a };
+            var winlines = new List<int[]> { new int[] {0,1,2,3} };
+            var mults = new List<int> {1};
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid,4,new[]{1,1,1,1},winlines,mults);
+            Assert.AreEqual(0, wins.Count);
         }
 
         [Test]
@@ -232,6 +276,34 @@ namespace WinlineEvaluator.Tests
             var grid = new[] { wildCount, wildCount };
             var wins = new WinlineEvaluator().EvaluateWins(grid,2,new[]{1,1}, new List<int[]>(), new List<int>());
             Assert.AreEqual(0, wins.Count);
+        }
+
+        [Test]
+        public void PerSymbol_CountsWildMatchesAcrossLine()
+        {
+            // PerSymbol payout should count wilds that are permitted to match the trigger
+            var a = new SymbolData("A", 2, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
+            var w = new SymbolData("W", 0, -1, true, SymbolWinMode.LineMatch, PayScaling.PerSymbol, totalCountTrigger: -1, matchGroupId: 0, allowWild: true);
+            var grid = new[] { a, w, a };
+            var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
+            var mults = new List<int> { 1 };
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid, 3, new[] { 1, 1, 1 }, winlines, mults);
+            // trigger contiguous prefix satisfied by index 0 => MinWinDepth=1, payout counts wild at idx1 -> totalMatches=3 => 3 * base 2 = 6
+            Assert.AreEqual(1, wins.Count);
+            Assert.AreEqual(6, wins[0].Value);
+        }
+
+        [Test]
+        public void TotalCount_DepthSquared_Works_InWinlineEvaluatorTests()
+        {
+            var cnt = new SymbolData("CNT", 3, -1, false, SymbolWinMode.TotalCount, PayScaling.DepthSquared, totalCountTrigger: 2, matchGroupId: 11);
+            var grid = new[] { cnt, cnt, cnt };
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid, 3, new[] { 1, 1, 1 }, new List<int[]>(), new List<int>());
+            Assert.AreEqual(1, wins.Count);
+            // count=3 trigger=2 extra=1 => scaled = base 3 * 2^1 = 6
+            Assert.AreEqual(6, wins[0].Value);
         }
     }
 }

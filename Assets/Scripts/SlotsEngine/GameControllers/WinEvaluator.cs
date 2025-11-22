@@ -467,7 +467,26 @@ public class WinEvaluator : Singleton<WinEvaluator>
                     case PayScaling.PerSymbol:
                     {
                         // Pay base value times number of matched symbols for line wins
-                        scaled = (long)baseVal * matchCount;
+                        // Important: trigger (min depth) still uses contiguous prefix (matchCount) to determine if a win is awarded.
+                        // For PerSymbol on LineMatch wins we calculate payout using the total number of matching symbols across the
+                        // entire evaluated winline pattern (concrete), not only the contiguous prefix. This preserves trigger semantics
+                        // but allows symbols later in the line to contribute to the per-symbol payout.
+                        int totalMatchesAcrossLine = 0;
+                        for (int c = 0; c < concrete.Length; c++)
+                        {
+                            int idx = concrete[c];
+                            if (idx < 0 || idx >= grid.Length) continue;
+                            int col = idx % columns;
+                            int row = idx / columns;
+                            if (row >= rowsPerColumn[col]) continue;
+                            var cellForCount = grid[idx];
+                            if (cellForCount == null) continue;
+                            if (cellForCount.Matches(trigger)) totalMatchesAcrossLine++;
+                        }
+
+                        // Fallback to contiguous matchCount if something unexpected happens (defensive)
+                        if (totalMatchesAcrossLine <= 0) totalMatchesAcrossLine = matchCount;
+                        scaled = (long)baseVal * totalMatchesAcrossLine;
                         break;
                     }
                     default:
@@ -488,11 +507,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
 
                 if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
                     Debug.Log($"Winline {i}: WIN! trigger={trigger.Name} matches={matchCount} baseValue={baseVal} scaled={scaled} lineMultiplier={winlineDef.WinMultiplier} totalValue={finalValue}");
-            }
-            else
-            {
-                if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                    Debug.Log($"Winline {i}: insufficient matches - found={matchCount} required={trigger.MinWinDepth}.");
             }
         }
 
@@ -628,7 +642,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
         }
 
         currentSpinWinData = winData;
-
         return winData;
     }
 
