@@ -72,14 +72,7 @@ public class ObjectPool<T> where T : MonoBehaviour
 
 	private void PrepareForUse(T instance, Transform parent)
 	{
-		// Ensure the instance is parented to the requested parent (or poolRoot if null)
 		instance.transform.SetParent(parent ?? poolRoot, worldPositionStays: false);
-
-		// Reset transform local state to avoid carrying over stale positions/rotations/scales from previous usage
-		instance.transform.localPosition = Vector3.zero;
-		instance.transform.localRotation = Quaternion.identity;
-		instance.transform.localScale = Vector3.one;
-
 		instance.gameObject.SetActive(true);
 		onGet?.Invoke(instance);
 	}
@@ -89,13 +82,7 @@ public class ObjectPool<T> where T : MonoBehaviour
 		if (instance == null) return;
 		onRelease?.Invoke(instance);
 		instance.gameObject.SetActive(false);
-
-		// Reparent under pool root and reset local transform so pooled items don't remain positioned in a scene hierarchy
 		instance.transform.SetParent(poolRoot, worldPositionStays: false);
-		instance.transform.localPosition = Vector3.zero;
-		instance.transform.localRotation = Quaternion.identity;
-		instance.transform.localScale = Vector3.one;
-
 		pool.Push(instance);
 	}
 

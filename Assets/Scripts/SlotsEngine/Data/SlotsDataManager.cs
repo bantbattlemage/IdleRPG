@@ -65,6 +65,23 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		DataPersistenceManager.Instance.SaveGame();
 	}
 
+	public void RemoveSlotsDataIfExists(SlotsData data)
+	{
+		if (data == null || LocalData == null) return;
+
+		if (LocalData.ContainsKey(data.AccessorId))
+		{
+			// Remove contained reel & symbol data to prevent orphaned entries
+			foreach (var reel in data.CurrentReelData.ToList())
+			{
+				if (reel != null) ReelDataManager.Instance.RemoveDataIfExists(reel);
+			}
+
+			LocalData.Remove(data.AccessorId);
+			DataPersistenceManager.Instance.SaveGame();
+		}
+	}
+
 	public void ClearSlotsData()
 	{
 		ClearData();

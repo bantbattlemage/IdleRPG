@@ -44,6 +44,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a79ef9aac105ee345b72051d783b0e5c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameReel
-  MaxDummyPerSide: 100
-  ExtraViewportBuffer: 8
-  DebugDummyCounts: 1
+  SymbolPrefab: {fileID: 2521349119243036360, guid: a1f3f567cc845364e986f00b0bb2c706, type: 3}
+  Strip: {fileID: 11400000, guid: 367f52360dfc12645a3647fcbe62540c, type: 2}
