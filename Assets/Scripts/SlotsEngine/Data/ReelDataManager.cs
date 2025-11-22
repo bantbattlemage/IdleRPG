@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Collections.Generic;
 
 public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 {
@@ -45,5 +46,31 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 			LocalData.Remove(data.AccessorId);
 			DataPersistenceManager.Instance.SaveGame();
 		}
+	}
+
+	public void SoftUpdateSymbolCount(ReelData reelData, int desiredCount)
+	{
+		if (reelData == null) return;
+		if (desiredCount < 1) desiredCount = 1;
+
+		// Adjust underlying symbol data list length gracefully maintaining existing entries
+		List<SymbolData> list = reelData.CurrentSymbolData != null
+			? new List<SymbolData>(reelData.CurrentSymbolData)
+			: new List<SymbolData>();
+
+		if (list.Count > desiredCount)
+		{
+			list.RemoveRange(desiredCount, list.Count - desiredCount);
+		}
+		else if (list.Count < desiredCount)
+		{
+			for (int i = list.Count; i < desiredCount; i++)
+			{
+				list.Add(reelData.CurrentReelStrip?.GetWeightedSymbol());
+			}
+		}
+
+		reelData.SetCurrentSymbolData(list);
+		DataPersistenceManager.Instance.SaveGame();
 	}
 }

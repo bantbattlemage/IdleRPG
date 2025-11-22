@@ -23,5 +23,8 @@ public enum SlotsEvent
 	StopButtonPressed,
 	BetUpPressed,
 	BetDownPressed,
-	PlayerInputPressed
+	PlayerInputPressed,
+
+	// slot management
+	AllSlotsRemoved
 }

@@ -157,34 +157,28 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private void RemoveSlots(SlotsEngine slotsToRemove)
 	{
-		if (slotsToRemove == null)
-		{
-			throw new ArgumentNullException(nameof(slotsToRemove));
-		}
+		if (slotsToRemove == null) throw new ArgumentNullException(nameof(slotsToRemove));
+		if (!playerSlots.Contains(slotsToRemove)) throw new Exception("Tried to remove slots that player doesn't have!");
+		if (slotsToRemove.CurrentState == State.Spinning) { Debug.LogWarning("Cannot remove slots while spinning."); return; }
 
-		if (!playerSlots.Contains(slotsToRemove))
-		{
-			throw new Exception("Tried to remove slots that player doesn't have!");
-		}
+		// Remove player data entry if present
+		if (slotsToRemove.CurrentSlotsData != null) playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
 
-		// Prevent removal while the slot is actively spinning
-		if (slotsToRemove.CurrentState == State.Spinning)
+		// Remove from list first
+		playerSlots.Remove(slotsToRemove);
+
+		// Destroy engine (SlotsEngineManager will broadcast AllSlotsRemoved if it becomes empty)
+		SlotsEngineManager.Instance.DestroySlots(slotsToRemove);
+
+		// Allow zero-slot state: do NOT auto-respawn.
+		if (playerSlots.Count == 0)
 		{
-			Debug.LogWarning("Cannot remove slots while spinning.");
+			// Optional broadcast (manager already broadcasts); keep single source -> no extra action here.
 			return;
 		}
 
-		// Remove player data entry if present
-		if (slotsToRemove.CurrentSlotsData != null)
-		{
-			playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
-		}
-
-		// Remove from our active list first to avoid callers accessing it during destroy
-		playerSlots.Remove(slotsToRemove);
-
-		// Destroy visual/engine objects
-		SlotsEngineManager.Instance.DestroySlots(slotsToRemove);
+		// Adjust layout for remaining slots
+		SlotsEngineManager.Instance.AdjustSlotsCanvases();
 	}
 
 	public bool RequestSpinPurchase()
