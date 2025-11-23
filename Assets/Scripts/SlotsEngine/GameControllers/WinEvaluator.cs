@@ -235,7 +235,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
                     int[] concrete = wl.GenerateIndexes(columns, rowsPerColumn ?? new int[columns]);
                     if (concrete == null) concrete = new int[0];
 
-                    sb.Append("Winline["); sb.Append(wi); sb.Append("] '"); sb.Append(wl.name); sb.Append("' pattern="); sb.Append(wl.Pattern); sb.Append(" concrete=[");
+                    sb.Append("Winline["); sb.Append(wi); sb.Append(") '"); sb.Append(wl.name); sb.Append("' pattern="); sb.Append(wl.Pattern); sb.Append(" concrete[");
                     for (int c = 0; c < concrete.Length; c++)
                     {
                         if (c > 0) sb.Append(","); sb.Append(concrete[c]);
@@ -257,13 +257,13 @@ public class WinEvaluator : Singleton<WinEvaluator>
 
                     // Build names array without LINQ allocations
                     var idxs = w.WinningSymbolIndexes ?? new int[0];
-                    sb.Append($"Win[{i}] LineIndex={w.LineIndex} WinValue={w.WinValue} Indexes=[");
+                    sb.Append($"Win[{i}] LineIndex={w.LineIndex} WinValue={w.WinValue} Indexes[");
                     for (int x = 0; x < idxs.Length; x++)
                     {
                         if (x > 0) sb.Append(",");
                         sb.Append(idxs[x]);
                     }
-                    sb.Append("] names=[");
+                    sb.Append("] names[");
 
                     for (int x = 0; x < idxs.Length; x++)
                     {
@@ -288,11 +288,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
             // Persist to file in one operation
             AppendToCurrentSpinLog(sb);
 
-            // Also print location for convenience (editor/log)
-            if (!string.IsNullOrEmpty(currentSpinLogFilePath))
-            {
-                Debug.Log($"Spin log written to: {currentSpinLogFilePath}");
-            }
+            // Also print location for convenience (editor/log) - omitted to avoid noise
         }
         catch (Exception ex)
         {
@@ -360,16 +356,12 @@ public class WinEvaluator : Singleton<WinEvaluator>
             int firstIndex = concrete.Length > 0 ? concrete[0] : -1;
             if (firstIndex < 0 || firstIndex >= grid.Length)
             {
-                if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                    Debug.Log($"Winline {i}: leftmost cell invalid or missing (idx={firstIndex}).");
                 continue;
             }
 
             var trigger = grid[firstIndex];
             if (trigger == null)
             {
-                if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                    Debug.Log($"Winline {i}: leftmost cell is null (idx={firstIndex}).");
                 continue;
             }
 
@@ -390,17 +382,15 @@ public class WinEvaluator : Singleton<WinEvaluator>
                     }
                     if (altIndex >= 0)
                     {
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"Winline {i}: leftmost wild fallback -> using idx={altIndex} '{trigger.Name}' as trigger.");
+                        // no-op
                     }
                     else
                     {
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"Winline {i}: no valid fallback trigger found for leading wild '{trigger.Name}'.");
                         continue;
                     }
                 }
                 else
                 {
-                    if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"Winline {i}: leftmost symbol '{trigger.Name}' cannot trigger line wins (MinWinDepth={trigger.MinWinDepth}, WinMode={trigger.WinMode}).");
                     continue;
                 }
             }
@@ -408,8 +398,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
             // If the resolved trigger has no positive BaseValue it cannot award a win; skip early
             if (trigger.BaseValue <= 0)
             {
-                if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                    Debug.Log($"Winline {i}: trigger '{trigger.Name}' cannot award wins because BaseValue={trigger.BaseValue}.");
                 continue;
             }
 
@@ -448,8 +436,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
                 // baseVal already checked earlier; keep check here in case trigger was changed
                 if (baseVal <= 0)
                 {
-                    if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                        Debug.Log($"Winline {i}: trigger '{trigger.Name}' has non-positive BaseValue ({baseVal}).");
                     continue;
                 }
 
@@ -504,9 +490,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
                 int finalValue = (int)total;
 
                 winData.Add(new WinData(i, finalValue, winningIndexes.ToArray()));
-
-                if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                    Debug.Log($"Winline {i}: WIN! trigger={trigger.Name} matches={matchCount} baseValue={baseVal} scaled={scaled} lineMultiplier={winlineDef.WinMultiplier} totalValue={finalValue}");
             }
         }
 
@@ -554,11 +537,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
                     int finalValue = (int)total;
 
                     winData.Add(new WinData(NonWinlineIndex, finalValue, new int[] { idx }));
-
-                    if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                        Debug.Log($"SymbolWin: SingleOnReel trigger={cell.Name} at idx={idx} value={finalValue}");
-
-                    // continue; allow multiple SingleOnReel instances across grid
                 }
 
                 // TotalCount: evaluate once per match-group id rather than per symbol name
@@ -590,8 +568,6 @@ public class WinEvaluator : Singleton<WinEvaluator>
 
                     if (exactMatches == 0)
                     {
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"SymbolWin: TotalCount trigger '{cell.Name}' skipped because no exact symbol instances were present (wilds ignored). GroupId={groupId}");
                         continue;
                     }
 
@@ -624,21 +600,13 @@ public class WinEvaluator : Singleton<WinEvaluator>
                         int finalValue = (int)total;
 
                         winData.Add(new WinData(NonWinlineIndex, finalValue, matching.ToArray()));
-
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"SymbolWin: TotalCount WIN! trigger={cell.Name} count={count} required={cell.TotalCountTrigger} baseValue={cell.BaseValue} scaled={scaled} totalValue={finalValue} GroupId={groupId}");
-                    }
-                    else
-                    {
-                        if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild))
-                            Debug.Log($"SymbolWin: TotalCount '{cell.Name}' not reached ({count}/{cell.TotalCountTrigger}). GroupId={groupId}");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            if (LoggingEnabled && (Application.isEditor || Debug.isDebugBuild)) Debug.Log($"SymbolWin evaluation exception: {ex.Message}");
+            Debug.LogWarning($"SymbolWin evaluation exception: {ex.Message}");
         }
 
         currentSpinWinData = winData;

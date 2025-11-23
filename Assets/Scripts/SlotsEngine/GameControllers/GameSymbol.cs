@@ -87,8 +87,11 @@ public class GameSymbol : MonoBehaviour
 
 		cachedImage.color = highlight;
 		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
-		// register in centralized pool for grouped kill support
-		if (activeTweener != null && TweenPool.Instance != null) TweenPool.Instance.Register(this, activeTweener);
+		// set DOTween target so it can be killed via DOTween.Kill(this)
+		if (activeTweener != null)
+		{
+			try { activeTweener.SetTarget(this); } catch { }
+		}
 	}
 
 	private void OnSymbolLanded(object obj)
@@ -124,8 +127,8 @@ public class GameSymbol : MonoBehaviour
 		if (cachedImage != null) cachedImage.DOKill();
 		transform.DOKill();
 
-		// ensure TweenPool clears any registered tweens for this owner
-		if (TweenPool.Instance != null) TweenPool.Instance.KillOwner(this);
+		// kill any tweens that targeted this object (replaces previous TweenPool behavior)
+		try { DOTween.Kill(this); } catch { }
 	}
 
 	private void OnDestroy()

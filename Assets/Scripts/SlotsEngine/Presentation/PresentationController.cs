@@ -74,27 +74,6 @@ public class PresentationController : Singleton<PresentationController>
 			{
 				var temp = WinlineDefinition.CreateRuntimeStraightAcross(r, 1);
 				evalWinlines.Add(temp);
-				if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled)
-					Debug.Log($"Added temporary StraightAcross winline for row {r}");
-			}
-		}
-
-		// Debug logging of cloned winlines and their generated indexes
-		if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled)
-		{
-			Debug.Log($"Presentation: columns={columns}, rowsPerColumn=[{string.Join(",", rowsPerColumn)}] clonedWinlines={evalWinlines.Count}");
-			for (int i = 0; i < currentSymbolGrid.Length; i++)
-			{
-				var gs = currentSymbolGrid[i];
-				var sd = gs?.CurrentSymbolData;
-				Debug.Log($"Grid idx={i}: name={(sd!=null?sd.Name:"null")} minWin={(sd!=null?sd.MinWinDepth:-999)} baseValue={(sd!=null?sd.BaseValue:0)} scaling={(sd!=null?sd.PayScaling.ToString():"(none)")} wild={(sd!=null&&sd.IsWild)} allowWild={(sd!=null&&sd.AllowWildMatch)}");
-			}
-			for (int wi = 0; wi < evalWinlines.Count; wi++)
-			{
-				var wl = evalWinlines[wi];
-				int[] concrete = wl.GenerateIndexes(columns, rowsPerColumn);
-				var names = concrete.Select(idx => (idx >= 0 && idx < currentSymbolGrid.Length && currentSymbolGrid[idx] != null) ? currentSymbolGrid[idx].CurrentSymbolData?.Name ?? "(null)" : "null").ToArray();
-				Debug.Log($"EvalWinline[{wi}] '{wl.name}' pattern={wl.Pattern} rowIndex={wl.RowIndex} rowOffset={wl.RowOffset} multiplier={wl.WinMultiplier} concrete=[{string.Join(",", concrete)}] names=[{string.Join(",", names)}]");
 			}
 		}
 
