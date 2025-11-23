@@ -13,6 +13,11 @@ using UnityEngine;
 /// Notes:
 /// - Exceptions thrown by handlers are caught and logged to avoid breaking the broadcast loop.
 /// - Logging can be toggled via <see cref="LoggingEnabled"/> for development diagnostics.
+///
+/// Performance:
+/// - Broadcasts used to allocate a new array snapshot on every call (ToArray()). This created significant
+///   GC pressure when many broadcasts occurred each frame. This implementation caches a snapshot per
+///   event channel and only rebuilds it when handlers change (on register/unregister).
 /// </summary>
 public class EventManager
 {
@@ -20,7 +25,39 @@ public class EventManager
 	public static bool LoggingEnabled = false;
 
 	// internal string-keyed channels
-	private Dictionary<string, List<Action<object>>> events = new Dictionary<string, List<Action<object>>>();
+	private Dictionary<string, EventChannel> events = new Dictionary<string, EventChannel>();
+
+	// Internal per-channel container that holds the mutable handler list and a cached snapshot array.
+	private class EventChannel
+	{
+		public readonly List<Action<object>> Handlers = new List<Action<object>>();
+		public Action<object>[] Snapshot;
+		public bool Dirty = true;
+
+		public void Add(Action<object> a)
+		{
+			Handlers.Add(a);
+			Dirty = true;
+		}
+
+		public void Remove(Action<object> a)
+		{
+			Handlers.Remove(a);
+			Dirty = true;
+		}
+
+		public bool HasHandlers() => Handlers.Count > 0;
+
+		public Action<object>[] GetSnapshot()
+		{
+			if (Dirty)
+			{
+				Snapshot = Handlers.Count == 0 ? Array.Empty<Action<object>>() : Handlers.ToArray();
+				Dirty = false;
+			}
+			return Snapshot;
+		}
+	}
 
 	// Internal helpers that operate on composed string keys
 	/// <summary>
@@ -31,13 +68,15 @@ public class EventManager
 		if (string.IsNullOrEmpty(eventKey)) throw new ArgumentNullException(nameof(eventKey));
 		if (action == null) throw new ArgumentNullException(nameof(action));
 
-		if (events.TryGetValue(eventKey, out List<Action<object>> currentRegisteredEvents))
+		if (events.TryGetValue(eventKey, out EventChannel currentChannel))
 		{
-			currentRegisteredEvents.Add(action);
+			currentChannel.Add(action);
 		}
 		else
 		{
-			events.Add(eventKey, new List<Action<object>>() { action });
+			var channel = new EventChannel();
+			channel.Add(action);
+			events.Add(eventKey, channel);
 		}
 	}
 
@@ -49,10 +88,10 @@ public class EventManager
 		if (string.IsNullOrEmpty(eventKey)) throw new ArgumentNullException(nameof(eventKey));
 		if (action == null) throw new ArgumentNullException(nameof(action));
 
-		if (events.TryGetValue(eventKey, out List<Action<object>> currentRegisteredEvents))
+		if (events.TryGetValue(eventKey, out EventChannel currentChannel))
 		{
-			currentRegisteredEvents.Remove(action);
-			if (currentRegisteredEvents.Count == 0)
+			currentChannel.Remove(action);
+			if (!currentChannel.HasHandlers())
 			{
 				events.Remove(eventKey);
 			}
@@ -65,19 +104,18 @@ public class EventManager
 
 	/// <summary>
 	/// Broadcasts a value to all handlers registered under the composed key.
-	/// Iterates over a snapshot of the handler list so handlers may safely modify subscriptions.
-	/// Exceptions thrown by handlers are caught and logged to avoid breaking the broadcast loop.
+	/// Iterates over a cached snapshot so handlers may safely modify subscriptions. Exceptions thrown by handlers are caught and logged to avoid breaking the broadcast loop.
 	/// </summary>
 	private void BroadcastByKey(string eventKey, object value = null)
 	{
 		if (string.IsNullOrEmpty(eventKey)) throw new ArgumentNullException(nameof(eventKey));
 
-		if (events.TryGetValue(eventKey, out List<Action<object>> currentRegisteredEvents))
+		if (events.TryGetValue(eventKey, out EventChannel currentChannel))
 		{
-			// iterate over a copy to avoid collection modified issues
-			var copy = currentRegisteredEvents.ToArray();
-			foreach (Action<object> e in copy)
+			var snapshot = currentChannel.GetSnapshot();
+			for (int i = 0; i < snapshot.Length; i++)
 			{
+				var e = snapshot[i];
 				if (e == null) continue;
 				try
 				{
@@ -102,7 +140,7 @@ public class EventManager
 	private bool HasSubscribersByKey(string eventKey)
 	{
 		if (string.IsNullOrEmpty(eventKey)) return false;
-		return events.TryGetValue(eventKey, out var list) && list.Count > 0;
+		return events.TryGetValue(eventKey, out var channel) && channel.HasHandlers();
 	}
 
 	// -------------------- Public enum-based API --------------------
