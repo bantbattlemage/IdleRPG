@@ -29,6 +29,8 @@ public class GameReel : MonoBehaviour
 
     // --- New: persistent per-reel pooled symbols (dummies + active + buffer)
     private List<GameSymbol> allPooledSymbols = new List<GameSymbol>();
+    // Added: hash set mirror for O(1) membership checks (avoids linear .Contains in tight loops)
+    private HashSet<GameSymbol> allPooledSet = new HashSet<GameSymbol>();
     private HashSet<GameSymbol> allocatedPooledSet = new HashSet<GameSymbol>();
     // Free-list stack to avoid linear scans when allocating
     private Stack<GameSymbol> freePooledStack = new Stack<GameSymbol>();
@@ -41,7 +43,7 @@ public class GameReel : MonoBehaviour
     private Coroutine beginSpinCoroutine;
     private Coroutine stopReelCoroutine;
 
-    // Pending solution holder used to avoid allocating closures for per-tween OnComplete
+    // Pending solution holder to avoid allocating closures for per-tween OnComplete
     private List<SymbolData> pendingLandingSolution;
 
     // Landing completion counter to wait for both tweens to finish (safer than single OnComplete)
@@ -54,15 +56,15 @@ public class GameReel : MonoBehaviour
     private List<SymbolData> tmpSelectedForThisReel = new List<SymbolData>();
     private List<SymbolData> tmpCombinedExisting = new List<SymbolData>();
     private List<SymbolData> tmpCombinedForBuffer = new List<SymbolData>();
+    // Reuse list for next reel symbols to avoid per-spin allocation
+    private List<GameSymbol> tmpNextReelSymbols = new List<GameSymbol>();
 
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition, SlotsEngine owner)
     {
         currentReelData = data; id = reelID; eventManager = slotsEventManager; reelStrip = stripDefinition.CreateInstance(); ownerEngine = owner;
-        // Cache common singletons early to avoid repeated Instance calls and to make CreateSymbolInstance/EnsurePooledSymbolCapacity use the cached pool
         cachedSymbolPool = GameSymbolPool.Instance;
         reelStrip.ResetSpinCounts();
         EnsureRootsCreated();
-        // Prewarm per-reel pool to estimated capacity BEFORE spawning so SpawnReel can use pooled symbols
         int est = EstimateNeededPooledCapacity();
         EnsurePooledSymbolCapacity(est);
         SpawnReel(currentReelData.CurrentSymbolData);
@@ -70,11 +72,9 @@ public class GameReel : MonoBehaviour
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripData stripData, SlotsEngine owner)
     {
         currentReelData = data; id = reelID; eventManager = slotsEventManager; reelStrip = stripData; ownerEngine = owner;
-        // Cache common singletons early to avoid repeated Instance calls
         cachedSymbolPool = GameSymbolPool.Instance;
         reelStrip.ResetSpinCounts();
         EnsureRootsCreated();
-        // Prewarm per-reel pool to estimated capacity BEFORE spawning so SpawnReel can use pooled symbols
         int est = EstimateNeededPooledCapacity();
         EnsurePooledSymbolCapacity(est);
         SpawnReel(currentReelData.CurrentSymbolData);
@@ -189,7 +189,7 @@ public class GameReel : MonoBehaviour
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym);
+                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
@@ -214,7 +214,7 @@ public class GameReel : MonoBehaviour
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym);
+                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
@@ -242,8 +242,9 @@ public class GameReel : MonoBehaviour
         void ClearList(List<GameSymbol> list)
         {
             if (list == null) return;
-            foreach (var g in list)
+            for (int i = 0; i < list.Count; i++)
             {
+                var g = list[i];
                 if (g == null) continue;
                 // Stop any active tweens and kill DOTween tweens targeting this symbol
                 g.StopAndClearTweens();
@@ -347,7 +348,7 @@ public class GameReel : MonoBehaviour
         ReleaseAllSymbolsInRoot(nextSymbolsRoot);
 
         // Prepare new symbols for the incoming reel
-        List<GameSymbol> newSymbols = new List<GameSymbol>();
+        tmpNextReelSymbols.Clear();
         float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
 
         tmpCombinedExisting.Clear();
@@ -377,11 +378,11 @@ public class GameReel : MonoBehaviour
             if (symbol != null) symbol.ApplySymbol(def);
             if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
-            newSymbols.Add(symbol);
+            tmpNextReelSymbols.Add(symbol);
             if (def != null) tmpCombinedExisting.Add(def);
         }
 
-        bufferSymbols = newSymbols;
+        bufferSymbols = tmpNextReelSymbols;
 
         // Compute dummy counts for the buffer (so we can position the next root correctly)
         ComputeDummyCounts(out int topCount, out int bottomCount);
@@ -404,7 +405,7 @@ public class GameReel : MonoBehaviour
                 SymbolData initDef = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym);
+                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
@@ -428,7 +429,7 @@ public class GameReel : MonoBehaviour
                 SymbolData initDef = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym);
+                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
@@ -469,7 +470,7 @@ public class GameReel : MonoBehaviour
                 var c = nextSymbolsRoot.GetChild(i);
                 if (c == null) continue;
                 RectTransform rt = null;
-                if (c.TryGetComponent<GameSymbol>(out var gs) && gs != null) rt = gs.CachedRect;
+                if (c.TryGetComponent<GameSymbol>(out var gs2) && gs2 != null) rt = gs2.CachedRect;
                 if (rt == null) rt = c as RectTransform ?? c.GetComponent<RectTransform>();
                 if (rt == null) continue;
                 float bottom = c.localPosition.y - (rt.rect.height * rt.pivot.y);
@@ -488,7 +489,6 @@ public class GameReel : MonoBehaviour
 
     private List<GameSymbol> SpawnDummySymbols(Transform root, bool bottom, int count, bool dim, List<SymbolData> existingSelections, bool consume)
     {
-        // This method kept for compatibility but now backed by persistent dummy pool logic.
         List<GameSymbol> dummies = new List<GameSymbol>(); if (count <= 0) return dummies; float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize; int startIndex = bottom ? 1 : currentReelData.SymbolCount; int flip = bottom ? -1 : 1; Color dimColor = new Color(0.5f, 0.5f, 0.5f);
 
         for (int i = 0; i < count; i++)
@@ -500,7 +500,7 @@ public class GameReel : MonoBehaviour
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym);
+                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, consume);
@@ -517,19 +517,19 @@ public class GameReel : MonoBehaviour
 
     public void FallOut(List<SymbolData> solution = null, bool kickback = false)
     {
-        ResetDimmedSymbols(); SpawnNextReel(solution); float fallDistance = -nextSymbolsRoot.transform.localPosition.y; float duration = currentReelData.ReelSpinDuration;
-        // Use integer counter to wait for both movements to finish to avoid race conditions
+        // Removed duplicated calls & duplicate coroutine starts to reduce CPU & GC overhead
+        ResetDimmedSymbols();
+        SpawnNextReel(solution);
+        float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
+        float duration = currentReelData.ReelSpinDuration;
         pendingLandingSolution = solution;
         landingPendingCount = 2;
 
-        // Stop any existing active spin coroutines
         if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
         if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
 
-        // reset speed multiplier
         spinSpeedMultiplier = 1f;
 
-        // Start lightweight coroutines for linear movement (cheaper than DOTween when linear)
         if (symbolRoot != null)
             activeSpinCoroutines[0] = StartCoroutine(MoveLocalY(symbolRoot, fallDistance, duration, 0));
         if (nextSymbolsRoot != null)
@@ -574,7 +574,6 @@ public class GameReel : MonoBehaviour
 
     private void LandingPartCompleted()
     {
-        // Decrement counter and only proceed when both coroutines have reported completion
         landingPendingCount--;
         if (landingPendingCount <= 0)
         {
@@ -623,7 +622,6 @@ public class GameReel : MonoBehaviour
     {
         if (symbolRoot == null) return;
 
-        // Return active dummies to pool (do not release to global pool - keep persistent per-reel)
         foreach (var d in topDummySymbols)
             if (d != null) ReleasePooledSymbol(d);
         topDummySymbols.Clear();
@@ -644,7 +642,6 @@ public class GameReel : MonoBehaviour
     {
         if (root == null) return;
 
-        // Iterate backwards over children to avoid allocating a temporary list
         for (int i = root.childCount - 1; i >= 0; i--)
         {
             var child = root.GetChild(i);
@@ -655,7 +652,7 @@ public class GameReel : MonoBehaviour
                 RemoveFromAllLists(symbol);
 
                 // If this symbol is part of the persistent per-reel dummy pool, return it to the dummy container
-                if (allPooledSymbols != null && allPooledSymbols.Contains(symbol))
+                if (allPooledSymbols != null && allPooledSet.Contains(symbol))
                 {
                     // mark it free and reparent to dummy container rather than releasing to global pool
                     ReleasePooledSymbol(symbol);
@@ -678,18 +675,15 @@ public class GameReel : MonoBehaviour
     {
         if (symbol == null) return;
 
-        // Use RemoveAll to handle potential multiple occurrences (defensive)
-        symbols.RemoveAll(s => s == symbol);
-        topDummySymbols.RemoveAll(s => s == symbol);
-        bottomDummySymbols.RemoveAll(s => s == symbol);
-        bufferSymbols.RemoveAll(s => s == symbol);
-        bufferTopDummySymbols.RemoveAll(s => s == symbol);
-        bufferBottomDummySymbols.RemoveAll(s => s == symbol);
+        // Manual removal to avoid predicate allocations from List.RemoveAll
+        for (int i = symbols.Count - 1; i >= 0; i--) if (symbols[i] == symbol) symbols.RemoveAt(i);
+        for (int i = topDummySymbols.Count - 1; i >= 0; i--) if (topDummySymbols[i] == symbol) topDummySymbols.RemoveAt(i);
+        for (int i = bottomDummySymbols.Count - 1; i >= 0; i--) if (bottomDummySymbols[i] == symbol) bottomDummySymbols.RemoveAt(i);
+        for (int i = bufferSymbols.Count - 1; i >= 0; i--) if (bufferSymbols[i] == symbol) bufferSymbols.RemoveAt(i);
+        for (int i = bufferTopDummySymbols.Count - 1; i >= 0; i--) if (bufferTopDummySymbols[i] == symbol) bufferTopDummySymbols.RemoveAt(i);
+        for (int i = bufferBottomDummySymbols.Count - 1; i >= 0; i--) if (bufferBottomDummySymbols[i] == symbol) bufferBottomDummySymbols.RemoveAt(i);
 
-        // Also ensure it is not allocated in our allocation set
         if (allocatedPooledSet.Contains(symbol)) allocatedPooledSet.Remove(symbol);
-
-        // If present in free stack, we can't remove it efficiently; leaving nulls handled in Acquire logic
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -797,7 +791,7 @@ private void ValidateNoSharedInstances()
                 sym.SetSizeAndLocalY(currentReelData != null ? currentReelData.SymbolSize : 100, 0);
                 // keep pool symbols inactive until allocated
                 if (sym.gameObject.activeSelf) sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym);
+                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 // newly created symbol is free until allocated
                 if (allocatedPooledSet.Contains(sym)) allocatedPooledSet.Remove(sym);
                 freePooledStack.Push(sym);
@@ -869,7 +863,7 @@ private void ValidateNoSharedInstances()
             SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
             if (def != null) newSym.InitializeSymbol(def, eventManager);
             if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
-            allPooledSymbols.Add(newSym);
+            allPooledSymbols.Add(newSym); allPooledSet.Add(newSym);
             allocatedPooledSet.Add(newSym);
             return newSym;
         }
