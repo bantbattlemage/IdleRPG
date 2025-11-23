@@ -177,7 +177,9 @@ public class GameReel : MonoBehaviour
         foreach (var d in bottomDummySymbols) ReleasePooledSymbol(d);
         topDummySymbols.Clear(); bottomDummySymbols.Clear();
 
-        // Use non-consuming selection for dummy symbols to avoid draining reserved counts prematurely.
+        // Calculate step size for positioning
+        float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+
         // Allocate bottom dummies first (positions below)
         for (int i = 0; i < bottomCount; i++)
         {
@@ -195,10 +197,8 @@ public class GameReel : MonoBehaviour
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
             sym.ApplySymbol(def);
             sym.transform.SetParent(symbolRoot, false);
-            float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
             float y = -step * (i + 1);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-            var img = sym.CachedImage; if (img != null) { img.DOKill(); img.color = Color.gray; }
             if (def != null) existingSelections?.Add(def);
             bottomDummySymbols.Add(sym);
         }
@@ -220,10 +220,8 @@ public class GameReel : MonoBehaviour
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
             sym.ApplySymbol(def);
             sym.transform.SetParent(symbolRoot, false);
-            float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
             float y = step * (activeCount + i);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-            var img = sym.CachedImage; if (img != null) { img.DOKill(); img.color = Color.gray; }
             if (def != null) existingSelections?.Add(def);
             topDummySymbols.Add(sym);
         }
@@ -252,8 +250,7 @@ public class GameReel : MonoBehaviour
                 var img = g.CachedImage;
                 if (img != null)
                 {
-                    img.DOKill();
-                    img.color = Color.white;
+                    img.color = Color.white; // No tween kill needed if we no longer tween colors during spin
                 }
             }
         }
@@ -413,7 +410,7 @@ public class GameReel : MonoBehaviour
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = -step * (i + 1);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-            var img = sym.CachedImage; if (img != null) { img.DOKill(); img.color = Color.white; }
+            var img = sym.CachedImage; if (img != null) { img.color = Color.white; }
             if (def != null) tmpCombinedForBuffer.Add(def);
             bufferBottomDummySymbols.Add(sym);
         }
@@ -437,7 +434,7 @@ public class GameReel : MonoBehaviour
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = step * (currentReelData.SymbolCount + i);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-            var img = sym.CachedImage; if (img != null) { img.DOKill(); img.color = Color.white; }
+            var img = sym.CachedImage; if (img != null) { img.color = Color.white; }
             if (def != null) tmpCombinedForBuffer.Add(def);
             bufferTopDummySymbols.Add(sym);
         }
@@ -508,7 +505,7 @@ public class GameReel : MonoBehaviour
             float y = (step * (i + startIndex)) * flip;
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
             sym.transform.SetParent(root, false);
-            var img = sym.CachedImage; if (img != null) { img.DOKill(); img.color = dim ? dimColor : Color.white; }
+            var img = sym.CachedImage; if (img != null) { img.color = dim ? dimColor : Color.white; }
             if (def != null) existingSelections?.Add(def);
             dummies.Add(sym);
         }
@@ -527,7 +524,6 @@ public class GameReel : MonoBehaviour
 
         if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
         if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
-
         spinSpeedMultiplier = 1f;
 
         if (symbolRoot != null)
@@ -604,8 +600,8 @@ public class GameReel : MonoBehaviour
         else { spinning = false; if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); }
     }
 
-    public void DimDummySymbols() { Color dim = new Color(0.5f, 0.5f, 0.5f); foreach (GameSymbol g in topDummySymbols) { var img = g.CachedImage; if (img != null) img.DOColor(dim, 0.1f); } foreach (GameSymbol g in bottomDummySymbols) { var img = g.CachedImage; if (img != null) img.DOColor(dim, 0.1f); } }
-    public void ResetDimmedSymbols() { foreach (GameSymbol g in topDummySymbols) { var image = g.CachedImage; if (image == null) continue; image.DOKill(); image.color = Color.white; } foreach (GameSymbol g in bottomDummySymbols) { var image = g.CachedImage; if (image == null) continue; image.DOKill(); image.color = Color.white; } }
+    public void DimDummySymbols() { Color dim = new Color(0.5f, 0.5f, 0.5f); foreach (GameSymbol g in topDummySymbols) { var img = g.CachedImage; if (img != null) img.color = dim; } foreach (GameSymbol g in bottomDummySymbols) { var img = g.CachedImage; if (img != null) img.color = dim; } }
+    public void ResetDimmedSymbols() { foreach (GameSymbol g in topDummySymbols) { var image = g.CachedImage; if (image == null) continue; image.color = Color.white; } foreach (GameSymbol g in bottomDummySymbols) { var image = g.CachedImage; if (image == null) continue; image.color = Color.white; } }
 
     public void UpdateSymbolLayout(float newSymbolSize, float newSpacing)
     {
