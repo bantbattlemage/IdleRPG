@@ -103,21 +103,119 @@ public class GameReel : MonoBehaviour
         float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize; int topCount = lastTopDummyCount > 0 ? lastTopDummyCount : currentReelData.SymbolCount; return step * (currentReelData.SymbolCount + topCount);
     }
 
+    // New helper: stop any pre-existing tweens and reset visuals before spinning
+    private void ClearPreSpinTweens()
+    {
+        void ClearList(List<GameSymbol> list)
+        {
+            if (list == null) return;
+            foreach (var g in list)
+            {
+                if (g == null) continue;
+                // Stop any active tweens and kill DOTween tweens targeting this symbol
+                g.StopAndClearTweens();
+                // Ensure image color/alpha reset to full white
+                var img = g.CachedImage;
+                if (img != null)
+                {
+                    img.DOKill();
+                    img.color = Color.white;
+                }
+            }
+        }
+
+        ClearList(symbols);
+        ClearList(topDummySymbols);
+        ClearList(bottomDummySymbols);
+        ClearList(bufferSymbols);
+        ClearList(bufferTopDummySymbols);
+        ClearList(bufferBottomDummySymbols);
+    }
+
     public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
     {
         reelStrip.ResetSpinCounts(); // start fresh spin counts
-        completeOnNextSpin = false; DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() => { BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () => { FallOut(solution, true); spinning = true; eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); }); });
+        completeOnNextSpin = false; DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() => { ClearPreSpinTweens(); BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () => { FallOut(solution, true); spinning = true; eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); }); });
     }
     public void StopReel(float delay = 0f) { DOTween.Sequence().AppendInterval(delay).AppendCallback(() => { completeOnNextSpin = true; if (activeSpinTweens[0] != null) activeSpinTweens[0].timeScale = 4f; if (activeSpinTweens[1] != null) activeSpinTweens[1].timeScale = 4f; }); }
 
     private void SpawnNextReel(List<SymbolData> solution = null)
     {
-        float offsetY = ComputeFallOffsetY(); nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0); ReleaseAllSymbolsInRoot(nextSymbolsRoot);
-        List<GameSymbol> newSymbols = new List<GameSymbol>(); float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize; var combinedExisting = new List<SymbolData>(); if (symbols != null) foreach (var gs in symbols) if (gs?.CurrentSymbolData != null) combinedExisting.Add(gs.CurrentSymbolData);
-        for (int i = 0; i < currentReelData.SymbolCount; i++) { GameSymbol symbol = GameSymbolPool.Instance.Get(nextSymbolsRoot); SymbolData def = solution != null ? solution[i] : reelStrip.GetWeightedSymbol(combinedExisting); symbol.InitializeSymbol(def, eventManager); symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i); newSymbols.Add(symbol); if (def != null) combinedExisting.Add(def); }
-        bufferSymbols = newSymbols; ComputeDummyCounts(out int topCount, out int bottomCount);
+        // Release any existing symbols under the next root first
+        ReleaseAllSymbolsInRoot(nextSymbolsRoot);
+
+        // Prepare new symbols for the incoming reel
+        List<GameSymbol> newSymbols = new List<GameSymbol>();
+        float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+        var combinedExisting = new List<SymbolData>();
+        if (symbols != null)
+            foreach (var gs in symbols)
+                if (gs?.CurrentSymbolData != null)
+                    combinedExisting.Add(gs.CurrentSymbolData);
+
+        for (int i = 0; i < currentReelData.SymbolCount; i++)
+        {
+            GameSymbol symbol = GameSymbolPool.Instance.Get(nextSymbolsRoot);
+            SymbolData def = solution != null ? solution[i] : reelStrip.GetWeightedSymbol(combinedExisting);
+            symbol.InitializeSymbol(def, eventManager);
+            symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+            newSymbols.Add(symbol);
+            if (def != null) combinedExisting.Add(def);
+        }
+
+        bufferSymbols = newSymbols;
+
+        // Compute dummy counts for the buffer (so we can position the next root correctly)
+        ComputeDummyCounts(out int topCount, out int bottomCount);
+
+        // Spawn buffer dummies under the next root
         bufferBottomDummySymbols = SpawnDummySymbols(nextSymbolsRoot, true, bottomCount, false, combinedExisting, consume:false);
         bufferTopDummySymbols = SpawnDummySymbols(nextSymbolsRoot, false, topCount, false, combinedExisting, consume:false);
+
+        // Position using rect extents so the vertical gap between strips equals the symbol spacing
+        float separation = currentReelData.SymbolSpacing; // gap between groups should equal the in-group spacing
+
+        // Find highest top edge of existing symbols (in symbolRoot local space)
+        float highestExistingTop = float.MinValue;
+        if (symbolRoot != null)
+        {
+            for (int i = 0; i < symbolRoot.childCount; i++)
+            {
+                var c = symbolRoot.GetChild(i);
+                if (c == null) continue;
+                RectTransform rt = null;
+                if (c.TryGetComponent<GameSymbol>(out var gs) && gs != null) rt = gs.CachedRect;
+                if (rt == null) rt = c as RectTransform ?? c.GetComponent<RectTransform>();
+                if (rt == null) continue;
+                float top = c.localPosition.y + (rt.rect.height * (1f - rt.pivot.y));
+                if (top > highestExistingTop) highestExistingTop = top;
+            }
+        }
+        if (highestExistingTop == float.MinValue) highestExistingTop = 0f;
+
+        // Find lowest bottom edge of incoming symbols (in nextSymbolsRoot local space)
+        float lowestIncomingBottom = float.MaxValue;
+        if (nextSymbolsRoot != null)
+        {
+            for (int i = 0; i < nextSymbolsRoot.childCount; i++)
+            {
+                var c = nextSymbolsRoot.GetChild(i);
+                if (c == null) continue;
+                RectTransform rt = null;
+                if (c.TryGetComponent<GameSymbol>(out var gs) && gs != null) rt = gs.CachedRect;
+                if (rt == null) rt = c as RectTransform ?? c.GetComponent<RectTransform>();
+                if (rt == null) continue;
+                float bottom = c.localPosition.y - (rt.rect.height * rt.pivot.y);
+                if (bottom < lowestIncomingBottom) lowestIncomingBottom = bottom;
+            }
+        }
+        if (lowestIncomingBottom == float.MaxValue) lowestIncomingBottom = 0f;
+
+        // Compute required next root local Y so that the gap between groups equals 'separation' (symbolSpacing)
+        float symbolRootY = symbolRoot != null ? symbolRoot.localPosition.y : 0f;
+        float requiredNextLocalY = symbolRootY + highestExistingTop - lowestIncomingBottom + separation;
+
+        nextSymbolsRoot.localPosition = new Vector3(0f, requiredNextLocalY, 0f);
     }
 
     private List<GameSymbol> SpawnDummySymbols(Transform root, bool bottom, int count, bool dim, List<SymbolData> existingSelections, bool consume)
@@ -149,26 +247,112 @@ public class GameReel : MonoBehaviour
 
     public void DimDummySymbols() { Color dim = new Color(0.5f, 0.5f, 0.5f); foreach (GameSymbol g in topDummySymbols) { var img = g.CachedImage; if (img != null) img.DOColor(dim, 0.1f); } foreach (GameSymbol g in bottomDummySymbols) { var img = g.CachedImage; if (img != null) img.DOColor(dim, 0.1f); } }
     public void ResetDimmedSymbols() { foreach (GameSymbol g in topDummySymbols) { var image = g.CachedImage; if (image == null) continue; image.DOKill(); image.color = Color.white; } foreach (GameSymbol g in bottomDummySymbols) { var image = g.CachedImage; if (image == null) continue; image.DOKill(); image.color = Color.white; } }
-    private void ReleaseAllSymbolsInRoot(Transform root) { if (root == null) return; while (root.childCount > 0) { var child = root.GetChild(0); if (child == null) continue; if (child.TryGetComponent<GameSymbol>(out var symbol)) GameSymbolPool.Instance.Release(symbol); else GameObject.Destroy(child.gameObject); } }
 
     public void UpdateSymbolLayout(float newSymbolSize, float newSpacing)
     {
-        if (currentReelData == null) return; currentReelData.SetSymbolSize(newSymbolSize, newSpacing); RecomputeAllPositions(); RegenerateDummies(); float offsetY = ComputeFallOffsetY(); if (nextSymbolsRoot != null) nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0); if (!spinning) DimDummySymbols();
+        if (currentReelData == null) return;
+        currentReelData.SetSymbolSize(newSymbolSize, newSpacing);
+        RecomputeAllPositions();
+        RegenerateDummies();
+        float offsetY = ComputeFallOffsetY();
+        if (nextSymbolsRoot != null) nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+        if (!spinning) DimDummySymbols();
     }
+
+    public void RegenerateDummies()
+    {
+        if (symbolRoot == null) return;
+
+        foreach (var d in topDummySymbols)
+            if (d != null) GameSymbolPool.Instance.Release(d);
+        topDummySymbols.Clear();
+
+        foreach (var d in bottomDummySymbols)
+            if (d != null) GameSymbolPool.Instance.Release(d);
+        bottomDummySymbols.Clear();
+
+        var existing = currentReelData.CurrentSymbolData != null ? new List<SymbolData>(currentReelData.CurrentSymbolData) : new List<SymbolData>();
+        GenerateActiveDummies(existing);
+
+        float offsetY = ComputeFallOffsetY();
+        if (nextSymbolsRoot != null && !spinning) nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+        if (!spinning) DimDummySymbols();
+    }
+
+    private void ReleaseAllSymbolsInRoot(Transform root)
+    {
+        if (root == null) return;
+
+        // Collect children first to avoid modifying while iterating
+        var children = new List<Transform>();
+        for (int i = 0; i < root.childCount; i++) children.Add(root.GetChild(i));
+
+        foreach (var child in children)
+        {
+            if (child == null) continue;
+            if (child.TryGetComponent<GameSymbol>(out var symbol))
+            {
+                // remove any stale references to this symbol from internal lists before releasing
+                RemoveFromAllLists(symbol);
+                GameSymbolPool.Instance.Release(symbol);
+            }
+            else
+            {
+                GameObject.Destroy(child.gameObject);
+            }
+        }
+    }
+
+    // Remove symbol references from all tracked lists to avoid stale references pointing to pooled instances
+    private void RemoveFromAllLists(GameSymbol symbol)
+    {
+        if (symbol == null) return;
+
+        // Use RemoveAll to handle potential multiple occurrences (defensive)
+        symbols.RemoveAll(s => s == symbol);
+        topDummySymbols.RemoveAll(s => s == symbol);
+        bottomDummySymbols.RemoveAll(s => s == symbol);
+        bufferSymbols.RemoveAll(s => s == symbol);
+        bufferTopDummySymbols.RemoveAll(s => s == symbol);
+        bufferBottomDummySymbols.RemoveAll(s => s == symbol);
+    }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+// Validation helper to detect if the same GameSymbol instance exists in both roots (debugging only)
+private void ValidateNoSharedInstances()
+{
+    if (symbolRoot == null || nextSymbolsRoot == null) return;
+
+    var currentSet = new HashSet<GameSymbol>(symbols.Where(s => s != null));
+    var bufferSet = new HashSet<GameSymbol>(bufferSymbols.Where(s => s != null));
+
+    foreach (var shared in currentSet.Intersect(bufferSet))
+    {
+        Debug.LogWarning($"GameReel {ID}: GameSymbol instance present in both symbolRoot and nextSymbolsRoot: {shared.name}");
+    }
+}
+#endif
 
     public void SetSymbolCount(int newCount, bool incremental = true)
     {
-        if (newCount < 1) newCount = 1; if (spinning) { Debug.LogWarning("Cannot change symbol count while reel is spinning."); return; } int oldCount = currentReelData.SymbolCount; if (newCount == oldCount) return;
-        
+        if (newCount < 1) newCount = 1;
+        if (spinning) { Debug.LogWarning("Cannot change symbol count while reel is spinning."); return; }
+        int oldCount = currentReelData.SymbolCount;
+        if (newCount == oldCount) return;
+
         // Check if this change will affect other reels' dummy counts
         bool affectsOtherReels = WillHeightChangeAffectOtherReels(oldCount, newCount);
-        
-        currentReelData.SetSymbolCount(newCount); var dataList = currentReelData.CurrentSymbolData ?? new List<SymbolData>(); if (dataList.Count > newCount) dataList.RemoveRange(newCount, dataList.Count - newCount); else if (dataList.Count < newCount) { for (int i = dataList.Count; i < newCount; i++) dataList.Add(reelStrip.GetWeightedSymbol(dataList)); } currentReelData.SetCurrentSymbolData(dataList);
+
+        currentReelData.SetSymbolCount(newCount);
+        var dataList = currentReelData.CurrentSymbolData ?? new List<SymbolData>();
+        if (dataList.Count > newCount) dataList.RemoveRange(newCount, dataList.Count - newCount);
+        else if (dataList.Count < newCount) { for (int i = dataList.Count; i < newCount; i++) dataList.Add(reelStrip.GetWeightedSymbol(dataList)); }
+        currentReelData.SetCurrentSymbolData(dataList);
         if (!incremental) { SpawnReel(currentReelData.CurrentSymbolData); SlotsEngineManager.Instance.AdjustSlotCanvas(ownerEngine); return; }
         if (newCount > oldCount) { for (int i = oldCount; i < newCount; i++) { GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot); SymbolData def = (currentReelData.CurrentSymbolData.Count > i) ? currentReelData.CurrentSymbolData[i] : reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData); sym.InitializeSymbol(def, eventManager); symbols.Add(sym); } }
         else { for (int i = oldCount - 1; i >= newCount; i--) { if (i < 0 || i >= symbols.Count) continue; var sym = symbols[i]; if (sym != null) GameSymbolPool.Instance.Release(sym); symbols.RemoveAt(i); } }
         RecomputeAllPositions();
-        
+
         if (affectsOtherReels)
         {
             // First regenerate dummies for all reels (since max height changed)
@@ -192,15 +376,15 @@ public class GameReel : MonoBehaviour
     private bool WillHeightChangeAffectOtherReels(int oldCount, int newCount)
     {
         if (ownerEngine == null || ownerEngine.CurrentReels == null) return false;
-        
+
         float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
         float oldHeight = oldCount * step;
         float newHeight = newCount * step;
-        
+
         // Find the current max height among all reels
         float currentMaxHeight = 0f;
         bool thisReelWasTallest = false;
-        
+
         foreach (var r in ownerEngine.CurrentReels)
         {
             if (r == null || r.CurrentReelData == null) continue;
@@ -209,18 +393,13 @@ public class GameReel : MonoBehaviour
             if (h > currentMaxHeight) currentMaxHeight = h;
             if (r == this && Mathf.Approximately(h, currentMaxHeight)) thisReelWasTallest = true;
         }
-        
+
         // If this reel was the tallest and is getting shorter, other reels might need fewer dummies
         if (thisReelWasTallest && newHeight < oldHeight) return true;
-        
+
         // If this reel is becoming taller than the current max, other reels need more dummies
         if (newHeight > currentMaxHeight) return true;
-        
+
         return false;
-    }
- 
-    public void RegenerateDummies()
-    {
-        if (symbolRoot == null) return; foreach (var d in topDummySymbols) if (d != null) GameSymbolPool.Instance.Release(d); topDummySymbols.Clear(); foreach (var d in bottomDummySymbols) if (d != null) GameSymbolPool.Instance.Release(d); bottomDummySymbols.Clear(); var existing = currentReelData.CurrentSymbolData != null ? new List<SymbolData>(currentReelData.CurrentSymbolData) : new List<SymbolData>(); GenerateActiveDummies(existing); float offsetY = ComputeFallOffsetY(); if (nextSymbolsRoot != null && !spinning) nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0); if (!spinning) DimDummySymbols();
     }
 }

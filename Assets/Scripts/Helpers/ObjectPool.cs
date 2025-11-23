@@ -72,7 +72,22 @@ public class ObjectPool<T> where T : MonoBehaviour
 
 	private void PrepareForUse(T instance, Transform parent)
 	{
+		// Parent under the requested parent. Use worldPositionStays = false so local transform is preserved/set relative to new parent.
 		instance.transform.SetParent(parent ?? poolRoot, worldPositionStays: false);
+
+		// Normalize transform to avoid leftover offsets from previous usage which can cause overlapping visuals
+		instance.transform.localPosition = Vector3.zero;
+		instance.transform.localRotation = Quaternion.identity;
+		instance.transform.localScale = Vector3.one;
+
+		// If a RectTransform exists, also reset its anchored/local properties
+		if (instance.TryGetComponent<RectTransform>(out var rt))
+		{
+			rt.anchoredPosition = Vector2.zero;
+			rt.localEulerAngles = Vector3.zero;
+			rt.localScale = Vector3.one;
+		}
+
 		instance.gameObject.SetActive(true);
 		onGet?.Invoke(instance);
 	}
@@ -83,6 +98,10 @@ public class ObjectPool<T> where T : MonoBehaviour
 		onRelease?.Invoke(instance);
 		instance.gameObject.SetActive(false);
 		instance.transform.SetParent(poolRoot, worldPositionStays: false);
+		// ensure pooled instances have a clean local transform while stored
+		instance.transform.localPosition = Vector3.zero;
+		instance.transform.localRotation = Quaternion.identity;
+		instance.transform.localScale = Vector3.one;
 		pool.Push(instance);
 	}
 
@@ -102,6 +121,10 @@ public class ObjectPool<T> where T : MonoBehaviour
 		{
 			var inst = UnityEngine.Object.Instantiate(prefab, poolRoot);
 			inst.gameObject.SetActive(false);
+			// normalize transform
+			inst.transform.localPosition = Vector3.zero;
+			inst.transform.localRotation = Quaternion.identity;
+			inst.transform.localScale = Vector3.one;
 			pool.Push(inst);
 			CountAll++;
 		}
@@ -121,6 +144,10 @@ public class ObjectPool<T> where T : MonoBehaviour
 		{
 			var inst = UnityEngine.Object.Instantiate(prefab, poolRoot);
 			inst.gameObject.SetActive(false);
+			// normalize transform
+			inst.transform.localPosition = Vector3.zero;
+			inst.transform.localRotation = Quaternion.identity;
+			inst.transform.localScale = Vector3.one;
 			pool.Push(inst);
 			CountAll++;
 		}
