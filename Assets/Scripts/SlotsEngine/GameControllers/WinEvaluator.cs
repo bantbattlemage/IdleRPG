@@ -482,8 +482,10 @@ public class WinEvaluator : Singleton<WinEvaluator>
 
                 // Apply line multiplier and credit cost
                 long creditCost = 1;
-                if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
-                    creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
+                var gp = GamePlayer.Instance; // cache GamePlayer lookup
+                var currentBet = gp != null ? gp.CurrentBet : null;
+                if (currentBet != null)
+                    creditCost = currentBet.CreditCost;
 
                 long total = scaled * winlineDef.WinMultiplier * creditCost;
                 if (total > int.MaxValue) total = int.MaxValue;
@@ -515,9 +517,9 @@ public class WinEvaluator : Singleton<WinEvaluator>
                 {
                     if (cell.BaseValue <= 0) continue;
 
-                    long creditCost = 1;
-                    if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
-                        creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
+                    var gp = GamePlayer.Instance; // cache lookup
+                    var currentBet = gp != null ? gp.CurrentBet : null;
+                    long creditCost = currentBet != null ? currentBet.CreditCost : 1;
 
                     // Apply PayScaling for SingleOnReel; PerSymbol == baseValue * 1, DepthSquared has no extra depth for single instance
                     long scaled = cell.BaseValue;
@@ -591,9 +593,9 @@ public class WinEvaluator : Singleton<WinEvaluator>
                                 break;
                         }
 
-                        long creditCost = 1;
-                        if (GamePlayer.Instance != null && GamePlayer.Instance.CurrentBet != null)
-                            creditCost = GamePlayer.Instance.CurrentBet.CreditCost;
+                        var gp = GamePlayer.Instance; // cache lookup
+                        var currentBet = gp != null ? gp.CurrentBet : null;
+                        long creditCost = currentBet != null ? currentBet.CreditCost : 1;
 
                         long total = scaled * creditCost;
                         if (total > int.MaxValue) total = int.MaxValue;

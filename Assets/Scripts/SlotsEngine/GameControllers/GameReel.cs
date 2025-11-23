@@ -28,9 +28,14 @@ public class GameReel : MonoBehaviour
     private HashSet<GameSymbol> allocatedPooledSet = new HashSet<GameSymbol>();
     private Transform dummyContainer;
 
+    // Cached singleton references to avoid repeated Instance lookups
+    private GameSymbolPool cachedSymbolPool;
+
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition, SlotsEngine owner)
     {
         currentReelData = data; id = reelID; eventManager = slotsEventManager; reelStrip = stripDefinition.CreateInstance(); ownerEngine = owner;
+        // Cache common singletons early to avoid repeated Instance calls and to make CreateSymbolInstance/EnsurePooledSymbolCapacity use the cached pool
+        cachedSymbolPool = GameSymbolPool.Instance;
         reelStrip.ResetSpinCounts();
         EnsureRootsCreated();
         // Prewarm per-reel pool to estimated capacity BEFORE spawning so SpawnReel can use pooled symbols
@@ -41,6 +46,8 @@ public class GameReel : MonoBehaviour
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripData stripData, SlotsEngine owner)
     {
         currentReelData = data; id = reelID; eventManager = slotsEventManager; reelStrip = stripData; ownerEngine = owner;
+        // Cache common singletons early to avoid repeated Instance calls
+        cachedSymbolPool = GameSymbolPool.Instance;
         reelStrip.ResetSpinCounts();
         EnsureRootsCreated();
         // Prewarm per-reel pool to estimated capacity BEFORE spawning so SpawnReel can use pooled symbols
@@ -150,7 +157,7 @@ public class GameReel : MonoBehaviour
             var sym = AcquireFreePooledSymbol();
             if (sym == null) // defensive fallback
             {
-                sym = GameSymbolPool.Instance.Get(dummyContainer);
+                sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
@@ -176,7 +183,7 @@ public class GameReel : MonoBehaviour
             var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
-                sym = GameSymbolPool.Instance.Get(dummyContainer);
+                sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -297,7 +304,7 @@ public class GameReel : MonoBehaviour
             var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
-                sym = GameSymbolPool.Instance.Get(dummyContainer);
+                sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 SymbolData initDef = reelStrip.GetWeightedSymbol(combinedForBuffer, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -321,7 +328,7 @@ public class GameReel : MonoBehaviour
             var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
-                sym = GameSymbolPool.Instance.Get(dummyContainer);
+                sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 SymbolData initDef = reelStrip.GetWeightedSymbol(combinedForBuffer, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -339,8 +346,6 @@ public class GameReel : MonoBehaviour
         }
 
         // Position using rect extents so the vertical gap between strips equals the symbol spacing
-        float separation = currentReelData.SymbolSpacing; // gap between groups should equal the in-group spacing
-
         // Find highest top edge of existing symbols (in symbolRoot local space)
         float highestExistingTop = float.MinValue;
         if (symbolRoot != null)
@@ -378,6 +383,7 @@ public class GameReel : MonoBehaviour
         if (lowestIncomingBottom == float.MaxValue) lowestIncomingBottom = 0f;
 
         // Compute required next root local Y so that the gap between groups equals 'separation' (symbolSpacing)
+        float separation = currentReelData != null ? currentReelData.SymbolSpacing : 0f;
         float symbolRootY = symbolRoot != null ? symbolRoot.localPosition.y : 0f;
         float requiredNextLocalY = symbolRootY + highestExistingTop - lowestIncomingBottom + separation;
 
@@ -394,7 +400,7 @@ public class GameReel : MonoBehaviour
             var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
-                sym = GameSymbolPool.Instance.Get(root);
+                sym = cachedSymbolPool != null ? cachedSymbolPool.Get(root) : GameSymbolPool.Instance?.Get(root);
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -492,7 +498,8 @@ public class GameReel : MonoBehaviour
                 }
                 else
                 {
-                    GameSymbolPool.Instance.Release(symbol);
+                    // use cached reference when available
+                    if (cachedSymbolPool != null) cachedSymbolPool.Release(symbol); else GameSymbolPool.Instance?.Release(symbol);
                 }
             }
             else
@@ -551,8 +558,8 @@ private void ValidateNoSharedInstances()
         else if (dataList.Count < newCount) { for (int i = dataList.Count; i < newCount; i++) dataList.Add(reelStrip.GetWeightedSymbol(dataList)); }
         currentReelData.SetCurrentSymbolData(dataList);
         if (!incremental) { SpawnReel(currentReelData.CurrentSymbolData); SlotsEngineManager.Instance.AdjustSlotCanvas(ownerEngine); return; }
-        if (newCount > oldCount) { for (int i = oldCount; i < newCount; i++) { GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot); SymbolData def = (currentReelData.CurrentSymbolData.Count > i) ? currentReelData.CurrentSymbolData[i] : reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData); sym.InitializeSymbol(def, eventManager); symbols.Add(sym); } }
-        else { for (int i = oldCount - 1; i >= newCount; i--) { if (i < 0 || i >= symbols.Count) continue; var sym = symbols[i]; if (sym != null) GameSymbolPool.Instance.Release(sym); symbols.RemoveAt(i); } }
+        if (newCount > oldCount) { for (int i = oldCount; i < newCount; i++) { GameSymbol sym = cachedSymbolPool != null ? cachedSymbolPool.Get(symbolRoot) : GameSymbolPool.Instance?.Get(symbolRoot); SymbolData def = (currentReelData.CurrentSymbolData.Count > i) ? currentReelData.CurrentSymbolData[i] : reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData); sym.InitializeSymbol(def, eventManager); symbols.Add(sym); } }
+        else { for (int i = oldCount - 1; i >= newCount; i--) { if (i < 0 || i >= symbols.Count) continue; var sym = symbols[i]; if (sym != null) { if (cachedSymbolPool != null) cachedSymbolPool.Release(sym); else GameSymbolPool.Instance?.Release(sym); } symbols.RemoveAt(i); } }
         RecomputeAllPositions();
 
         if (affectsOtherReels)
@@ -649,9 +656,9 @@ private void ValidateNoSharedInstances()
     {
         try
         {
-            if (GameSymbolPool.Instance != null)
+            if (cachedSymbolPool != null)
             {
-                var s = GameSymbolPool.Instance.Get(parent);
+                var s = cachedSymbolPool.Get(parent);
                 if (s != null)
                 {
                     return s;

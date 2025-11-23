@@ -24,6 +24,9 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	private EventManager eventManager;
 
+	// Cached global event manager to avoid repeated Instance lookups
+	private GlobalEventManager cachedGlobalEventManager;
+
 	// Presentation buffering: when multiple SlotsEngine instances present wins together
 	// buffer messages per-slot and display them one-slot-at-a-time when the group completes.
 	private int presentationSessionDepth = 0;
@@ -37,11 +40,13 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		BetDownButton.onClick.AddListener(OnBetDownPressed);
 		BetUpButton.onClick.AddListener(OnBetUpPressed);
 
-		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetChanged, OnBetChanged);
-		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.CreditsChanged, OnCreditsChanged);
+		cachedGlobalEventManager = GlobalEventManager.Instance;
+
+		cachedGlobalEventManager.RegisterEvent(SlotsEvent.BetChanged, OnBetChanged);
+		cachedGlobalEventManager.RegisterEvent(SlotsEvent.CreditsChanged, OnCreditsChanged);
 
 		// Clear console when a new spin begins
-		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.SpinButtonPressed, OnAnySpinStarted);
+		cachedGlobalEventManager.RegisterEvent(SlotsEvent.SpinButtonPressed, OnAnySpinStarted);
 
 		WinText.text = string.Empty;
 		SetConsoleMessage(string.Empty);
@@ -68,12 +73,12 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	private void OnBetUpPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.BetUpPressed);
+		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.BetUpPressed);
 	}
 
 	private void OnBetDownPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.BetDownPressed);
+		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.BetDownPressed);
 	}
 
 	private void OnBetChanged(object obj)
@@ -352,18 +357,18 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		{
 			DOTween.Sequence().AppendInterval(1f).AppendCallback(() =>
 			{
-				GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.SpinButtonPressed);
+				cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.SpinButtonPressed);
 			});
 		}
 	}
 
 	void OnSpinPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.SpinButtonPressed);
+		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.SpinButtonPressed);
 	}
 
 	void OnStopPressed()
 	{
-		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.StopButtonPressed);
+		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.StopButtonPressed);
 	}
 }
