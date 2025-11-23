@@ -121,9 +121,35 @@ public class SlotsEngine : MonoBehaviour
 		}
 		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidth / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidth / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0); currentReelsGroup = reelsGroup;
 		RegenerateAllReelDummies();
+
+		// Prewarm the GameSymbol pool to avoid runtime expansion: estimate needed based on reels * max symbols per reel
+		try
+		{
+			int maxPerReel = 0;
+			if (currentSlotsData?.CurrentReelData != null && currentSlotsData.CurrentReelData.Count > 0)
+			{
+				foreach (var rd in currentSlotsData.CurrentReelData) if (rd != null && rd.SymbolCount > maxPerReel) maxPerReel = rd.SymbolCount;
+			}
+			int reelCountFinal = reels.Count > 0 ? reels.Count : (currentSlotsData?.CurrentReelData?.Count ?? 0);
+			int prewarmCount = Mathf.Max(0, reelCountFinal * maxPerReel);
+			if (prewarmCount > 0 && GameSymbolPool.Instance != null)
+			{
+				GameSymbolPool.Instance.Prewarm(prewarmCount);
+			}
+		}
+		catch { }
 	}
 
 	private void RegenerateAllReelDummies()
+	{
+		foreach (var r in reels) if (r != null) r.RegenerateDummies();
+	}
+
+	/// <summary>
+	/// Regenerates dummies for all reels when a height change in one reel affects the max height context.
+	/// This is called from GameReel.SetSymbolCount when it detects a height change that impacts other reels.
+	/// </summary>
+	public void RegenerateAllReelDummiesForHeightChange()
 	{
 		foreach (var r in reels) if (r != null) r.RegenerateDummies();
 	}
@@ -141,7 +167,10 @@ public class SlotsEngine : MonoBehaviour
 		if (currentReelsGroup == null) { SpawnReels(reelsRootTransform); return; }
 		GameObject g = Instantiate(reelPrefab, currentReelsGroup); GameReel reel = g.GetComponent<GameReel>(); int newIndex = reels.Count;
 		if (newReelData.CurrentReelStrip != null) reel.InitializeReel(newReelData, newIndex, eventManager, newReelData.CurrentReelStrip, this); else reel.InitializeReel(newReelData, newIndex, eventManager, newReelData.DefaultReelStrip, this);
-		reels.Add(reel); RepositionReels(); RegenerateAllReelDummies(); eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
+		reels.Add(reel); RepositionReels();
+		// When adding a reel, all existing reels need to check if their dummy counts should change due to new max height
+		RegenerateAllReelDummies();
+		eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
 	}
 	public void AddReel(ReelDefinition definition) { if (definition == null) throw new ArgumentNullException(nameof(definition)); AddReel(definition.CreateInstance()); }
 	/// <summary>
@@ -171,7 +200,10 @@ public class SlotsEngine : MonoBehaviour
 		currentSlotsData.InsertReelAt(index, newReelData); ReelDataManager.Instance.AddNewData(newReelData); SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
 		GameObject g = Instantiate(reelPrefab, currentReelsGroup); GameReel reel = g.GetComponent<GameReel>();
 		if (newReelData.CurrentReelStrip != null) reel.InitializeReel(newReelData, index, eventManager, newReelData.CurrentReelStrip, this); else reel.InitializeReel(newReelData, index, eventManager, newReelData.DefaultReelStrip, this);
-		reels.Insert(index, reel); RefreshReelsAfterModification(); RegenerateAllReelDummies(); eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
+		reels.Insert(index, reel); RefreshReelsAfterModification();
+		// When inserting a reel, all reels need to check if their dummy counts should change due to new max height
+		RegenerateAllReelDummies();
+		eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
 	}
 
 	/// <summary>
@@ -182,7 +214,10 @@ public class SlotsEngine : MonoBehaviour
 		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot remove reel while spinning."); return; }
 		if (index < 0 || index >= reels.Count) throw new ArgumentOutOfRangeException(nameof(index));
 		var dataToRemove = currentSlotsData.CurrentReelData[index]; currentSlotsData.RemoveReel(dataToRemove); ReelDataManager.Instance.RemoveDataIfExists(dataToRemove); SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
-		GameReel reel = reels[index]; if (reel != null && reel.gameObject != null) Destroy(reel.gameObject); reels.RemoveAt(index); RefreshReelsAfterModification(); RegenerateAllReelDummies(); eventManager.BroadcastEvent(SlotsEvent.ReelRemoved, reel);
+		GameReel reel = reels[index]; if (reel != null && reel.gameObject != null) Destroy(reel.gameObject); reels.RemoveAt(index); RefreshReelsAfterModification();
+		// When removing a reel, all remaining reels need to check if their dummy counts should change due to new max height
+		RegenerateAllReelDummies();
+		eventManager.BroadcastEvent(SlotsEvent.ReelRemoved, reel);
 	}
 	public void RemoveReel(GameReel reelToRemove) { int idx = reels.IndexOf(reelToRemove); if (idx == -1) throw new ArgumentException("Reel not part of this SlotsEngine", nameof(reelToRemove)); RemoveReelAt(idx); }
 
@@ -228,6 +263,27 @@ public class SlotsEngine : MonoBehaviour
 		RegenerateAllReelDummies();
 	}
 
+	/// <summary>
+	/// Adjusts reel symbol size and spacing when a reel's height change affects the max height.
+	/// This is called from GameReel.SetSymbolCount to trigger proper rescaling while preserving the selective dummy regeneration that was already done.
+	/// </summary>
+	public void AdjustReelSizeForHeightChange(float totalHeight, float totalWidth)
+	{
+		if (stateMachine.CurrentState == State.Spinning) throw new InvalidOperationException("Should not adjust reels while they are spinning!");
+		if (reels == null || reels.Count == 0) return;
+		
+		int maxSymbols = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); int reelCount = currentSlotsData.CurrentReelData.Count; const float heightFill = 0.8f; const float widthFill = 0.95f; const float spacingFactor = 0.1f;
+		float symbolMaxByHeight = float.MaxValue; if (totalHeight > 0f && maxSymbols > 0) { float stepPerSymbol = 1f + spacingFactor; symbolMaxByHeight = (totalHeight * heightFill) / (maxSymbols * stepPerSymbol); }
+		float symbolMaxByWidth = float.MaxValue; if (totalWidth > 0f && reelCount > 0) { float denom = reelCount + (reelCount - 1) * spacingFactor; if (denom > 0f) symbolMaxByWidth = (totalWidth * widthFill) / denom; }
+		float chosenSymbolSize = Math.Min(symbolMaxByHeight, symbolMaxByWidth); if (float.IsInfinity(chosenSymbolSize) || float.IsNaN(chosenSymbolSize) || chosenSymbolSize <= 0f) chosenSymbolSize = currentSlotsData.CurrentReelData[0].SymbolSize; float chosenSpacing = chosenSymbolSize * spacingFactor;
+		ReelData firstDef = currentSlotsData.CurrentReelData[0]; bool sizeMatches = Mathf.Approximately(firstDef.SymbolSize, chosenSymbolSize) && Mathf.Approximately(firstDef.SymbolSpacing, chosenSpacing); bool reelsCountMatches = reels.Count == currentSlotsData.CurrentReelData.Count; if (sizeMatches && reelsCountMatches) return;
+		
+		foreach (ReelData r in currentSlotsData.CurrentReelData) r.SetSymbolSize(chosenSymbolSize, chosenSpacing);
+		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; reel.UpdateSymbolLayout(chosenSymbolSize, chosenSpacing); float x = (chosenSpacing + chosenSymbolSize) * i; reel.transform.localPosition = new Vector3(x, 0f, 0f); }
+		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidthComputed / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidthComputed / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
+		// Note: Do NOT call RegenerateAllReelDummies here - that was already done selectively by the caller
+	}
+	
 	void OnReelCompleted(object obj)
 	{
 		if (reels.TrueForAll(x => !x.Spinning)) { spinInProgress = false; eventManager.BroadcastEvent(SlotsEvent.SpinCompleted); }

@@ -168,6 +168,18 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		ApplyCellSizeToSlot(slot, grid.cellSize.x, grid.cellSize.y);
 	}
 
+	/// <summary>
+	/// Adjust only a single slot when a reel's height change affects max height.
+	/// This uses a specialized rescaling path that doesn't regenerate dummies (they were already regenerated selectively).
+	/// </summary>
+	public void AdjustSlotCanvasForHeightChange(SlotsEngine slot)
+	{
+		if (slot == null) return; if (slotsDisplayPages == null || slotsDisplayPages.Count == 0) return; if (currentSlotPageIndex < 0 || currentSlotPageIndex >= slotsDisplayPages.Count) currentSlotPageIndex = 0;
+		var grid = currentSlotsDisplayPage.gridGroup.GetComponent<GridLayoutGroup>(); if (grid == null) return;
+		Canvas.ForceUpdateCanvases();
+		ApplyCellSizeToSlotForHeightChange(slot, grid.cellSize.x, grid.cellSize.y);
+	}
+
 	private void ApplyCellSizeToSlot(SlotsEngine s, float cellWidth, float cellHeight)
 	{
 		if (s.ReelsRootTransform != null)
@@ -175,6 +187,15 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 			var rt = s.ReelsRootTransform.GetComponent<RectTransform>(); if (rt != null) { rt.sizeDelta = new Vector2(cellWidth, cellHeight); rt.localScale = Vector3.one; }
 		}
 		s.AdjustReelSize(cellHeight, cellWidth);
+	}
+
+	private void ApplyCellSizeToSlotForHeightChange(SlotsEngine s, float cellWidth, float cellHeight)
+	{
+		if (s.ReelsRootTransform != null)
+		{
+			var rt = s.ReelsRootTransform.GetComponent<RectTransform>(); if (rt != null) { rt.sizeDelta = new Vector2(cellWidth, cellHeight); rt.localScale = Vector3.one; }
+		}
+		s.AdjustReelSizeForHeightChange(cellHeight, cellWidth);
 	}
 
 	/// <summary>

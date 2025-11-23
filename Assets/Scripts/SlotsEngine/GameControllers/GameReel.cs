@@ -159,13 +159,66 @@ public class GameReel : MonoBehaviour
     public void SetSymbolCount(int newCount, bool incremental = true)
     {
         if (newCount < 1) newCount = 1; if (spinning) { Debug.LogWarning("Cannot change symbol count while reel is spinning."); return; } int oldCount = currentReelData.SymbolCount; if (newCount == oldCount) return;
+        
+        // Check if this change will affect other reels' dummy counts
+        bool affectsOtherReels = WillHeightChangeAffectOtherReels(oldCount, newCount);
+        
         currentReelData.SetSymbolCount(newCount); var dataList = currentReelData.CurrentSymbolData ?? new List<SymbolData>(); if (dataList.Count > newCount) dataList.RemoveRange(newCount, dataList.Count - newCount); else if (dataList.Count < newCount) { for (int i = dataList.Count; i < newCount; i++) dataList.Add(reelStrip.GetWeightedSymbol(dataList)); } currentReelData.SetCurrentSymbolData(dataList);
         if (!incremental) { SpawnReel(currentReelData.CurrentSymbolData); SlotsEngineManager.Instance.AdjustSlotCanvas(ownerEngine); return; }
         if (newCount > oldCount) { for (int i = oldCount; i < newCount; i++) { GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot); SymbolData def = (currentReelData.CurrentSymbolData.Count > i) ? currentReelData.CurrentSymbolData[i] : reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData); sym.InitializeSymbol(def, eventManager); symbols.Add(sym); } }
         else { for (int i = oldCount - 1; i >= newCount; i--) { if (i < 0 || i >= symbols.Count) continue; var sym = symbols[i]; if (sym != null) GameSymbolPool.Instance.Release(sym); symbols.RemoveAt(i); } }
-        RecomputeAllPositions(); RegenerateDummies(); SlotsEngineManager.Instance.AdjustSlotCanvas(ownerEngine);
+        RecomputeAllPositions();
+        
+        if (affectsOtherReels)
+        {
+            // First regenerate dummies for all reels (since max height changed)
+            if (ownerEngine != null) ownerEngine.RegenerateAllReelDummiesForHeightChange();
+            // Then trigger layout rescaling through the manager (which will NOT regenerate dummies again)
+            if (SlotsEngineManager.Instance != null) SlotsEngineManager.Instance.AdjustSlotCanvasForHeightChange(ownerEngine);
+        }
+        else
+        {
+            // Only regenerate this reel's dummies - no rescaling needed
+            RegenerateDummies();
+        }
     }
 
+    /// <summary>
+    /// Determines if changing from oldCount to newCount will affect other reels' dummy counts.
+    /// This happens when:
+    /// 1. This reel was the tallest and is getting shorter
+    /// 2. This reel is becoming the tallest
+    /// </summary>
+    private bool WillHeightChangeAffectOtherReels(int oldCount, int newCount)
+    {
+        if (ownerEngine == null || ownerEngine.CurrentReels == null) return false;
+        
+        float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize;
+        float oldHeight = oldCount * step;
+        float newHeight = newCount * step;
+        
+        // Find the current max height among all reels
+        float currentMaxHeight = 0f;
+        bool thisReelWasTallest = false;
+        
+        foreach (var r in ownerEngine.CurrentReels)
+        {
+            if (r == null || r.CurrentReelData == null) continue;
+            float s = r.CurrentReelData.SymbolSpacing + r.CurrentReelData.SymbolSize;
+            float h = r.CurrentReelData.SymbolCount * s;
+            if (h > currentMaxHeight) currentMaxHeight = h;
+            if (r == this && Mathf.Approximately(h, currentMaxHeight)) thisReelWasTallest = true;
+        }
+        
+        // If this reel was the tallest and is getting shorter, other reels might need fewer dummies
+        if (thisReelWasTallest && newHeight < oldHeight) return true;
+        
+        // If this reel is becoming taller than the current max, other reels need more dummies
+        if (newHeight > currentMaxHeight) return true;
+        
+        return false;
+    }
+ 
     public void RegenerateDummies()
     {
         if (symbolRoot == null) return; foreach (var d in topDummySymbols) if (d != null) GameSymbolPool.Instance.Release(d); topDummySymbols.Clear(); foreach (var d in bottomDummySymbols) if (d != null) GameSymbolPool.Instance.Release(d); bottomDummySymbols.Clear(); var existing = currentReelData.CurrentSymbolData != null ? new List<SymbolData>(currentReelData.CurrentSymbolData) : new List<SymbolData>(); GenerateActiveDummies(existing); float offsetY = ComputeFallOffsetY(); if (nextSymbolsRoot != null && !spinning) nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0); if (!spinning) DimDummySymbols();
