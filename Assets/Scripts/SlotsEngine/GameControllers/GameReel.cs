@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using System.Collections;
 
 public class GameReel : MonoBehaviour
 {
@@ -26,10 +27,16 @@ public class GameReel : MonoBehaviour
     // --- New: persistent per-reel pooled symbols (dummies + active + buffer)
     private List<GameSymbol> allPooledSymbols = new List<GameSymbol>();
     private HashSet<GameSymbol> allocatedPooledSet = new HashSet<GameSymbol>();
+    // Free-list stack to avoid linear scans when allocating
+    private Stack<GameSymbol> freePooledStack = new Stack<GameSymbol>();
     private Transform dummyContainer;
 
     // Cached singleton references to avoid repeated Instance lookups
     private GameSymbolPool cachedSymbolPool;
+
+    // Coroutine handles for delayed operations to avoid DOTween.Sequence allocations
+    private Coroutine beginSpinCoroutine;
+    private Coroutine stopReelCoroutine;
 
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition, SlotsEngine owner)
     {
@@ -238,15 +245,81 @@ public class GameReel : MonoBehaviour
         ClearList(bufferBottomDummySymbols);
     }
 
+    // Public method to immediately begin spin without scheduling a coroutine (used by SlotsEngine single-coroutine stagger)
+    public void BeginSpinImmediate(List<SymbolData> solution = null)
+    {
+        // Reset per-reel state that would normally be set in BeginSpin
+        // Ensure per-reel pool is large enough before spin starts to prevent transient gaps
+        int est = EstimateNeededPooledCapacity();
+        EnsurePooledSymbolCapacity(est);
+        reelStrip.ResetSpinCounts(); // start fresh spin counts
+
+        // Cancel any pending stop so a leftover stop doesn't apply mid-spin
+        if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; }
+
+        // Clear any previous active tweens to avoid interacting with stale Tween references
+        try
+        {
+            if (activeSpinTweens[0] != null) { activeSpinTweens[0].Kill(); activeSpinTweens[0] = null; }
+        }
+        catch { activeSpinTweens[0] = null; }
+        try
+        {
+            if (activeSpinTweens[1] != null) { activeSpinTweens[1].Kill(); activeSpinTweens[1] = null; }
+        }
+        catch { activeSpinTweens[1] = null; }
+
+        // Reset sequence state
+        sequenceA = false; sequenceB = false;
+
+        // Always start in continuous mode unless an explicit StopReel sets this later
+        completeOnNextSpin = false;
+
+        ClearPreSpinTweens();
+        BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () =>
+        {
+            FallOut(solution, true);
+            spinning = true;
+            eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
+        });
+    }
+
     public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
     {
         // Ensure per-reel pool is large enough before spin starts to prevent transient gaps
         int est = EstimateNeededPooledCapacity();
         EnsurePooledSymbolCapacity(est);
         reelStrip.ResetSpinCounts(); // start fresh spin counts
-        completeOnNextSpin = false; DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() => { ClearPreSpinTweens(); BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () => { FallOut(solution, true); spinning = true; eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); }); });
+        completeOnNextSpin = false;
+
+        // Cancel any existing begin coroutine for this reel and start a lightweight coroutine to schedule the delayed start
+        if (beginSpinCoroutine != null) StopCoroutine(beginSpinCoroutine);
+        beginSpinCoroutine = StartCoroutine(DelayedBeginSpin(startDelay, solution));
     }
-    public void StopReel(float delay = 0f) { DOTween.Sequence().AppendInterval(delay).AppendCallback(() => { completeOnNextSpin = true; if (activeSpinTweens[0] != null) activeSpinTweens[0].timeScale = 4f; if (activeSpinTweens[1] != null) activeSpinTweens[1].timeScale = 4f; }); }
+
+    private IEnumerator DelayedBeginSpin(float delay, List<SymbolData> solution)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        // Use the immediate entrypoint to avoid duplicating logic
+        BeginSpinImmediate(solution);
+        beginSpinCoroutine = null;
+    }
+
+    public void StopReel(float delay = 0f)
+    {
+        // Cancel any existing stop coroutine and schedule a lightweight delayed stop to avoid DOTween.Sequence allocations
+        if (stopReelCoroutine != null) StopCoroutine(stopReelCoroutine);
+        stopReelCoroutine = StartCoroutine(DelayedStopReel(delay));
+    }
+
+    private IEnumerator DelayedStopReel(float delay)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        completeOnNextSpin = true;
+        if (activeSpinTweens[0] != null) activeSpinTweens[0].timeScale = 4f;
+        if (activeSpinTweens[1] != null) activeSpinTweens[1].timeScale = 4f;
+        stopReelCoroutine = null;
+    }
 
     private void SpawnNextReel(List<SymbolData> solution = null)
     {
@@ -524,6 +597,8 @@ public class GameReel : MonoBehaviour
 
         // Also ensure it is not allocated in our allocation set
         if (allocatedPooledSet.Contains(symbol)) allocatedPooledSet.Remove(symbol);
+
+        // If present in free stack, we can't remove it efficiently; leaving nulls handled in Acquire logic
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -634,6 +709,7 @@ private void ValidateNoSharedInstances()
                 allPooledSymbols.Add(sym);
                 // newly created symbol is free until allocated
                 if (allocatedPooledSet.Contains(sym)) allocatedPooledSet.Remove(sym);
+                freePooledStack.Push(sym);
             }
          }
      }
@@ -682,18 +758,17 @@ private void ValidateNoSharedInstances()
 
     private GameSymbol AcquireFreePooledSymbol()
     {
-        for (int i = 0; i < allPooledSymbols.Count; i++)
+        // Fast path: use stack to pop free symbols
+        while (freePooledStack.Count > 0)
         {
-            var s = allPooledSymbols[i];
+            var s = freePooledStack.Pop();
             if (s == null) continue;
-            if (!allocatedPooledSet.Contains(s))
-            {
-                allocatedPooledSet.Add(s);
-                // ensure it's active when handed out
-                if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
-                return s;
-            }
+            if (allocatedPooledSet.Contains(s)) continue; // defensive
+            allocatedPooledSet.Add(s);
+            if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
+            return s;
         }
+
         // No free symbol available: create one and return it
         EnsureRootsCreated();
         var newSym = CreateSymbolInstance(dummyContainer);
@@ -718,6 +793,8 @@ private void ValidateNoSharedInstances()
         if (s.gameObject.activeSelf) s.gameObject.SetActive(false);
         // return to dummy container so it's out of the way until reused
         if (dummyContainer != null) s.transform.SetParent(dummyContainer, true);
+        // push back to free stack for fast future reuse
+        freePooledStack.Push(s);
     }
 
     // Public API: prewarm per-reel pooled symbols (used by SlotsEngine)
@@ -726,6 +803,13 @@ private void ValidateNoSharedInstances()
         EnsureRootsCreated();
         int est = EstimateNeededPooledCapacity();
         if (est > 0) EnsurePooledSymbolCapacity(est);
+    }
+
+    private void OnDestroy()
+    {
+        // Ensure any running coroutines are stopped to avoid lingering callbacks
+        if (beginSpinCoroutine != null) StopCoroutine(beginSpinCoroutine);
+        if (stopReelCoroutine != null) StopCoroutine(stopReelCoroutine);
     }
 
 }

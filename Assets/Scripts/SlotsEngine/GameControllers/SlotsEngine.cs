@@ -69,6 +69,9 @@ public class SlotsEngine : MonoBehaviour
 		else if (GamePlayer.Instance.CurrentCredits < GamePlayer.Instance.CurrentBet.CreditCost) SlotConsoleController.Instance.SetConsoleMessage("Not enough credits! Switch to a lower bet or add credits.");
 	}
 
+	// Coroutine handle used to stagger starting reels from a single scheduler rather than per-reel sequences
+	private Coroutine staggerSpinCoroutine;
+
 	/// <summary>
 	/// Randomizes each reel's visible symbols based on its strip and begins the spin with a slight stagger.
 	/// Notifies the `WinEvaluator` that a new spin started when logging is enabled.
@@ -77,14 +80,35 @@ public class SlotsEngine : MonoBehaviour
 	{
 		if (spinInProgress) throw new InvalidOperationException("Spin already in progress!");
 		try { if (WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) WinEvaluator.Instance.NotifySpinStarted(); } catch { }
-		float falloutDelay = 0.025f;
+
+		// Prepare per-reel solutions. Pre-size lists to avoid intermediate resizes when many reels are present.
+		var perReelSolutions = new List<List<SymbolData>>(reels.Count);
 		for (int i = 0; i < reels.Count; i++)
 		{
-			List<SymbolData> testSolution = new List<SymbolData>(); var selectionsForReel = new List<SymbolData>();
-			for (int k = 0; k < reels[i].CurrentReelData.SymbolCount; k++) { var symbol = reels[i].GetRandomSymbolFromStrip(selectionsForReel); testSolution.Add(symbol); if (symbol != null) selectionsForReel.Add(symbol); }
+			int symbolCount = reels[i].CurrentReelData != null ? reels[i].CurrentReelData.SymbolCount : 0;
+			var testSolution = new List<SymbolData>(Math.Max(1, symbolCount));
+			var selectionsForReel = new List<SymbolData>(Math.Max(1, symbolCount));
+			for (int k = 0; k < symbolCount; k++) { var symbol = reels[i].GetRandomSymbolFromStrip(selectionsForReel); testSolution.Add(symbol); if (symbol != null) selectionsForReel.Add(symbol); }
 			reels[i].CurrentReelData.SetCurrentSymbolData(testSolution);
-			reels[i].BeginSpin(testSolution, falloutDelay); falloutDelay += 0.025f;
+			perReelSolutions.Add(testSolution);
 		}
+
+		// Use a single coroutine to stagger BeginSpinImmediate calls to avoid per-reel scheduling allocations.
+		float falloutStep = 0.025f;
+		if (staggerSpinCoroutine != null) StopCoroutine(staggerSpinCoroutine);
+		staggerSpinCoroutine = StartCoroutine(StaggeredBeginSpin(perReelSolutions, falloutStep));
+	}
+
+	private System.Collections.IEnumerator StaggeredBeginSpin(List<List<SymbolData>> solutions, float step)
+	{
+		for (int i = 0; i < reels.Count; i++)
+		{
+			var sol = (i < solutions.Count) ? solutions[i] : null;
+			reels[i].BeginSpinImmediate(sol);
+			// small yield to stagger visually and avoid synchronized bursts
+			if (step > 0f) yield return new WaitForSeconds(step);
+		}
+		staggerSpinCoroutine = null;
 	}
 
 	private void OnReelSpinStarted(object obj)
@@ -361,5 +385,11 @@ public class SlotsEngine : MonoBehaviour
 	public void UnregisterReelChanged(Action<object> handler)
 	{
 		if (handler == null) return; if (eventManager == null) { if (pendingReelChangedHandlers.Contains(handler)) pendingReelChangedHandlers.Remove(handler); return; } eventManager.UnregisterEvent(SlotsEvent.ReelAdded, handler); eventManager.UnregisterEvent(SlotsEvent.ReelRemoved, handler);
+	}
+
+	private void OnDestroy()
+	{
+		// ensure any stagger coroutine is stopped
+		if (staggerSpinCoroutine != null) StopCoroutine(staggerSpinCoroutine);
 	}
 }
