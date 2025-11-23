@@ -20,9 +20,12 @@ public class GameReel : MonoBehaviour
     private List<GameSymbol> bufferSymbols = new List<GameSymbol>();
     private List<GameSymbol> bufferTopDummySymbols = new List<GameSymbol>();
     private List<GameSymbol> bufferBottomDummySymbols = new List<GameSymbol>();
-    private bool completeOnNextSpin = false; private Tweener[] activeSpinTweens = new Tweener[2];
+    private bool completeOnNextSpin = false; private Coroutine[] activeSpinCoroutines = new Coroutine[2];
     private EventManager eventManager;
     private int lastTopDummyCount = 0; private int lastBottomDummyCount = 0;
+
+    // spin speed multiplier used to accelerate the coroutine-based move when Stop is requested
+    private float spinSpeedMultiplier = 1f;
 
     // --- New: persistent per-reel pooled symbols (dummies + active + buffer)
     private List<GameSymbol> allPooledSymbols = new List<GameSymbol>();
@@ -121,7 +124,8 @@ public class GameReel : MonoBehaviour
                     sym = CreateSymbolInstance(symbolRoot);
                 }
             }
-            SymbolData newSymbol = (existingSymbolData is { Count: > 0 }) ? existingSymbolData[i] : reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
+            // Safely obtain symbol definition from provided existingSymbolData if it contains this index; otherwise pick from strip
+            SymbolData newSymbol = (existingSymbolData != null && existingSymbolData.Count > i) ? existingSymbolData[i] : reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
             // If this symbol was freshly created it has been initialized. Apply the new data for reuse.
             if (sym != null) sym.ApplySymbol(newSymbol);
             if (sym != null) sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
@@ -273,17 +277,20 @@ public class GameReel : MonoBehaviour
         // Cancel any pending stop so a leftover stop doesn't apply mid-spin
         if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; }
 
-        // Clear any previous active tweens to avoid interacting with stale Tween references
+        // Clear any previous active coroutines to avoid interacting with stale references
         try
         {
-            if (activeSpinTweens[0] != null) { activeSpinTweens[0].Kill(); activeSpinTweens[0] = null; }
+            if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
         }
-        catch { activeSpinTweens[0] = null; }
+        catch { activeSpinCoroutines[0] = null; }
         try
         {
-            if (activeSpinTweens[1] != null) { activeSpinTweens[1].Kill(); activeSpinTweens[1] = null; }
+            if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
         }
-        catch { activeSpinTweens[1] = null; }
+        catch { activeSpinCoroutines[1] = null; }
+
+        // reset speed multiplier
+        spinSpeedMultiplier = 1f;
 
         // Always start in continuous mode unless an explicit StopReel sets this later
         completeOnNextSpin = false;
@@ -329,8 +336,8 @@ public class GameReel : MonoBehaviour
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
         completeOnNextSpin = true;
-        if (activeSpinTweens[0] != null) activeSpinTweens[0].timeScale = 4f;
-        if (activeSpinTweens[1] != null) activeSpinTweens[1].timeScale = 4f;
+        // accelerate coroutine-based spin movement
+        spinSpeedMultiplier = 4f;
         stopReelCoroutine = null;
     }
 
@@ -365,7 +372,8 @@ public class GameReel : MonoBehaviour
                     symbol = CreateSymbolInstance(nextSymbolsRoot);
                 }
             }
-            SymbolData def = solution != null ? solution[i] : reelStrip.GetWeightedSymbol(tmpCombinedExisting);
+            // Safely obtain definition from provided solution if it has enough entries; otherwise fallback to reelStrip selection
+            SymbolData def = (solution != null && solution.Count > i) ? solution[i] : reelStrip.GetWeightedSymbol(tmpCombinedExisting);
             if (symbol != null) symbol.ApplySymbol(def);
             if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
@@ -510,18 +518,63 @@ public class GameReel : MonoBehaviour
     public void FallOut(List<SymbolData> solution = null, bool kickback = false)
     {
         ResetDimmedSymbols(); SpawnNextReel(solution); float fallDistance = -nextSymbolsRoot.transform.localPosition.y; float duration = currentReelData.ReelSpinDuration;
-        // Use integer counter to wait for both tweens to finish to avoid race conditions
+        // Use integer counter to wait for both movements to finish to avoid race conditions
         pendingLandingSolution = solution;
         landingPendingCount = 2;
-        if (activeSpinTweens[0] != null) { activeSpinTweens[0].Kill(); activeSpinTweens[0] = null; }
-        if (activeSpinTweens[1] != null) { activeSpinTweens[1].Kill(); activeSpinTweens[1] = null; }
-        activeSpinTweens[0] = symbolRoot.transform.DOLocalMoveY(fallDistance, duration).OnComplete(LandingPartCompleted).SetEase(Ease.Linear);
-        activeSpinTweens[1] = nextSymbolsRoot.transform.DOLocalMoveY(0, duration).OnComplete(LandingPartCompleted).SetEase(Ease.Linear);
+
+        // Stop any existing active spin coroutines
+        if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
+        if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
+
+        // reset speed multiplier
+        spinSpeedMultiplier = 1f;
+
+        // Start lightweight coroutines for linear movement (cheaper than DOTween when linear)
+        if (symbolRoot != null)
+            activeSpinCoroutines[0] = StartCoroutine(MoveLocalY(symbolRoot, fallDistance, duration, 0));
+        if (nextSymbolsRoot != null)
+            activeSpinCoroutines[1] = StartCoroutine(MoveLocalY(nextSymbolsRoot, 0f, duration, 1));
+    }
+
+    private IEnumerator MoveLocalY(Transform t, float targetY, float duration, int index)
+    {
+        if (t == null)
+        {
+            LandingPartCompleted();
+            yield break;
+        }
+
+        float startY = t.localPosition.y;
+        float elapsed = 0f;
+        if (duration <= 0f)
+        {
+            var lpImmediate = t.localPosition; lpImmediate.y = targetY; t.localPosition = lpImmediate;
+        }
+        else
+        {
+            while (elapsed < duration)
+            {
+                float dt = Time.deltaTime * spinSpeedMultiplier;
+                elapsed += dt;
+                float p = Mathf.Clamp01(duration > 0f ? (elapsed / duration) : 1f);
+                float newY = Mathf.Lerp(startY, targetY, p);
+                var lp = t.localPosition; lp.y = newY; t.localPosition = lp;
+                yield return null;
+            }
+        }
+
+        // Ensure final position
+        var finalLp = t.localPosition; finalLp.y = targetY; t.localPosition = finalLp;
+
+        // clear coroutine handle
+        if (index >= 0 && index < activeSpinCoroutines.Length) activeSpinCoroutines[index] = null;
+
+        LandingPartCompleted();
     }
 
     private void LandingPartCompleted()
     {
-        // Decrement counter and only proceed when both tweens have reported completion
+        // Decrement counter and only proceed when both coroutines have reported completion
         landingPendingCount--;
         if (landingPendingCount <= 0)
         {
@@ -848,6 +901,8 @@ private void ValidateNoSharedInstances()
         // Ensure any running coroutines are stopped to avoid lingering callbacks
         if (beginSpinCoroutine != null) StopCoroutine(beginSpinCoroutine);
         if (stopReelCoroutine != null) StopCoroutine(stopReelCoroutine);
+        if (activeSpinCoroutines[0] != null) StopCoroutine(activeSpinCoroutines[0]);
+        if (activeSpinCoroutines[1] != null) StopCoroutine(activeSpinCoroutines[1]);
     }
 
 }
