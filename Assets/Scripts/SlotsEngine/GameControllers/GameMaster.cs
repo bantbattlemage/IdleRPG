@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 /// <summary>
 /// Game-level coordinator responsible for player setup and starting a new or continued session.
@@ -21,6 +22,19 @@ public class GameMaster : Singleton<GameMaster>
 		Application.runInBackground = true;
 
 		stateMachine = new StateMachine();
+
+		// Initialize DOTween early and pre-allocate tweens/sequences capacity to avoid runtime growth
+		try
+		{
+			DOTween.Init();
+			// Pre-size tweeners and sequences to reduce per-frame work in DOTweenComponent.Update()
+			// Values chosen conservatively for many-slots scenarios; adjust if your game needs more.
+			DOTween.SetTweensCapacity(2048, 512);
+		}
+		catch (System.Exception ex)
+		{
+			Debug.LogWarning($"DOTween initialization failed: {ex.Message}");
+		}
 	}
 
 	/// <summary>

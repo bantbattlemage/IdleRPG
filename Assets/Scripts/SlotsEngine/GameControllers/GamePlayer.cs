@@ -77,21 +77,56 @@ public class GamePlayer : Singleton<GamePlayer>
 		if (Input.GetKeyDown(KeyCode.R))
 		{
 			var slots = playerSlots.GetRandom();
-			slots.AddReel();
+			if (slots == null)
+			{
+				Debug.LogWarning("No slots available to add a reel.");
+			}
+			else
+			{
+				slots.AddReel();
+			}
 		}
 
 		// Testing add symbols
 		if (Input.GetKeyDown(KeyCode.A))
 		{
 			var slots = playerSlots.GetRandom();
-			var reel = slots.CurrentReels.GetRandom();
-			reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
+			if (slots == null)
+			{
+				Debug.LogWarning("No slots available to add a symbol.");
+			}
+			else
+			{
+				var reel = slots.CurrentReels.GetRandom();
+				if (reel == null)
+				{
+					Debug.LogWarning("Selected slot has no reels to add a symbol to.");
+				}
+				else
+				{
+					reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
+				}
+			}
 		}
 		if (Input.GetKeyDown(KeyCode.Z))
 		{
 			var slots = playerSlots.GetRandom();
-			var reel = slots.CurrentReels.GetRandom();
-			reel.SetSymbolCount(reel.CurrentReelData.SymbolCount - 1);
+			if (slots == null)
+			{
+				Debug.LogWarning("No slots available to remove a symbol.");
+			}
+			else
+			{
+				var reel = slots.CurrentReels.GetRandom();
+				if (reel == null)
+				{
+					Debug.LogWarning("Selected slot has no reels to remove a symbol from.");
+				}
+				else
+				{
+					reel.SetSymbolCount(reel.CurrentReelData.SymbolCount - 1);
+				}
+			}
 		}
 
 		// Testing kill slots

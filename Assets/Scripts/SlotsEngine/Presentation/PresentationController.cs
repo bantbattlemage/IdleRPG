@@ -84,12 +84,19 @@ public class PresentationController : Singleton<PresentationController>
 		if (winData.Count > 0)
 		{
 			PlayWinlines(slotsToPresent, currentSymbolGrid, winData);
-			DOTween.Sequence().AppendInterval(1f).AppendCallback(() => { CompletePresentation(slotsData); });
+			// use coroutine instead of DOTween.Sequence to avoid allocations from Sequence/Callback closures
+			StartCoroutine(DelayedCompletePresentation(slotsData, 1f));
 		}
 		else
 		{
 			CompletePresentation(slotsData);
 		}
+	}
+
+	private IEnumerator<YieldInstruction> DelayedCompletePresentation(SlotsPresentationData slotsData, float delay)
+	{
+		if (delay > 0f) yield return new WaitForSeconds(delay);
+		CompletePresentation(slotsData);
 	}
 
 	private void PlayWinlines(SlotsEngine slotsToPresent, GameSymbol[] grid, List<WinData> winData)
