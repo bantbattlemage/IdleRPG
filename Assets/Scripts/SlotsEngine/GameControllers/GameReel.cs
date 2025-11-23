@@ -23,22 +23,30 @@ public class GameReel : MonoBehaviour
     private EventManager eventManager;
     private int lastTopDummyCount = 0; private int lastBottomDummyCount = 0;
 
-    // --- New: persistent per-reel dummy pool ---
-    private List<GameSymbol> allDummySymbols = new List<GameSymbol>();
-    private HashSet<GameSymbol> allocatedDummySet = new HashSet<GameSymbol>();
+    // --- New: persistent per-reel pooled symbols (dummies + active + buffer)
+    private List<GameSymbol> allPooledSymbols = new List<GameSymbol>();
+    private HashSet<GameSymbol> allocatedPooledSet = new HashSet<GameSymbol>();
     private Transform dummyContainer;
 
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition, SlotsEngine owner)
     {
         currentReelData = data; id = reelID; eventManager = slotsEventManager; reelStrip = stripDefinition.CreateInstance(); ownerEngine = owner;
         reelStrip.ResetSpinCounts();
-        EnsureRootsCreated(); SpawnReel(currentReelData.CurrentSymbolData);
+        EnsureRootsCreated();
+        // Prewarm per-reel pool to estimated capacity BEFORE spawning so SpawnReel can use pooled symbols
+        int est = EstimateNeededPooledCapacity();
+        EnsurePooledSymbolCapacity(est);
+        SpawnReel(currentReelData.CurrentSymbolData);
     }
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripData stripData, SlotsEngine owner)
     {
         currentReelData = data; id = reelID; eventManager = slotsEventManager; reelStrip = stripData; ownerEngine = owner;
         reelStrip.ResetSpinCounts();
-        EnsureRootsCreated(); SpawnReel(currentReelData.CurrentSymbolData);
+        EnsureRootsCreated();
+        // Prewarm per-reel pool to estimated capacity BEFORE spawning so SpawnReel can use pooled symbols
+        int est = EstimateNeededPooledCapacity();
+        EnsurePooledSymbolCapacity(est);
+        SpawnReel(currentReelData.CurrentSymbolData);
     }
 
     public SymbolData GetRandomSymbolFromStrip() => reelStrip.GetWeightedSymbol();
@@ -65,12 +73,30 @@ public class GameReel : MonoBehaviour
         ReleaseAllSymbolsInRoot(symbolRoot); symbols.Clear();
         // Note: Do NOT release dummy instances here - they live in the persistent pool
         topDummySymbols.Clear(); bottomDummySymbols.Clear();
+        // Ensure we have at least enough pooled symbols for the visible rows
+        EnsurePooledSymbolCapacity(currentReelData != null ? currentReelData.SymbolCount : 0);
         float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize; var selectedForThisReel = new List<SymbolData>();
         for (int i = 0; i < currentReelData.SymbolCount; i++)
         {
-            GameSymbol sym = GameSymbolPool.Instance.Get(symbolRoot);
+            // Acquire a pooled symbol (creates enough if necessary). Caller will apply/initialize as appropriate.
+            GameSymbol sym = AcquireFreePooledSymbol();
+            if (sym == null)
+            {
+                // As a last-resort ensure capacity and try again
+                EnsurePooledSymbolCapacity(currentReelData != null ? currentReelData.SymbolCount : 1);
+                sym = AcquireFreePooledSymbol();
+                if (sym == null)
+                {
+                    // Fallback to global pool or create directly to avoid throwing NRE
+                    sym = CreateSymbolInstance(symbolRoot);
+                }
+            }
             SymbolData newSymbol = (existingSymbolData is { Count: > 0 }) ? existingSymbolData[i] : reelStrip.GetWeightedSymbol(selectedForThisReel);
-            sym.InitializeSymbol(newSymbol, eventManager); sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+            // If this symbol was freshly created it has been initialized. Apply the new data for reuse.
+            if (sym != null) sym.ApplySymbol(newSymbol);
+            if (sym != null) sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+            // ensure proper parenting
+            if (sym != null) sym.transform.SetParent(symbolRoot, false);
             symbols.Add(sym); if (newSymbol != null) selectedForThisReel.Add(newSymbol);
         }
         GenerateActiveDummies(selectedForThisReel);
@@ -108,24 +134,29 @@ public class GameReel : MonoBehaviour
     {
         ComputeDummyCounts(out int topCount, out int bottomCount); lastTopDummyCount = topCount; lastBottomDummyCount = bottomCount;
         // Ensure pool capacity covers active dummies
-        EnsureDummyPoolSize(topCount + bottomCount);
+        // Ensure capacity for visible symbols + active dummies
+        int visible = currentReelData != null ? currentReelData.SymbolCount : 0;
+        EnsurePooledSymbolCapacity(visible + topCount + bottomCount);
 
         // Release any currently allocated active dummies back to pool (they will be reallocated)
-        foreach (var d in topDummySymbols) ReleaseDummy(d);
-        foreach (var d in bottomDummySymbols) ReleaseDummy(d);
+        foreach (var d in topDummySymbols) ReleasePooledSymbol(d);
+        foreach (var d in bottomDummySymbols) ReleasePooledSymbol(d);
         topDummySymbols.Clear(); bottomDummySymbols.Clear();
 
         // Use non-consuming selection for dummy symbols to avoid draining reserved counts prematurely.
         // Allocate bottom dummies first (positions below)
         for (int i = 0; i < bottomCount; i++)
         {
-            var sym = AcquireFreeDummy();
+            var sym = AcquireFreePooledSymbol();
             if (sym == null) // defensive fallback
             {
                 sym = GameSymbolPool.Instance.Get(dummyContainer);
-                sym.InitializeSymbol(reelStrip.GetWeightedSymbol(existingSelections, false), eventManager);
-                allDummySymbols.Add(sym);
-                allocatedDummySet.Add(sym);
+                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
+                sym.InitializeSymbol(initDef, eventManager);
+                // Ensure it's hidden until allocated properly
+                sym.gameObject.SetActive(false);
+                allPooledSymbols.Add(sym);
+                allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
             sym.ApplySymbol(def);
@@ -142,13 +173,15 @@ public class GameReel : MonoBehaviour
         int activeCount = currentReelData.SymbolCount;
         for (int i = 0; i < topCount; i++)
         {
-            var sym = AcquireFreeDummy();
+            var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
                 sym = GameSymbolPool.Instance.Get(dummyContainer);
-                sym.InitializeSymbol(reelStrip.GetWeightedSymbol(existingSelections, false), eventManager);
-                allDummySymbols.Add(sym);
-                allocatedDummySet.Add(sym);
+                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
+                sym.InitializeSymbol(initDef, eventManager);
+                sym.gameObject.SetActive(false);
+                allPooledSymbols.Add(sym);
+                allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
             sym.ApplySymbol(def);
@@ -200,6 +233,9 @@ public class GameReel : MonoBehaviour
 
     public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
     {
+        // Ensure per-reel pool is large enough before spin starts to prevent transient gaps
+        int est = EstimateNeededPooledCapacity();
+        EnsurePooledSymbolCapacity(est);
         reelStrip.ResetSpinCounts(); // start fresh spin counts
         completeOnNextSpin = false; DOTween.Sequence().AppendInterval(startDelay).AppendCallback(() => { ClearPreSpinTweens(); BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () => { FallOut(solution, true); spinning = true; eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); }); });
     }
@@ -219,12 +255,26 @@ public class GameReel : MonoBehaviour
                 if (gs?.CurrentSymbolData != null)
                     combinedExisting.Add(gs.CurrentSymbolData);
 
+        // Ensure we have pooled symbols for the visible buffer rows
+        EnsurePooledSymbolCapacity(currentReelData != null ? currentReelData.SymbolCount : 0);
+
         for (int i = 0; i < currentReelData.SymbolCount; i++)
         {
-            GameSymbol symbol = GameSymbolPool.Instance.Get(nextSymbolsRoot);
+            // Acquire a pooled symbol for the visible buffer symbols
+            GameSymbol symbol = AcquireFreePooledSymbol();
+            if (symbol == null)
+            {
+                EnsurePooledSymbolCapacity(currentReelData != null ? currentReelData.SymbolCount : 1);
+                symbol = AcquireFreePooledSymbol();
+                if (symbol == null)
+                {
+                    symbol = CreateSymbolInstance(nextSymbolsRoot);
+                }
+            }
             SymbolData def = solution != null ? solution[i] : reelStrip.GetWeightedSymbol(combinedExisting);
-            symbol.InitializeSymbol(def, eventManager);
-            symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+            if (symbol != null) symbol.ApplySymbol(def);
+            if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
+            if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
             newSymbols.Add(symbol);
             if (def != null) combinedExisting.Add(def);
         }
@@ -235,21 +285,24 @@ public class GameReel : MonoBehaviour
         ComputeDummyCounts(out int topCount, out int bottomCount);
 
         // Spawn buffer dummies under the next root using persistent dummy pool
-        // Ensure there is capacity for both active and buffer dummies
-        EnsureDummyPoolSize(Math.Max(allDummySymbols.Count, topCount + bottomCount + lastTopDummyCount + lastBottomDummyCount));
+        // Ensure there is capacity for both active and buffer dummies (use estimate to be safe)
+        int estCap = EstimateNeededPooledCapacity();
+        EnsurePooledSymbolCapacity(Math.Max(allPooledSymbols.Count, estCap));
 
         // Acquire buffer bottom dummies
         bufferBottomDummySymbols.Clear();
         var combinedForBuffer = new List<SymbolData>(combinedExisting);
         for (int i = 0; i < bottomCount; i++)
         {
-            var sym = AcquireFreeDummy();
+            var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
                 sym = GameSymbolPool.Instance.Get(dummyContainer);
-                sym.InitializeSymbol(reelStrip.GetWeightedSymbol(combinedForBuffer, false), eventManager);
-                allDummySymbols.Add(sym);
-                allocatedDummySet.Add(sym);
+                SymbolData initDef = reelStrip.GetWeightedSymbol(combinedForBuffer, false);
+                sym.InitializeSymbol(initDef, eventManager);
+                sym.gameObject.SetActive(false);
+                allPooledSymbols.Add(sym);
+                allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(combinedForBuffer, false);
             sym.ApplySymbol(def);
@@ -265,13 +318,15 @@ public class GameReel : MonoBehaviour
         bufferTopDummySymbols.Clear();
         for (int i = 0; i < topCount; i++)
         {
-            var sym = AcquireFreeDummy();
+            var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
                 sym = GameSymbolPool.Instance.Get(dummyContainer);
-                sym.InitializeSymbol(reelStrip.GetWeightedSymbol(combinedForBuffer, false), eventManager);
-                allDummySymbols.Add(sym);
-                allocatedDummySet.Add(sym);
+                SymbolData initDef = reelStrip.GetWeightedSymbol(combinedForBuffer, false);
+                sym.InitializeSymbol(initDef, eventManager);
+                sym.gameObject.SetActive(false);
+                allPooledSymbols.Add(sym);
+                allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(combinedForBuffer, false);
             sym.ApplySymbol(def);
@@ -336,13 +391,15 @@ public class GameReel : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            var sym = AcquireFreeDummy();
+            var sym = AcquireFreePooledSymbol();
             if (sym == null)
             {
                 sym = GameSymbolPool.Instance.Get(root);
-                sym.InitializeSymbol(reelStrip.GetWeightedSymbol(existingSelections, consume), eventManager);
-                allDummySymbols.Add(sym);
-                allocatedDummySet.Add(sym);
+                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume);
+                sym.InitializeSymbol(initDef, eventManager);
+                sym.gameObject.SetActive(false);
+                allPooledSymbols.Add(sym);
+                allocatedPooledSet.Add(sym);
             }
             SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, consume);
             sym.ApplySymbol(def);
@@ -396,11 +453,11 @@ public class GameReel : MonoBehaviour
 
         // Return active dummies to pool (do not release to global pool - keep persistent per-reel)
         foreach (var d in topDummySymbols)
-            if (d != null) ReleaseDummy(d);
+            if (d != null) ReleasePooledSymbol(d);
         topDummySymbols.Clear();
 
         foreach (var d in bottomDummySymbols)
-            if (d != null) ReleaseDummy(d);
+            if (d != null) ReleasePooledSymbol(d);
         bottomDummySymbols.Clear();
 
         var existing = currentReelData.CurrentSymbolData != null ? new List<SymbolData>(currentReelData.CurrentSymbolData) : new List<SymbolData>();
@@ -428,10 +485,10 @@ public class GameReel : MonoBehaviour
                 RemoveFromAllLists(symbol);
 
                 // If this symbol is part of the persistent per-reel dummy pool, return it to the dummy container
-                if (allDummySymbols != null && allDummySymbols.Contains(symbol))
+                if (allPooledSymbols != null && allPooledSymbols.Contains(symbol))
                 {
                     // mark it free and reparent to dummy container rather than releasing to global pool
-                    ReleaseDummy(symbol);
+                    ReleasePooledSymbol(symbol);
                 }
                 else
                 {
@@ -459,7 +516,7 @@ public class GameReel : MonoBehaviour
         bufferBottomDummySymbols.RemoveAll(s => s == symbol);
 
         // Also ensure it is not allocated in our allocation set
-        if (allocatedDummySet.Contains(symbol)) allocatedDummySet.Remove(symbol);
+        if (allocatedPooledSet.Contains(symbol)) allocatedPooledSet.Remove(symbol);
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -548,53 +605,120 @@ private void ValidateNoSharedInstances()
         return false;
     }
 
-    // --- Dummy pool helpers ---
-    private void EnsureDummyPoolSize(int totalNeeded)
+    // --- Per-reel pooled symbol helpers (covers visible symbols, buffer symbols and dummies) ---
+    private void EnsurePooledSymbolCapacity(int totalNeeded)
     {
         if (totalNeeded <= 0) return;
         // if already sufficient, nothing to do
-        if (allDummySymbols.Count >= totalNeeded) return;
+        if (allPooledSymbols.Count >= totalNeeded) return;
         EnsureRootsCreated();
-        int toCreate = totalNeeded - allDummySymbols.Count;
+        int toCreate = totalNeeded - allPooledSymbols.Count;
         for (int i = 0; i < toCreate; i++)
         {
-            var sym = GameSymbolPool.Instance.Get(dummyContainer);
-            // initialize with a harmless non-consuming pick so the symbol has a sprite
+            var sym = CreateSymbolInstance(dummyContainer);
+            // initialize with a harmless non-consuming pick so the symbol has a sprite and registers events
             SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(new List<SymbolData>(), false) : null;
-            if (def != null) sym.InitializeSymbol(def, eventManager); else sym.InitializeSymbol(reelStrip?.GetWeightedSymbol(null), eventManager);
-            sym.SetSizeAndLocalY(currentReelData != null ? currentReelData.SymbolSize : 100, 0);
-            // keep pool dummies inactive until allocated
-            if (sym.gameObject.activeSelf) sym.gameObject.SetActive(false);
-            allDummySymbols.Add(sym);
-            // newly created symbol is free until allocated
-            if (allocatedDummySet.Contains(sym)) allocatedDummySet.Remove(sym);
-        }
+            if (sym != null)
+            {
+                if (def != null) sym.InitializeSymbol(def, eventManager); else sym.InitializeSymbol(reelStrip?.GetWeightedSymbol(null), eventManager);
+                sym.SetSizeAndLocalY(currentReelData != null ? currentReelData.SymbolSize : 100, 0);
+                // keep pool symbols inactive until allocated
+                if (sym.gameObject.activeSelf) sym.gameObject.SetActive(false);
+                allPooledSymbols.Add(sym);
+                // newly created symbol is free until allocated
+                if (allocatedPooledSet.Contains(sym)) allocatedPooledSet.Remove(sym);
+            }
+         }
+     }
+
+    // Estimate conservative capacity needed for pooling to avoid gaps: visible + top/bottom dummies + buffer
+    private int EstimateNeededPooledCapacity()
+    {
+        if (currentReelData == null) return 0;
+        ComputeDummyCounts(out int topCount, out int bottomCount);
+        int visible = currentReelData.SymbolCount;
+        int buffer = 2 * (currentReelData.SymbolCount); // safe buffer for incoming/outgoing
+        int estimate = visible + topCount + bottomCount + buffer;
+        // clamp to a reasonable max
+        int maxReasonable = currentReelData.SymbolCount * 6 + 24;
+        return Mathf.Min(estimate, maxReasonable);
     }
 
-    private GameSymbol AcquireFreeDummy()
+    // Robust symbol creation: prefer GameSymbolPool, fallback to manual GameObject if needed
+    private GameSymbol CreateSymbolInstance(Transform parent)
     {
-        for (int i = 0; i < allDummySymbols.Count; i++)
+        try
         {
-            var s = allDummySymbols[i];
-            if (s == null) continue;
-            if (!allocatedDummySet.Contains(s))
+            if (GameSymbolPool.Instance != null)
             {
-                allocatedDummySet.Add(s);
+                var s = GameSymbolPool.Instance.Get(parent);
+                if (s != null)
+                {
+                    return s;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // ignore and fallback to manual creation
+        }
+
+        // Fallback: create GameObject and add GameSymbol
+        var go = new GameObject("PooledGameSymbol");
+        if (parent != null) go.transform.SetParent(parent, false);
+        var gs = go.AddComponent<GameSymbol>();
+        // ensure it has an Image & RectTransform for layout - add minimal components if missing
+        if (go.GetComponent<UnityEngine.UI.Image>() == null) go.AddComponent<UnityEngine.UI.Image>();
+        if (go.GetComponent<RectTransform>() == null) go.AddComponent<RectTransform>();
+        return gs;
+    }
+
+    private GameSymbol AcquireFreePooledSymbol()
+    {
+        for (int i = 0; i < allPooledSymbols.Count; i++)
+        {
+            var s = allPooledSymbols[i];
+            if (s == null) continue;
+            if (!allocatedPooledSet.Contains(s))
+            {
+                allocatedPooledSet.Add(s);
                 // ensure it's active when handed out
                 if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
                 return s;
             }
         }
+        // No free symbol available: create one and return it
+        EnsureRootsCreated();
+        var newSym = CreateSymbolInstance(dummyContainer);
+        if (newSym != null)
+        {
+            // initialize with non-consuming pick to get a sprite
+            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(new List<SymbolData>(), false) : null;
+            if (def != null) newSym.InitializeSymbol(def, eventManager);
+            if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
+            allPooledSymbols.Add(newSym);
+            allocatedPooledSet.Add(newSym);
+            return newSym;
+        }
         return null;
     }
 
-    private void ReleaseDummy(GameSymbol s)
+    private void ReleasePooledSymbol(GameSymbol s)
     {
         if (s == null) return;
-        allocatedDummySet.Remove(s);
-        // hide the dummy to avoid visual orphaning
+        allocatedPooledSet.Remove(s);
+        // hide the pooled symbol to avoid visual orphaning
         if (s.gameObject.activeSelf) s.gameObject.SetActive(false);
         // return to dummy container so it's out of the way until reused
         if (dummyContainer != null) s.transform.SetParent(dummyContainer, true);
     }
+
+    // Public API: prewarm per-reel pooled symbols (used by SlotsEngine)
+    public void PrewarmPooledSymbols()
+    {
+        EnsureRootsCreated();
+        int est = EstimateNeededPooledCapacity();
+        if (est > 0) EnsurePooledSymbolCapacity(est);
+    }
+
 }

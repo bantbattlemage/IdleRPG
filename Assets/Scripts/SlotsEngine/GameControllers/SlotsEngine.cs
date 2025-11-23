@@ -113,12 +113,33 @@ public class SlotsEngine : MonoBehaviour
 	{
 		if (currentReelsGroup != null) { Destroy(currentReelsGroup.gameObject); reels.Clear(); }
 		Transform reelsGroup = new GameObject("ReelsGroup").transform; reelsGroup.parent = gameCanvas.transform; reelsGroup.localScale = Vector3.one;
+
+		// Prewarm global pool conservatively based on reel definitions to avoid allocation gaps on first spins
+		try
+		{
+			if (GameSymbolPool.Instance != null && currentSlotsData?.CurrentReelData != null)
+			{
+				int totalEstimate = 0;
+				foreach (var rd in currentSlotsData.CurrentReelData)
+				{
+					if (rd == null) continue;
+					int symbolCount = Mathf.Max(1, rd.SymbolCount);
+					int perReelEstimate = symbolCount * 6 + 24; // matches per-reel maxReasonable used elsewhere
+					totalEstimate += perReelEstimate;
+				}
+				if (totalEstimate > 0) GameSymbolPool.Instance.Prewarm(totalEstimate);
+			}
+		}
+		catch { }
+
 		for (int i = 0; i < currentSlotsData.CurrentReelData.Count; i++)
 		{
 			ReelData data = currentSlotsData.CurrentReelData[i]; GameObject g = Instantiate(reelPrefab, reelsGroup.transform); GameReel reel = g.GetComponent<GameReel>();
 			if (data.CurrentReelStrip != null) reel.InitializeReel(data, i, eventManager, data.CurrentReelStrip, this); else reel.InitializeReel(data, i, eventManager, data.DefaultReelStrip, this);
 			g.transform.localPosition = new Vector3((data.SymbolSpacing + data.SymbolSize) * i, 0, 0); reels.Add(reel);
 		}
+		// Prewarm per-reel pools immediately after creating reels to avoid gaps on first spins
+		foreach (var r in reels) r?.PrewarmPooledSymbols();
 		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidth / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidth / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0); currentReelsGroup = reelsGroup;
 		RegenerateAllReelDummies();
 
