@@ -563,6 +563,8 @@ private void ValidateNoSharedInstances()
             SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(new List<SymbolData>(), false) : null;
             if (def != null) sym.InitializeSymbol(def, eventManager); else sym.InitializeSymbol(reelStrip?.GetWeightedSymbol(null), eventManager);
             sym.SetSizeAndLocalY(currentReelData != null ? currentReelData.SymbolSize : 100, 0);
+            // keep pool dummies inactive until allocated
+            if (sym.gameObject.activeSelf) sym.gameObject.SetActive(false);
             allDummySymbols.Add(sym);
             // newly created symbol is free until allocated
             if (allocatedDummySet.Contains(sym)) allocatedDummySet.Remove(sym);
@@ -578,6 +580,8 @@ private void ValidateNoSharedInstances()
             if (!allocatedDummySet.Contains(s))
             {
                 allocatedDummySet.Add(s);
+                // ensure it's active when handed out
+                if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
                 return s;
             }
         }
@@ -588,6 +592,8 @@ private void ValidateNoSharedInstances()
     {
         if (s == null) return;
         allocatedDummySet.Remove(s);
+        // hide the dummy to avoid visual orphaning
+        if (s.gameObject.activeSelf) s.gameObject.SetActive(false);
         // return to dummy container so it's out of the way until reused
         if (dummyContainer != null) s.transform.SetParent(dummyContainer, true);
     }
