@@ -124,8 +124,34 @@ public class GameReel : MonoBehaviour
                     sym = CreateSymbolInstance(symbolRoot);
                 }
             }
-            // Safely obtain symbol definition from provided existingSymbolData if it contains this index; otherwise pick from strip
-            SymbolData newSymbol = (existingSymbolData != null && existingSymbolData.Count > i) ? existingSymbolData[i] : reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
+
+            // Safely obtain symbol definition from provided existingSymbolData if it contains this index and non-null;
+            // attempt to recover sprite by name when missing; otherwise pick from strip
+            SymbolData newSymbol = null;
+            if (existingSymbolData != null && existingSymbolData.Count > i && existingSymbolData[i] != null)
+            {
+                newSymbol = existingSymbolData[i];
+                if (newSymbol.Sprite == null && !string.IsNullOrEmpty(newSymbol.Name))
+                {
+                    try { newSymbol.Sprite = AssetResolver.ResolveSprite(newSymbol.Name); } catch { }
+                }
+
+                if (newSymbol.Sprite == null)
+                {
+                    // couldn't resolve sprite for persisted symbol -> fallback to strip selection
+                    newSymbol = reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
+                }
+                else
+                {
+                    // ensure symbol is registered with manager so future loads can resolve by accessor id
+                    try { if (SymbolDataManager.Instance != null && newSymbol.AccessorId == 0) SymbolDataManager.Instance.AddNewData(newSymbol); } catch { }
+                }
+            }
+            else
+            {
+                newSymbol = reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
+            }
+
             // If this symbol was freshly created it has been initialized. Apply the new data for reuse.
             if (sym != null) sym.ApplySymbol(newSymbol);
             if (sym != null) sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
@@ -370,8 +396,28 @@ public class GameReel : MonoBehaviour
                     symbol = CreateSymbolInstance(nextSymbolsRoot);
                 }
             }
-            // Safely obtain definition from provided solution if it has enough entries; otherwise fallback to reelStrip selection
-            SymbolData def = (solution != null && solution.Count > i) ? solution[i] : reelStrip.GetWeightedSymbol(tmpCombinedExisting);
+            // Safely obtain definition from provided solution if it has enough entries and non-null; otherwise fallback to reelStrip selection
+            SymbolData def = null;
+            if (solution != null && solution.Count > i && solution[i] != null)
+            {
+                def = solution[i];
+                if (def.Sprite == null && !string.IsNullOrEmpty(def.Name))
+                {
+                    try { def.Sprite = AssetResolver.ResolveSprite(def.Name); } catch { }
+                }
+                if (def.Sprite == null)
+                {
+                    def = reelStrip.GetWeightedSymbol(tmpCombinedExisting);
+                }
+                else
+                {
+                    try { if (SymbolDataManager.Instance != null && def.AccessorId == 0) SymbolDataManager.Instance.AddNewData(def); } catch { }
+                }
+            }
+            else
+            {
+                def = reelStrip.GetWeightedSymbol(tmpCombinedExisting);
+            }
             if (symbol != null) symbol.ApplySymbol(def);
             if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
@@ -862,7 +908,37 @@ private void ValidateNoSharedInstances()
         else if (dataList.Count < newCount) { for (int i = dataList.Count; i < newCount; i++) dataList.Add(reelStrip.GetWeightedSymbol(dataList)); }
         currentReelData.SetCurrentSymbolData(dataList);
         if (!incremental) { SpawnReel(currentReelData.CurrentSymbolData); SlotsEngineManager.Instance.AdjustSlotCanvas(ownerEngine); return; }
-        if (newCount > oldCount) { for (int i = oldCount; i < newCount; i++) { GameSymbol sym = cachedSymbolPool != null ? cachedSymbolPool.Get(symbolRoot) : GameSymbolPool.Instance?.Get(symbolRoot); SymbolData def = (currentReelData.CurrentSymbolData.Count > i) ? currentReelData.CurrentSymbolData[i] : reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData); sym.InitializeSymbol(def, eventManager); symbols.Add(sym); } }
+        if (newCount > oldCount)
+        {
+            for (int i = oldCount; i < newCount; i++)
+            {
+                GameSymbol sym = cachedSymbolPool != null ? cachedSymbolPool.Get(symbolRoot) : GameSymbolPool.Instance?.Get(symbolRoot);
+                SymbolData def = null;
+                if (currentReelData.CurrentSymbolData.Count > i && currentReelData.CurrentSymbolData[i] != null)
+                {
+                    def = currentReelData.CurrentSymbolData[i];
+                    if (def.Sprite == null && !string.IsNullOrEmpty(def.Name))
+                    {
+                        try { def.Sprite = AssetResolver.ResolveSprite(def.Name); } catch { }
+                    }
+                    if (def.Sprite == null)
+                    {
+                        def = reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData);
+                    }
+                    else
+                    {
+                        try { if (SymbolDataManager.Instance != null && def.AccessorId == 0) SymbolDataManager.Instance.AddNewData(def); } catch { }
+                    }
+                }
+                else
+                {
+                    def = reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData);
+                }
+
+                sym.InitializeSymbol(def, eventManager);
+                symbols.Add(sym);
+            }
+        }
         else { for (int i = oldCount - 1; i >= newCount; i--) { if (i < 0 || i >= symbols.Count) continue; var sym = symbols[i]; if (sym != null) { if (cachedSymbolPool != null) cachedSymbolPool.Release(sym); else GameSymbolPool.Instance?.Release(sym); } symbols.RemoveAt(i); } }
         RecomputeAllPositions();
 

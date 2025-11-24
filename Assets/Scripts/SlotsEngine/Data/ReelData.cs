@@ -12,6 +12,7 @@ public class ReelData : Data
 	[SerializeField] private string defaultReelStripKey;
 	[SerializeField] private string baseDefinitionKey;
 	[SerializeField] private string[] currentSymbolKeys;
+	[SerializeField] private int[] currentSymbolAccessorIds; // NEW: persistent accessor id references for symbols
 
 	[System.NonSerialized] private ReelStripData currentReelStrip;
 	[System.NonSerialized] private ReelDefinition baseDefinition;
@@ -71,9 +72,13 @@ public class ReelData : Data
 		if (symbolDatas != null)
 		{
 			currentSymbolKeys = new string[symbolDatas.Count];
+			currentSymbolAccessorIds = new int[symbolDatas.Count];
 			for (int i = 0; i < symbolDatas.Count; i++)
 			{
-				currentSymbolKeys[i] = symbolDatas[i] != null ? symbolDatas[i].Name : null;
+				var sd = symbolDatas[i];
+				currentSymbolKeys[i] = sd != null ? sd.Name : null;
+				// Persist accessor id when available; use -1 for missing
+				currentSymbolAccessorIds[i] = sd != null ? sd.AccessorId : -1;
 			}
 		}
 	}
@@ -104,16 +109,101 @@ public class ReelData : Data
 			currentReelStrip = DefinitionResolver.Resolve<ReelStripDefinition>(defaultReelStripKey)?.CreateInstance();
 		}
 
-		if ((currentSymbolData == null || currentSymbolData.Count == 0) && currentSymbolKeys != null)
+		// Build a target length for symbol lists using available persisted arrays
+		int len = 0;
+		if (currentSymbolAccessorIds != null) len = Mathf.Max(len, currentSymbolAccessorIds.Length);
+		if (currentSymbolKeys != null) len = Mathf.Max(len, currentSymbolKeys.Length);
+		if ((currentSymbolData != null) && currentSymbolData.Count > len) len = currentSymbolData.Count;
+
+		// If there is nothing to resolve, keep current state
+		if (len == 0)
 		{
-			currentSymbolData = new List<SymbolData>();
-			for (int i = 0; i < currentSymbolKeys.Length; i++)
-			{
-				// Resolve by name: this assumes symbol name is unique and used as key
-				Sprite sprite = AssetResolver.ResolveSprite(currentSymbolKeys[i]);
-				// Create a runtime SymbolData with default no-win values (BaseValue=0, MinWinDepth=-1)
-				currentSymbolData.Add(new SymbolData(currentSymbolKeys[i], sprite, 0, -1, 1f, PayScaling.DepthSquared, false, true));
-			}
+			return;
 		}
+
+		// Ensure backing arrays exist for persistence consistency
+		if (currentSymbolKeys == null) currentSymbolKeys = new string[len];
+		if (currentSymbolAccessorIds == null) currentSymbolAccessorIds = new int[len];
+
+		var result = new List<SymbolData>(len);
+		for (int i = 0; i < len; i++)
+		{
+			SymbolData resolved = null;
+
+			// 1) Try resolve by persisted accessor id if present and positive
+			if (currentSymbolAccessorIds != null && i < currentSymbolAccessorIds.Length)
+			{
+				int accessor = currentSymbolAccessorIds[i];
+				if (accessor > 0)
+				{
+					try
+					{
+						if (SymbolDataManager.Instance != null && SymbolDataManager.Instance.TryGetData(accessor, out var fromManager))
+						{
+							resolved = fromManager;
+							// if manager-provided symbol lacks a sprite/key, try to resolve using persisted key or name
+							if (resolved != null && resolved.Sprite == null)
+							{
+								string nameKey = null;
+								if (currentSymbolKeys != null && i < currentSymbolKeys.Length && !string.IsNullOrEmpty(currentSymbolKeys[i])) nameKey = currentSymbolKeys[i];
+								if (string.IsNullOrEmpty(nameKey) && !string.IsNullOrEmpty(resolved.Name)) nameKey = resolved.Name;
+								if (!string.IsNullOrEmpty(nameKey))
+								{
+									try { resolved.Sprite = AssetResolver.ResolveSprite(nameKey); } catch { }
+									// ensure persisted key is populated so future resolution doesn't rely solely on accessor
+									if (!string.IsNullOrEmpty(nameKey))
+									{
+										if (currentSymbolKeys == null || i >= currentSymbolKeys.Length)
+										{
+											var newKeys = new string[len];
+											if (currentSymbolKeys != null) Array.Copy(currentSymbolKeys, newKeys, Math.Min(currentSymbolKeys.Length, newKeys.Length));
+											currentSymbolKeys = newKeys;
+										}
+										currentSymbolKeys[i] = nameKey;
+									}
+								}
+							}
+						}
+					}
+					catch { }
+				}
+			}
+
+			// 2) If still unresolved, check if current in-memory data exists and reuse it
+			if (resolved == null && currentSymbolData != null && i < currentSymbolData.Count)
+			{
+				resolved = currentSymbolData[i];
+			}
+
+			// 3) Fallback: resolve by key/name and create a runtime SymbolData
+			if (resolved == null && currentSymbolKeys != null && i < currentSymbolKeys.Length)
+			{
+				string key = currentSymbolKeys[i];
+				Sprite sprite = AssetResolver.ResolveSprite(key);
+				resolved = new SymbolData(key, sprite, 0, -1, 1f, PayScaling.DepthSquared, false, true);
+
+				// If we can persist this runtime-created symbol into the SymbolDataManager, do so so accessor ids are available later
+				try
+				{
+					if (SymbolDataManager.Instance != null && resolved != null && resolved.AccessorId == 0)
+					{
+						SymbolDataManager.Instance.AddNewData(resolved);
+						// record assigned accessor id for future resolution
+						if (currentSymbolAccessorIds == null || i >= currentSymbolAccessorIds.Length)
+						{
+							var newArr = new int[len];
+							if (currentSymbolAccessorIds != null) Array.Copy(currentSymbolAccessorIds, newArr, Math.Min(currentSymbolAccessorIds.Length, newArr.Length));
+							currentSymbolAccessorIds = newArr;
+						}
+						currentSymbolAccessorIds[i] = resolved.AccessorId;
+					}
+				}
+				catch { }
+			}
+
+			result.Add(resolved);
+		}
+
+		currentSymbolData = result;
 	}
 }

@@ -17,9 +17,18 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 	{
 		base.AddNewData(newData);
 
-		for (int i = 0; i < newData.CurrentSymbolData.Count; i++)
+		// Ensure contained SymbolData entries are registered with SymbolDataManager and that
+		// the ReelData has up-to-date AccessorId references persisted.
+		if (newData?.CurrentSymbolData != null)
 		{
-			SymbolDataManager.Instance.AddNewData(newData.CurrentSymbolData[i]);
+			for (int i = 0; i < newData.CurrentSymbolData.Count; i++)
+			{
+				var sym = newData.CurrentSymbolData[i];
+				if (sym != null) SymbolDataManager.Instance.AddNewData(sym);
+			}
+
+			// After SymbolDataManager assigned AccessorIds, refresh the stored accessor id array
+			newData.SetCurrentSymbolData(newData.CurrentSymbolData);
 		}
 
 		DataPersistenceManager.Instance.SaveGame();
