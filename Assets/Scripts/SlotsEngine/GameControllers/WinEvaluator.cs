@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using EvaluatorCore;
+using System.Text;
+using System.IO;
 
 /// <summary>
 /// Adapter that delegates pure win-evaluation logic to a Unity-independent core implementation.
@@ -25,10 +27,138 @@ public class WinEvaluator : Singleton<WinEvaluator>
         // intentionally no-op; left to preserve public API for callers
     }
 
-    // No-op logger stub kept so callers in game code can still invoke logging without Unity IO dependencies
+    // Detailed consolidated logger: writes a single log file under persistentDataPath/SpinLogs and emits one Debug.Log containing the same payload.
+    // Avoids spamming the Unity log by emitting a single consolidated string.
     public void LogSpinResult(GameSymbol[] grid, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines, List<WinData> winData)
     {
-        // intentionally no-op; logging was removed during refactor
+        if (!LoggingEnabled) return;
+        try
+        {
+            var sb = new StringBuilder();
+            var now = DateTime.UtcNow;
+            sb.AppendLine($"=== Spin Log {now:yyyy-MM-dd HH:mm:ss.fff} UTC ===");
+
+            // rows per column
+            if (rowsPerColumn != null)
+            {
+                sb.AppendLine("RowsPerColumn: " + string.Join(",", rowsPerColumn.Select(x => x.ToString())));
+            }
+            else
+            {
+                sb.AppendLine("RowsPerColumn: null");
+            }
+
+            int gridLen = grid != null ? grid.Length : 0;
+            sb.AppendLine($"GridLength: {gridLen}, Columns: {columns}");
+
+            // describe grid
+            sb.AppendLine("Grid cells (index -> col,row : Name | IsWild | BaseValue | MinWinDepth | WinMode | PayScaling | MatchGroupId | AllowWildMatch):");
+            if (grid != null)
+            {
+                for (int i = 0; i < grid.Length; i++)
+                {
+                    var gs = grid[i];
+                    int col = (columns > 0) ? (i % columns) : 0;
+                    int row = (columns > 0) ? (i / columns) : 0;
+                    string name = "<null>";
+                    string details = "";
+                    if (gs != null)
+                    {
+                        var sd = gs.CurrentSymbolData;
+                        if (sd != null)
+                        {
+                            name = sd.Name ?? "<noname>";
+                            details = $"IsWild={sd.IsWild},BaseValue={sd.BaseValue},MinWinDepth={sd.MinWinDepth},WinMode={sd.WinMode},PayScaling={sd.PayScaling},MatchGroupId={sd.MatchGroupId},AllowWild={sd.AllowWildMatch}";
+                        }
+                        else
+                        {
+                            name = "<no SymbolData>";
+                        }
+                    }
+                    sb.AppendLine($"  [{i}] -> ({col},{row}) : {name} | {details}");
+                }
+            }
+
+            // Describe winlines and generated indexes
+            sb.AppendLine("WinlineDefinitions and generated indexes:");
+            if (winlines != null)
+            {
+                for (int wi = 0; wi < winlines.Count; wi++)
+                {
+                    var wl = winlines[wi];
+                    if (wl == null) { sb.AppendLine($"  [{wi}] <null>"); continue; }
+                    try
+                    {
+                        var pattern = wl.GenerateIndexes(columns, rowsPerColumn);
+                        sb.AppendLine($"  [{wi}] {wl.name} (PatternType={wl.Pattern}, RowIndex={wl.RowIndex}, RowOffset={wl.RowOffset}, WinMultiplier={wl.WinMultiplier}):");
+                        if (pattern != null && pattern.Length > 0)
+                        {
+                            var parts = new List<string>();
+                            for (int p = 0; p < pattern.Length; p++)
+                            {
+                                int idx = pattern[p];
+                                string valid = "invalid";
+                                string sym = "<null>";
+                                if (idx >= 0 && idx < gridLen)
+                                {
+                                    int col = idx % columns; int row = idx / columns;
+                                    if (rowsPerColumn != null && col < rowsPerColumn.Length && row < rowsPerColumn[col]) valid = "valid";
+                                    var gs = grid[idx]; if (gs != null && gs.CurrentSymbolData != null) sym = gs.CurrentSymbolData.Name ?? "<noname>";
+                                }
+                                parts.Add($"{idx}({valid})->{sym}");
+                            }
+                            sb.AppendLine("    " + string.Join(", ", parts));
+                        }
+                        else sb.AppendLine("    <empty pattern>");
+                    }
+                    catch (Exception ex)
+                    {
+                        sb.AppendLine($"  [{wi}] {wl.name} - GenerateIndexes threw: {ex.Message}");
+                    }
+                }
+            }
+
+            // WinData results
+            sb.AppendLine("Evaluated Wins:");
+            if (winData != null && winData.Count > 0)
+            {
+                foreach (var w in winData)
+                {
+                    var idxs = w.WinningSymbolIndexes != null ? string.Join(",", w.WinningSymbolIndexes) : "";
+                    sb.AppendLine($"  LineIndex={w.LineIndex}, WinValue={w.WinValue}, Indexes=[{idxs}]");
+                }
+            }
+            else
+            {
+                sb.AppendLine("  <no wins>");
+            }
+
+            sb.AppendLine("=== End Spin Log ===");
+
+            // Ensure directory exists
+            string dir = Path.Combine(Application.persistentDataPath, "SpinLogs");
+            try { Directory.CreateDirectory(dir); } catch { }
+
+            // Write file (timestamped)
+            string fileName = $"spin_{now:yyyyMMdd_HHmmssfff}.log";
+            string fullPath = Path.Combine(dir, fileName);
+            try
+            {
+                File.WriteAllText(fullPath, sb.ToString());
+            }
+            catch (Exception ex)
+            {
+                // If file write fails, still log consolidated message to editor log
+                Debug.LogWarning($"WinEvaluator: Failed to write spin log to '{fullPath}': {ex.Message}");
+            }
+
+            // Emit a single consolidated entry to the Unity Editor log to aid quick debugging
+            Debug.Log(sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"WinEvaluator: Exception during LogSpinResult: {ex}");
+        }
     }
 
     public List<WinData> EvaluateWins(SymbolData[] grid, int columns, int[] rowsPerColumn, List<WinlineDefinition> winlines)

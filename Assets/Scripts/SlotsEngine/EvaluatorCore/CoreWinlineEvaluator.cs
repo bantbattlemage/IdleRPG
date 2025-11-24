@@ -23,20 +23,47 @@ namespace EvaluatorCore
             for (int i = 0; i < winlines.Count; i++)
             {
                 var pattern = winlines[i]; if (pattern == null || pattern.Length == 0) continue;
-                int first = pattern[0]; if (first < 0 || first >= grid.Length) continue;
+
+                // Find first usable index in pattern (handle jagged columns where some positions can be -1)
+                int pStart = -1;
+                for (int pi = 0; pi < pattern.Length; pi++)
+                {
+                    int candidate = pattern[pi];
+                    if (candidate < 0 || candidate >= grid.Length) continue;
+                    int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
+                    var candCell = grid[candidate]; if (candCell == null) continue;
+                    pStart = pi; break;
+                }
+                if (pStart < 0) continue;
+
+                // Ensure there are no earlier valid entries (preserve leftmost-visible start semantics)
+                bool earlierValidExists = false;
+                for (int pj = 0; pj < pStart; pj++)
+                {
+                    int candidate = pattern[pj];
+                    if (candidate < 0 || candidate >= grid.Length) continue;
+                    int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
+                    var candCell = grid[candidate]; if (candCell == null) continue;
+                    earlierValidExists = true; break;
+                }
+                if (earlierValidExists) continue;
+
+                int first = pattern[pStart];
                 var trigger = grid[first]; if (trigger == null) continue;
+
                 bool needsFallback = (trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch) || (trigger.IsWild && trigger.BaseValue <= 0);
                 if (needsFallback)
                 {
                     if (trigger.IsWild)
                     {
                         int alt = -1;
-                        for (int p = 1; p < pattern.Length; p++)
+                        for (int p = pStart + 1; p < pattern.Length; p++)
                         {
                             int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
                             int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
                             var cand = grid[idx]; if (cand == null) continue;
-                            if (!cand.IsWild && cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch) { alt = idx; trigger = cand; break; }
+                            // Allow using a paying symbol as fallback, including paying wilds
+                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch) { alt = idx; trigger = cand; break; }
                         }
                         if (alt < 0) continue;
                     }
@@ -47,7 +74,8 @@ namespace EvaluatorCore
                 if (trigger.BaseValue <= 0) continue;
 
                 var matched = new List<int>();
-                for (int k = 0; k < pattern.Length; k++)
+                // Match contiguously starting from the chosen pStart position
+                for (int k = pStart; k < pattern.Length; k++)
                 {
                     int gi = pattern[k]; if (gi < 0 || gi >= grid.Length) break;
                     int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) break;

@@ -1,0 +1,209 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="563e4a05-0fd0-40e9-a605-41009584e88b" name="andrew@ANDREW-DESKTOP 2025-11-23 23:44:55" runUser="ANDREW-DESKTOP\andrew" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-11-23T23:44:55.3719970-06:00" queuing="2025-11-23T23:44:55.3719974-06:00" start="2025-11-23T23:44:54.8853172-06:00" finish="2025-11-23T23:44:55.4018096-06:00" />
+  <TestSettings name="default" id="473aaa01-8b68-498b-bab1-323c1127fc2a">
+    <Deployment runDeploymentRoot="andrew_ANDREW-DESKTOP_2025-11-23_23_44_55" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="fdd8a881-a2c8-40d7-be57-2b54e601a49a" testId="cdd9796e-a25d-3987-9c31-581b341bfb11" testName="PerSymbol_StillRequiresContiguousTriggerDepth" computerName="ANDREW-DESKTOP" duration="00:00:00.0001060" startTime="2025-11-23T23:44:55.3467332-06:00" endTime="2025-11-23T23:44:55.3468393-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fdd8a881-a2c8-40d7-be57-2b54e601a49a" />
+    <UnitTestResult executionId="35a783a0-c9d1-465d-be5f-73cc931f17b6" testId="68494e71-e2b8-2cc4-00c0-dee43ac7beee" testName="PatternStartingWithInvalidIndex_IsIgnored" computerName="ANDREW-DESKTOP" duration="00:00:00.0170930" startTime="2025-11-23T23:44:55.3287015-06:00" endTime="2025-11-23T23:44:55.3457942-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="35a783a0-c9d1-465d-be5f-73cc931f17b6">
+      <Output>
+        <ErrorInfo>
+          <Message>  Patterns whose first index is invalid must be ignored (no wins)&#xD;
+  Expected: 0&#xD;
+  But was:  1&#xD;
+</Message>
+          <StackTrace>   at WinlineEvaluator.Tests.UpdatedTests.PatternStartingWithInvalidIndex_IsIgnored() in D:\GitHub\IdleRPG\Tests\WinlineEvaluatorTests.cs:line 298&#xD;
+
+1)    at WinlineEvaluator.Tests.UpdatedTests.PatternStartingWithInvalidIndex_IsIgnored() in D:\GitHub\IdleRPG\Tests\WinlineEvaluatorTests.cs:line 298&#xD;
+
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="1dc5622f-ae9f-4ef9-af94-e824cfd29ae2" testId="e009bf07-3254-533f-5c51-d6c7a8affe15" testName="LineMatch_PerSymbol_PaysBaseTimesMatches" computerName="ANDREW-DESKTOP" duration="00:00:00.0002050" startTime="2025-11-23T23:44:55.3255873-06:00" endTime="2025-11-23T23:44:55.3257921-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1dc5622f-ae9f-4ef9-af94-e824cfd29ae2" />
+    <UnitTestResult executionId="b4ac257c-a40d-4a16-ac38-21847eaa8c9c" testId="f73e5666-7ccc-bafe-a094-2ab6a88b5520" testName="PerSymbolScaling_Works" computerName="ANDREW-DESKTOP" duration="00:00:00.0001350" startTime="2025-11-23T23:44:55.3468426-06:00" endTime="2025-11-23T23:44:55.3469778-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b4ac257c-a40d-4a16-ac38-21847eaa8c9c" />
+    <UnitTestResult executionId="2382c613-983d-458e-8db7-8aeecd829757" testId="6909d1ad-a97c-080b-80e7-73a9a8fef0c9" testName="PayingCandidateAfterNonPayingWild_TriggersWin_DiagonalUp" computerName="ANDREW-DESKTOP" duration="00:00:00.0002080" startTime="2025-11-23T23:44:55.3460907-06:00" endTime="2025-11-23T23:44:55.3462988-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2382c613-983d-458e-8db7-8aeecd829757" />
+    <UnitTestResult executionId="8c8ecc1f-bd06-4c5b-bf2d-f606760274b5" testId="d1eeb3e9-527b-42c1-fea3-10d5c2cb5eed" testName="WildFallback_W2W_LineAwards" computerName="ANDREW-DESKTOP" duration="00:00:00.0001360" startTime="2025-11-23T23:44:55.3476759-06:00" endTime="2025-11-23T23:44:55.3478120-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8c8ecc1f-bd06-4c5b-bf2d-f606760274b5" />
+    <UnitTestResult executionId="27b2b766-b116-491f-8774-504a4dbdb7d2" testId="707b5fa5-20a9-f94c-cf39-f53bf071b132" testName="TruncatedColumn_StopsMatch" computerName="ANDREW-DESKTOP" duration="00:00:00.0001080" startTime="2025-11-23T23:44:55.3474533-06:00" endTime="2025-11-23T23:44:55.3475612-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="27b2b766-b116-491f-8774-504a4dbdb7d2" />
+    <UnitTestResult executionId="9b370c22-3cb0-4ae2-a0f4-cb666b8a0a60" testId="aab00ab5-3dec-9923-54d2-a21c0b271fb2" testName="PerSymbol_CountsWildMatchesAcrossLine" computerName="ANDREW-DESKTOP" duration="00:00:00.0001290" startTime="2025-11-23T23:44:55.3464620-06:00" endTime="2025-11-23T23:44:55.3465914-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9b370c22-3cb0-4ae2-a0f4-cb666b8a0a60" />
+    <UnitTestResult executionId="db15b51f-a054-4871-9daa-09bf05b6b281" testId="97b3d9b7-0714-06a0-e0c4-d2ad83ec9242" testName="Dummy_Picks_Do_Not_Consume_Reserved_Counts" computerName="ANDREW-DESKTOP" duration="00:00:00.0019660" startTime="2025-11-23T23:44:55.3211216-06:00" endTime="2025-11-23T23:44:55.3230870-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="db15b51f-a054-4871-9daa-09bf05b6b281" />
+    <UnitTestResult executionId="e826e8fc-cfe8-4ecc-8c64-c94583703c92" testId="15ce0b2f-01d5-4d83-0c10-0843e007d8af" testName="PerSymbol_IncludesLaterMatchesAcrossLine" computerName="ANDREW-DESKTOP" duration="00:00:00.0001340" startTime="2025-11-23T23:44:55.3465954-06:00" endTime="2025-11-23T23:44:55.3467293-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e826e8fc-cfe8-4ecc-8c64-c94583703c92" />
+    <UnitTestResult executionId="1d0f9349-873a-4cdf-b2bf-1c023a9403c4" testId="36415c35-8cc6-780a-e259-c8ae5d66d58d" testName="NonDepletable_Count_Is_Always_Chosen" computerName="ANDREW-DESKTOP" duration="00:00:00.0001590" startTime="2025-11-23T23:44:55.3232836-06:00" endTime="2025-11-23T23:44:55.3234425-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1d0f9349-873a-4cdf-b2bf-1c023a9403c4" />
+    <UnitTestResult executionId="eef7ee9a-b2eb-4c51-a38c-5e7c4fde9951" testId="62a3606a-ab9f-d2d6-49e8-47620569b7e7" testName="TotalCount_PerSymbol_PaysBaseTimesCount" computerName="ANDREW-DESKTOP" duration="00:00:00.0001410" startTime="2025-11-23T23:44:55.3259593-06:00" endTime="2025-11-23T23:44:55.3261002-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="eef7ee9a-b2eb-4c51-a38c-5e7c4fde9951" />
+    <UnitTestResult executionId="ee25d6ca-66d6-4a84-a789-94434d5fed0c" testId="99ea2fa9-bb4b-b909-84e7-c3410445e520" testName="OverlappingLines_BothAward" computerName="ANDREW-DESKTOP" duration="00:00:00.0003430" startTime="2025-11-23T23:44:55.3283514-06:00" endTime="2025-11-23T23:44:55.3286943-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ee25d6ca-66d6-4a84-a789-94434d5fed0c" />
+    <UnitTestResult executionId="ca51b897-1231-4232-ad4a-fa001338ad69" testId="2f47e0a1-27f6-bdfa-cb33-29e9ee97243d" testName="RandomPool_Distributes_By_Weights_When_No_Reserve_Remains" computerName="ANDREW-DESKTOP" duration="00:00:00.0000800" startTime="2025-11-23T23:44:55.3234478-06:00" endTime="2025-11-23T23:44:55.3235282-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ca51b897-1231-4232-ad4a-fa001338ad69" />
+    <UnitTestResult executionId="5124851b-ee3c-4977-b718-e62c09ef9e3f" testId="97359c7f-486d-87f7-8c27-b32179082683" testName="WildFallback_NoPayingTrigger_NoWin" computerName="ANDREW-DESKTOP" duration="00:00:00.0001010" startTime="2025-11-23T23:44:55.3475645-06:00" endTime="2025-11-23T23:44:55.3476657-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5124851b-ee3c-4977-b718-e62c09ef9e3f" />
+    <UnitTestResult executionId="475cda28-3e88-4306-a671-537b6569edc3" testId="3eb3ca93-93f3-1579-523b-76788c121b8e" testName="MaxPerReel_Respected_With_Reserved_Math" computerName="ANDREW-DESKTOP" duration="00:00:00.0001770" startTime="2025-11-23T23:44:55.3230999-06:00" endTime="2025-11-23T23:44:55.3232771-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="475cda28-3e88-4306-a671-537b6569edc3" />
+    <UnitTestResult executionId="b0a9bd32-71c2-401e-bbf9-efcef8cc87df" testId="fd08c3f6-c4fe-1618-ce22-9cee96a02fff" testName="SingleOnReel_AwardsEachInstance" computerName="ANDREW-DESKTOP" duration="00:00:00.0002000" startTime="2025-11-23T23:44:55.3469817-06:00" endTime="2025-11-23T23:44:55.3471818-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b0a9bd32-71c2-401e-bbf9-efcef8cc87df" />
+    <UnitTestResult executionId="752901f8-b686-46cb-bfc3-5c96965ddde1" testId="c10c9a8f-45e7-99e6-3812-1d97b9ca36d1" testName="LineMatch_DepthSquared_PaysPowerOfTwoPerExtraDepth" computerName="ANDREW-DESKTOP" duration="00:00:00.0009800" startTime="2025-11-23T23:44:55.3245998-06:00" endTime="2025-11-23T23:44:55.3255795-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="752901f8-b686-46cb-bfc3-5c96965ddde1" />
+    <UnitTestResult executionId="c6b195b1-1ab6-4bef-95ae-7c2dae235697" testId="8d5643f0-1f7b-52b6-d90b-70f053c6b41c" testName="Wilds_DoNotTrigger_TotalCount_OnTheir_Own" computerName="ANDREW-DESKTOP" duration="00:00:00.0000850" startTime="2025-11-23T23:44:55.3478160-06:00" endTime="2025-11-23T23:44:55.3479005-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c6b195b1-1ab6-4bef-95ae-7c2dae235697" />
+    <UnitTestResult executionId="92990f78-30da-4ebc-9a81-55d9c595b88f" testId="5ccd084f-8556-2cc3-63a4-ebda488934ab" testName="TotalCount_IgnoresWilds_GroupAwards" computerName="ANDREW-DESKTOP" duration="00:00:00.0001430" startTime="2025-11-23T23:44:55.3473058-06:00" endTime="2025-11-23T23:44:55.3474485-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="92990f78-30da-4ebc-9a81-55d9c595b88f" />
+    <UnitTestResult executionId="ab4329a6-6bfb-4f83-8006-44523d77621a" testId="794c432b-e681-0fd7-dcef-eba709f46a7b" testName="DiagonalAndStraight_WildsThenPayingSymbols_AreRecognized" computerName="ANDREW-DESKTOP" duration="00:00:00.0006390" startTime="2025-11-23T23:44:55.3273091-06:00" endTime="2025-11-23T23:44:55.3279480-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ab4329a6-6bfb-4f83-8006-44523d77621a" />
+    <UnitTestResult executionId="ca301ceb-a63c-4374-8454-e8de674c2a9f" testId="bf088e85-6ef7-85c1-67fe-3d3b18f89748" testName="TotalCount_DepthSquared_Works_InWinlineEvaluatorTests" computerName="ANDREW-DESKTOP" duration="00:00:00.0001150" startTime="2025-11-23T23:44:55.3471872-06:00" endTime="2025-11-23T23:44:55.3473018-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ca301ceb-a63c-4374-8454-e8de674c2a9f" />
+    <UnitTestResult executionId="bedf4bd3-6ede-4706-8fd7-56dbcc8ed6ef" testId="b1903ae3-8253-db7f-fb08-48f894c010d0" testName="DepthSquaredScaling_Works" computerName="ANDREW-DESKTOP" duration="00:00:00.0011329" startTime="2025-11-23T23:44:55.3261660-06:00" endTime="2025-11-23T23:44:55.3272988-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bedf4bd3-6ede-4706-8fd7-56dbcc8ed6ef" />
+    <UnitTestResult executionId="dd8e51a3-fb84-4d34-924b-63b2290fb4d9" testId="313a7119-8d87-c4ad-54b5-46ff988d6f59" testName="AllReservedSlots_Depletable_FirstStripFill_AllFromThatSymbol" computerName="ANDREW-DESKTOP" duration="00:00:00.0072020" startTime="2025-11-23T23:44:55.3132188-06:00" endTime="2025-11-23T23:44:55.3203874-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="dd8e51a3-fb84-4d34-924b-63b2290fb4d9" />
+    <UnitTestResult executionId="5d0433b4-f2eb-46eb-9ff0-985c6eb51319" testId="7dc3bf4a-1638-af41-0188-74f2bf082fb2" testName="TotalCount_DepthSquared_PaysDepthSquaredScaling" computerName="ANDREW-DESKTOP" duration="00:00:00.0001550" startTime="2025-11-23T23:44:55.3257988-06:00" endTime="2025-11-23T23:44:55.3259535-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5d0433b4-f2eb-46eb-9ff0-985c6eb51319" />
+    <UnitTestResult executionId="c16fd0d3-7883-4463-91e8-175fc682f1d4" testId="3d5e2899-714f-6b05-5f13-97996e04afcd" testName="PayingCandidateAfterNonPayingWild_TriggersWin_DiagonalDown" computerName="ANDREW-DESKTOP" duration="00:00:00.0002290" startTime="2025-11-23T23:44:55.3458550-06:00" endTime="2025-11-23T23:44:55.3460844-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c16fd0d3-7883-4463-91e8-175fc682f1d4" />
+    <UnitTestResult executionId="a202a2cc-a6dd-4d7b-b7d6-000331ea5aa2" testId="2a9c4836-2997-bb93-1ec5-de5f12021574" testName="DiagonalDown_LeftmostMissing_PayingLaterTriggersWin" computerName="ANDREW-DESKTOP" duration="00:00:00.0003880" startTime="2025-11-23T23:44:55.3279561-06:00" endTime="2025-11-23T23:44:55.3283441-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a202a2cc-a6dd-4d7b-b7d6-000331ea5aa2" />
+    <UnitTestResult executionId="f97bee9b-fb5d-4bd7-be5a-63d4455c4dc8" testId="2bfd3932-5a9a-fe90-c270-34fcbdf78355" testName="PayingWild_AsTrigger_PerSymbolScaling" computerName="ANDREW-DESKTOP" duration="00:00:00.0001530" startTime="2025-11-23T23:44:55.3463047-06:00" endTime="2025-11-23T23:44:55.3464576-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f97bee9b-fb5d-4bd7-be5a-63d4455c4dc8" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="TotalCount_PerSymbol_PaysBaseTimesCount" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="62a3606a-ab9f-d2d6-49e8-47620569b7e7">
+      <Execution id="eef7ee9a-b2eb-4c51-a38c-5e7c4fde9951" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.PayScalingTests.Tests" name="TotalCount_PerSymbol_PaysBaseTimesCount" />
+    </UnitTest>
+    <UnitTest name="NonDepletable_Count_Is_Always_Chosen" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="36415c35-8cc6-780a-e259-c8ae5d66d58d">
+      <Execution id="1d0f9349-873a-4cdf-b2bf-1c023a9403c4" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="SlotsEngine.SelectionMath.Tests.ReelStripSelectionMathTests" name="NonDepletable_Count_Is_Always_Chosen" />
+    </UnitTest>
+    <UnitTest name="OverlappingLines_BothAward" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="99ea2fa9-bb4b-b909-84e7-c3410445e520">
+      <Execution id="ee25d6ca-66d6-4a84-a789-94434d5fed0c" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="OverlappingLines_BothAward" />
+    </UnitTest>
+    <UnitTest name="PayingWild_AsTrigger_PerSymbolScaling" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="2bfd3932-5a9a-fe90-c270-34fcbdf78355">
+      <Execution id="f97bee9b-fb5d-4bd7-be5a-63d4455c4dc8" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PayingWild_AsTrigger_PerSymbolScaling" />
+    </UnitTest>
+    <UnitTest name="PerSymbol_IncludesLaterMatchesAcrossLine" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="15ce0b2f-01d5-4d83-0c10-0843e007d8af">
+      <Execution id="e826e8fc-cfe8-4ecc-8c64-c94583703c92" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PerSymbol_IncludesLaterMatchesAcrossLine" />
+    </UnitTest>
+    <UnitTest name="PayingCandidateAfterNonPayingWild_TriggersWin_DiagonalUp" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="6909d1ad-a97c-080b-80e7-73a9a8fef0c9">
+      <Execution id="2382c613-983d-458e-8db7-8aeecd829757" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PayingCandidateAfterNonPayingWild_TriggersWin_DiagonalUp" />
+    </UnitTest>
+    <UnitTest name="Dummy_Picks_Do_Not_Consume_Reserved_Counts" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="97b3d9b7-0714-06a0-e0c4-d2ad83ec9242">
+      <Execution id="db15b51f-a054-4871-9daa-09bf05b6b281" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="SlotsEngine.SelectionMath.Tests.ReelStripSelectionMathTests" name="Dummy_Picks_Do_Not_Consume_Reserved_Counts" />
+    </UnitTest>
+    <UnitTest name="DiagonalDown_LeftmostMissing_PayingLaterTriggersWin" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="2a9c4836-2997-bb93-1ec5-de5f12021574">
+      <Execution id="a202a2cc-a6dd-4d7b-b7d6-000331ea5aa2" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="DiagonalDown_LeftmostMissing_PayingLaterTriggersWin" />
+    </UnitTest>
+    <UnitTest name="MaxPerReel_Respected_With_Reserved_Math" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="3eb3ca93-93f3-1579-523b-76788c121b8e">
+      <Execution id="475cda28-3e88-4306-a671-537b6569edc3" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="SlotsEngine.SelectionMath.Tests.ReelStripSelectionMathTests" name="MaxPerReel_Respected_With_Reserved_Math" />
+    </UnitTest>
+    <UnitTest name="SingleOnReel_AwardsEachInstance" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="fd08c3f6-c4fe-1618-ce22-9cee96a02fff">
+      <Execution id="b0a9bd32-71c2-401e-bbf9-efcef8cc87df" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="SingleOnReel_AwardsEachInstance" />
+    </UnitTest>
+    <UnitTest name="PatternStartingWithInvalidIndex_IsIgnored" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="68494e71-e2b8-2cc4-00c0-dee43ac7beee">
+      <Execution id="35a783a0-c9d1-465d-be5f-73cc931f17b6" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PatternStartingWithInvalidIndex_IsIgnored" />
+    </UnitTest>
+    <UnitTest name="Wilds_DoNotTrigger_TotalCount_OnTheir_Own" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="8d5643f0-1f7b-52b6-d90b-70f053c6b41c">
+      <Execution id="c6b195b1-1ab6-4bef-95ae-7c2dae235697" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="Wilds_DoNotTrigger_TotalCount_OnTheir_Own" />
+    </UnitTest>
+    <UnitTest name="PerSymbol_StillRequiresContiguousTriggerDepth" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="cdd9796e-a25d-3987-9c31-581b341bfb11">
+      <Execution id="fdd8a881-a2c8-40d7-be57-2b54e601a49a" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PerSymbol_StillRequiresContiguousTriggerDepth" />
+    </UnitTest>
+    <UnitTest name="DepthSquaredScaling_Works" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="b1903ae3-8253-db7f-fb08-48f894c010d0">
+      <Execution id="bedf4bd3-6ede-4706-8fd7-56dbcc8ed6ef" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="DepthSquaredScaling_Works" />
+    </UnitTest>
+    <UnitTest name="RandomPool_Distributes_By_Weights_When_No_Reserve_Remains" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="2f47e0a1-27f6-bdfa-cb33-29e9ee97243d">
+      <Execution id="ca51b897-1231-4232-ad4a-fa001338ad69" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="SlotsEngine.SelectionMath.Tests.ReelStripSelectionMathTests" name="RandomPool_Distributes_By_Weights_When_No_Reserve_Remains" />
+    </UnitTest>
+    <UnitTest name="LineMatch_DepthSquared_PaysPowerOfTwoPerExtraDepth" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="c10c9a8f-45e7-99e6-3812-1d97b9ca36d1">
+      <Execution id="752901f8-b686-46cb-bfc3-5c96965ddde1" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.PayScalingTests.Tests" name="LineMatch_DepthSquared_PaysPowerOfTwoPerExtraDepth" />
+    </UnitTest>
+    <UnitTest name="WildFallback_W2W_LineAwards" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="d1eeb3e9-527b-42c1-fea3-10d5c2cb5eed">
+      <Execution id="8c8ecc1f-bd06-4c5b-bf2d-f606760274b5" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="WildFallback_W2W_LineAwards" />
+    </UnitTest>
+    <UnitTest name="TotalCount_DepthSquared_Works_InWinlineEvaluatorTests" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="bf088e85-6ef7-85c1-67fe-3d3b18f89748">
+      <Execution id="ca301ceb-a63c-4374-8454-e8de674c2a9f" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="TotalCount_DepthSquared_Works_InWinlineEvaluatorTests" />
+    </UnitTest>
+    <UnitTest name="PayingCandidateAfterNonPayingWild_TriggersWin_DiagonalDown" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="3d5e2899-714f-6b05-5f13-97996e04afcd">
+      <Execution id="c16fd0d3-7883-4463-91e8-175fc682f1d4" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PayingCandidateAfterNonPayingWild_TriggersWin_DiagonalDown" />
+    </UnitTest>
+    <UnitTest name="PerSymbol_CountsWildMatchesAcrossLine" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="aab00ab5-3dec-9923-54d2-a21c0b271fb2">
+      <Execution id="9b370c22-3cb0-4ae2-a0f4-cb666b8a0a60" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PerSymbol_CountsWildMatchesAcrossLine" />
+    </UnitTest>
+    <UnitTest name="AllReservedSlots_Depletable_FirstStripFill_AllFromThatSymbol" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="313a7119-8d87-c4ad-54b5-46ff988d6f59">
+      <Execution id="dd8e51a3-fb84-4d34-924b-63b2290fb4d9" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="SlotsEngine.SelectionMath.Tests.ReelStripSelectionMathTests" name="AllReservedSlots_Depletable_FirstStripFill_AllFromThatSymbol" />
+    </UnitTest>
+    <UnitTest name="PerSymbolScaling_Works" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="f73e5666-7ccc-bafe-a094-2ab6a88b5520">
+      <Execution id="b4ac257c-a40d-4a16-ac38-21847eaa8c9c" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="PerSymbolScaling_Works" />
+    </UnitTest>
+    <UnitTest name="LineMatch_PerSymbol_PaysBaseTimesMatches" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="e009bf07-3254-533f-5c51-d6c7a8affe15">
+      <Execution id="1dc5622f-ae9f-4ef9-af94-e824cfd29ae2" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.PayScalingTests.Tests" name="LineMatch_PerSymbol_PaysBaseTimesMatches" />
+    </UnitTest>
+    <UnitTest name="TotalCount_DepthSquared_PaysDepthSquaredScaling" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="7dc3bf4a-1638-af41-0188-74f2bf082fb2">
+      <Execution id="5d0433b4-f2eb-46eb-9ff0-985c6eb51319" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.PayScalingTests.Tests" name="TotalCount_DepthSquared_PaysDepthSquaredScaling" />
+    </UnitTest>
+    <UnitTest name="WildFallback_NoPayingTrigger_NoWin" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="97359c7f-486d-87f7-8c27-b32179082683">
+      <Execution id="5124851b-ee3c-4977-b718-e62c09ef9e3f" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="WildFallback_NoPayingTrigger_NoWin" />
+    </UnitTest>
+    <UnitTest name="TruncatedColumn_StopsMatch" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="707b5fa5-20a9-f94c-cf39-f53bf071b132">
+      <Execution id="27b2b766-b116-491f-8774-504a4dbdb7d2" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="TruncatedColumn_StopsMatch" />
+    </UnitTest>
+    <UnitTest name="DiagonalAndStraight_WildsThenPayingSymbols_AreRecognized" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="794c432b-e681-0fd7-dcef-eba709f46a7b">
+      <Execution id="ab4329a6-6bfb-4f83-8006-44523d77621a" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="DiagonalAndStraight_WildsThenPayingSymbols_AreRecognized" />
+    </UnitTest>
+    <UnitTest name="TotalCount_IgnoresWilds_GroupAwards" storage="d:\github\idlerpg\tests\bin\debug\net6.0\tests.dll" id="5ccd084f-8556-2cc3-63a4-ebda488934ab">
+      <Execution id="92990f78-30da-4ebc-9a81-55d9c595b88f" />
+      <TestMethod codeBase="D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll" adapterTypeName="executor://nunit3testexecutor/" className="WinlineEvaluator.Tests.UpdatedTests" name="TotalCount_IgnoresWilds_GroupAwards" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="cdd9796e-a25d-3987-9c31-581b341bfb11" executionId="fdd8a881-a2c8-40d7-be57-2b54e601a49a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="68494e71-e2b8-2cc4-00c0-dee43ac7beee" executionId="35a783a0-c9d1-465d-be5f-73cc931f17b6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e009bf07-3254-533f-5c51-d6c7a8affe15" executionId="1dc5622f-ae9f-4ef9-af94-e824cfd29ae2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f73e5666-7ccc-bafe-a094-2ab6a88b5520" executionId="b4ac257c-a40d-4a16-ac38-21847eaa8c9c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6909d1ad-a97c-080b-80e7-73a9a8fef0c9" executionId="2382c613-983d-458e-8db7-8aeecd829757" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d1eeb3e9-527b-42c1-fea3-10d5c2cb5eed" executionId="8c8ecc1f-bd06-4c5b-bf2d-f606760274b5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="707b5fa5-20a9-f94c-cf39-f53bf071b132" executionId="27b2b766-b116-491f-8774-504a4dbdb7d2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="aab00ab5-3dec-9923-54d2-a21c0b271fb2" executionId="9b370c22-3cb0-4ae2-a0f4-cb666b8a0a60" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="97b3d9b7-0714-06a0-e0c4-d2ad83ec9242" executionId="db15b51f-a054-4871-9daa-09bf05b6b281" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="15ce0b2f-01d5-4d83-0c10-0843e007d8af" executionId="e826e8fc-cfe8-4ecc-8c64-c94583703c92" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="36415c35-8cc6-780a-e259-c8ae5d66d58d" executionId="1d0f9349-873a-4cdf-b2bf-1c023a9403c4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="62a3606a-ab9f-d2d6-49e8-47620569b7e7" executionId="eef7ee9a-b2eb-4c51-a38c-5e7c4fde9951" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="99ea2fa9-bb4b-b909-84e7-c3410445e520" executionId="ee25d6ca-66d6-4a84-a789-94434d5fed0c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2f47e0a1-27f6-bdfa-cb33-29e9ee97243d" executionId="ca51b897-1231-4232-ad4a-fa001338ad69" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="97359c7f-486d-87f7-8c27-b32179082683" executionId="5124851b-ee3c-4977-b718-e62c09ef9e3f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3eb3ca93-93f3-1579-523b-76788c121b8e" executionId="475cda28-3e88-4306-a671-537b6569edc3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fd08c3f6-c4fe-1618-ce22-9cee96a02fff" executionId="b0a9bd32-71c2-401e-bbf9-efcef8cc87df" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c10c9a8f-45e7-99e6-3812-1d97b9ca36d1" executionId="752901f8-b686-46cb-bfc3-5c96965ddde1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8d5643f0-1f7b-52b6-d90b-70f053c6b41c" executionId="c6b195b1-1ab6-4bef-95ae-7c2dae235697" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5ccd084f-8556-2cc3-63a4-ebda488934ab" executionId="92990f78-30da-4ebc-9a81-55d9c595b88f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="794c432b-e681-0fd7-dcef-eba709f46a7b" executionId="ab4329a6-6bfb-4f83-8006-44523d77621a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bf088e85-6ef7-85c1-67fe-3d3b18f89748" executionId="ca301ceb-a63c-4374-8454-e8de674c2a9f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b1903ae3-8253-db7f-fb08-48f894c010d0" executionId="bedf4bd3-6ede-4706-8fd7-56dbcc8ed6ef" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="313a7119-8d87-c4ad-54b5-46ff988d6f59" executionId="dd8e51a3-fb84-4d34-924b-63b2290fb4d9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7dc3bf4a-1638-af41-0188-74f2bf082fb2" executionId="5d0433b4-f2eb-46eb-9ff0-985c6eb51319" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3d5e2899-714f-6b05-5f13-97996e04afcd" executionId="c16fd0d3-7883-4463-91e8-175fc682f1d4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2a9c4836-2997-bb93-1ec5-de5f12021574" executionId="a202a2cc-a6dd-4d7b-b7d6-000331ea5aa2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2bfd3932-5a9a-fe90-c270-34fcbdf78355" executionId="f97bee9b-fb5d-4bd7-be5a-63d4455c4dc8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="28" executed="28" passed="27" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>NUnit Adapter 4.3.1.0: Test execution started&#xD;
+Running all tests in D:\GitHub\IdleRPG\Tests\bin\Debug\net6.0\Tests.dll&#xD;
+   NUnit3TestExecutor discovered 28 of 28 NUnit test cases using Current Discovery mode, Non-Explicit run&#xD;
+NUnit Adapter 4.3.1.0: Test execution complete&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

@@ -111,22 +111,22 @@ public class WinlineDefinition : ScriptableObject
             }
             case PatternType.DiagonalDown:
             {
+                // Anchor diagonals to the global maxRows so visual diagonal aligns with the tallest columns.
                 int desiredBase = (maxRows - 1 - rowOffset);
-                int base0 = ClampRow(desiredBase, rowsPerColumn[0]);
                 for (int c = 0; c < columns; c++)
                 {
-                    int row = base0 - c;
+                    int row = desiredBase - c;
                     if (row >= 0 && row < rowsPerColumn[c]) result[c] = row * columns + c; else result[c] = -1;
                 }
                 return result;
             }
             case PatternType.DiagonalUp:
             {
+                // Anchor diagonals to the global rowOffset base rather than clamping to column 0.
                 int desiredBase = rowOffset;
-                int base0 = ClampRow(desiredBase, rowsPerColumn[0]);
                 for (int c = 0; c < columns; c++)
                 {
-                    int rowUp = base0 + c;
+                    int rowUp = desiredBase + c;
                     if (rowUp >= 0 && rowUp < rowsPerColumn[c]) result[c] = rowUp * columns + c; else result[c] = -1;
                 }
                 return result;
