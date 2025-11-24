@@ -10,6 +10,35 @@ namespace EvaluatorCore
     public static class CoreWinlineEvaluator
     {
         // Evaluate using PlainSymbolData and simple patterns (int[] per-column indexes)
+        //
+        // Semantics (detailed):
+        // - Patterns are arrays of per-column flat indexes (row*columns + col) produced by WinlineDefinition.GenerateIndexes.
+        //   Entries with -1 or that map outside a column's row count are treated as invalid/unused for that pattern.
+        // - pStart selection: the evaluator finds the first usable (valid, in-bounds and non-null) position in the pattern
+        //   and treats that as the primary leftmost usable candidate for a line. This accounts for jagged columns where some
+        //   early pattern slots may be invalid (-1).
+        // - Leftmost anchoring rule: if the pattern's leftmost slot (pattern[0]) maps to a valid, in-bounds, non-null cell in
+        //   the grid, the evaluator treats the pattern as anchored to column 0 and enforces that matching must begin from that
+        //   leftmost position. This prevents the evaluator from starting a match further right when a valid leftmost cell exists.
+        // - Wild-only fallback rule: to preserve wilds as match-extenders, when the leftmost anchored slot is a wild that is
+        //   intentionally non-paying (e.g. BaseValue==0 and MinWinDepth<=0), a narrow fallback is allowed: the evaluator will
+        //   search forward from the anchored position for the first *paying* LineMatch trigger and use that as the trigger while
+        //   still anchoring the pattern to the leftmost column. This lets leading wilds extend a later paying symbol without
+        //   treating wilds as independent triggers.
+        // - When pattern[0] is invalid (e.g. -1) the evaluator retains permissive behavior: the first usable candidate (pStart)
+        //   may be a wild; in that case the evaluator will search forward for the first paying LineMatch trigger and use it as
+        //   the trigger while allowing earlier wilds to contribute to the contiguous match.
+        // - Blocking rule: if there exists any earlier usable pattern position before the chosen pStart that itself could be a
+        //   paying LineMatch trigger, the evaluator treats that as an earlierValidExists blocker and skips the pattern. This
+        //   prevents the evaluator from ignoring an earlier paying start in favor of a later one.
+        // - Matching: once a trigger is chosen the evaluator computes a contiguous match starting at the earliest matching slot
+        //   between the anchored/usable leftmost and the chosen trigger position. Matching stops at the first non-matching or
+        //   invalid slot. If the contiguous match length >= trigger.MinWinDepth the line wins.
+        // - Pay scaling: two scaling modes are supported: DepthSquared (base * 2^extraDepth) and PerSymbol (base * totalMatchesAcrossLine).
+        //
+        // Note: these rules were chosen to keep a consistent visual leftmost anchoring while allowing wilds to act as extenders
+        // without requiring wilds to be configured as paying triggers. If desired, the wild-only fallback behavior can be made
+        // configurable.
         public static List<CoreWinData> EvaluateWins(PlainSymbolData[] grid, int columns, int[] rowsPerColumn, List<int[]> winlines, List<int> winMultipliers, int creditCost = 1)
         {
             var results = new List<CoreWinData>();
