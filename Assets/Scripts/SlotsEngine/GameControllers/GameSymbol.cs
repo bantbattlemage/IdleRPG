@@ -42,8 +42,26 @@ public class GameSymbol : MonoBehaviour
 		currentSymbolData = symbol;
 
 		if (cachedImage == null) cachedImage = GetComponent<Image>();
-		cachedImage.sprite = symbol.Sprite;
-		cachedImage.color = Color.white;
+		if (symbol == null)
+		{
+			// Clear visual state when no symbol provided to avoid showing stale sprites
+			if (cachedImage != null)
+			{
+				cachedImage.enabled = true;
+				cachedImage.sprite = null;
+				cachedImage.color = Color.white;
+			}
+			return;
+		}
+
+		// Ensure sprite is obtained from the data object (may trigger runtime resolution)
+		var s = symbol.Sprite;
+		if (cachedImage != null)
+		{
+			cachedImage.enabled = true; // ensure image component is enabled so visible sprites render
+			cachedImage.sprite = s;
+			cachedImage.color = Color.white;
+		}
 
 		// ensure transform rotation matches original when applying a new symbol
 		transform.localRotation = originalLocalRotation;

@@ -101,14 +101,21 @@ public class SlotsEngine : MonoBehaviour
 
 	private System.Collections.IEnumerator StaggeredBeginSpin(List<List<SymbolData>> solutions, float step)
 	{
+		// Schedule all reel starts in the same frame using per-reel delays to avoid creation-time timing differences
 		for (int i = 0; i < reels.Count; i++)
 		{
 			var sol = (i < solutions.Count) ? solutions[i] : null;
-			reels[i].BeginSpinImmediate(sol);
-			// small yield to stagger visually and avoid synchronized bursts
-			if (step > 0f) yield return new WaitForSeconds(step);
+			try
+			{
+				float delay = step * i;
+				reels[i].BeginSpin(sol, delay);
+			}
+			catch { }
 		}
+
+		// coroutine completes immediately after scheduling
 		staggerSpinCoroutine = null;
+		yield break;
 	}
 
 	private void OnReelSpinStarted(object obj)
