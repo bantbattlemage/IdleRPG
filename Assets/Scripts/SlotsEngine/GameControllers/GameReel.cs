@@ -516,9 +516,26 @@ public class GameReel : MonoBehaviour
     {
         // Removed duplicated calls & duplicate coroutine starts to reduce CPU & GC overhead
         ResetDimmedSymbols();
+
+        // baseline offset used to preserve original perceived speed regardless of how the next strip
+        // was positioned (we may compute precise rect extents when positioning nextSymbolsRoot).
+        float baselineOffset = ComputeFallOffsetY();
+
         SpawnNextReel(solution);
         float fallDistance = -nextSymbolsRoot.transform.localPosition.y;
+
+        // If the actual fall distance differs from the baseline compute a scaled duration so
+        // the visual speed (units/sec) remains consistent with the configured ReelSpinDuration.
         float duration = currentReelData.ReelSpinDuration;
+        if (baselineOffset > 0f)
+        {
+            // scale duration in proportion to distance so smaller/larger gaps still move at
+            // the same units/sec defined by ReelSpinDuration over the baseline offset.
+            duration = duration * (Mathf.Abs(fallDistance) / baselineOffset);
+            // protect against very small/large values
+            duration = Mathf.Max(0.01f, duration);
+        }
+
         pendingLandingSolution = solution;
         landingPendingCount = 2;
 
@@ -589,15 +606,146 @@ public class GameReel : MonoBehaviour
     }
 
     private void BounceReel(Vector3 direction, float strength = 100f, float duration = 0.5f, float sharpness = 0f, float peak = 0.4f, Action onComplete = null)
-    { if (nextSymbolsRoot != null) nextSymbolsRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear); symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { onComplete?.Invoke(); }); }
+    {
+        try
+        {
+            if (nextSymbolsRoot != null)
+            {
+                // Use DOTween extension if available; protect with try to avoid hard dependency in test harness
+                try { nextSymbolsRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear); } catch { }
+            }
+            if (symbolRoot != null)
+            {
+                try { symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { onComplete?.Invoke(); }); }
+                catch { onComplete?.Invoke(); }
+            }
+            else
+            {
+                onComplete?.Invoke();
+            }
+        }
+        catch
+        {
+            try { onComplete?.Invoke(); } catch { }
+        }
+    }
+
+    // Diagnostic helper to validate pooled symbol integrity and detect duplicates or corruption.
+    private void ValidatePoolIntegrity(string context)
+    {
+        try
+        {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Active subsets (these are expected to overlap with allPooledSymbols)
+            var subsets = new Dictionary<string, IEnumerable<GameSymbol>>()
+            {
+                { "symbols", symbols },
+                { "topDummySymbols", topDummySymbols },
+                { "bottomDummySymbols", bottomDummySymbols },
+                { "bufferSymbols", bufferSymbols },
+                { "bufferTopDummySymbols", bufferTopDummySymbols },
+                { "bufferBottomDummySymbols", bufferBottomDummySymbols }
+            };
+
+            // 1) Check for duplicate references inside each list
+            foreach (var kv in subsets)
+            {
+                var name = kv.Key;
+                var list = kv.Value ?? Enumerable.Empty<GameSymbol>();
+                var dup = list.GroupBy(x => x).Where(g => g.Key != null && g.Count() > 1).ToList();
+                foreach (var g in dup)
+                {
+                    Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: duplicate GameSymbol instance found {name} (count={g.Count()}) - name={g.Key?.name} context={context}");
+                }
+            }
+
+            // 2) Check for intersections between different active subsets (a symbol should not be in two active role lists)
+            var subsetNames = subsets.Keys.ToList();
+            for (int a = 0; a < subsetNames.Count; a++)
+            {
+                for (int b = a + 1; b < subsetNames.Count; b++)
+                {
+                    var nameA = subsetNames[a]; var nameB = subsetNames[b];
+                    var setA = new HashSet<GameSymbol>(subsets[nameA] ?? Enumerable.Empty<GameSymbol>());
+                    var setB = new HashSet<GameSymbol>(subsets[nameB] ?? Enumerable.Empty<GameSymbol>());
+                    setA.IntersectWith(setB);
+                    if (setA.Count > 0)
+                    {
+                        foreach (var s in setA)
+                            Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: GameSymbol present in multiple active lists ({nameA};{nameB}) - name={s?.name} context={context}");
+                    }
+                }
+            }
+
+            // 3) allPooledSymbols should not contain duplicate references
+            var pooledDups = allPooledSymbols.GroupBy(x => x).Where(g => g.Key != null && g.Count() > 1).ToList();
+            foreach (var g in pooledDups)
+            {
+                Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: duplicate GameSymbol in allPooledSymbols (count={g.Count()}) - name={g.Key?.name} context={context}");
+            }
+
+            // 4) allocatedPooledSet should be subset of allPooledSet
+            foreach (var aSym in allocatedPooledSet)
+            {
+                if (!allPooledSet.Contains(aSym))
+                {
+                    Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: allocatedPooledSet contains symbol not in allPooledSet: {aSym?.name} context={context}");
+                }
+            }
+
+            // 5) free stack entries should be present in allPooledSet and not in allocated set
+            foreach (var s in freePooledStack.ToArray())
+            {
+                if (!allPooledSet.Contains(s)) Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: freePooledStack contains symbol not in allPooledSet: {s?.name} context={context}");
+                if (allocatedPooledSet.Contains(s)) Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: freePooledStack contains symbol marked allocated: {s?.name} context={context}");
+            }
+
+            // 6) allocatedPooledSet size should not exceed total pooled list size (sanity)
+            var allocCount = allocatedPooledSet.Count;
+            var allCount = allPooledSymbols.Count;
+            if (allocCount > allCount)
+                Debug.LogWarning($"[GameReel {ID}] PoolIntegrity: allocatedPooledSet size ({allocCount}) > allPooledSymbols size ({allCount}) context={context}");
+
+            #endif
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[GameReel {ID}] ValidatePoolIntegrity failed: {ex.Message}");
+        }
+    }
+
     private void CompleteReelSpin(List<SymbolData> solution)
     {
         ReleaseAllSymbolsInRoot(symbolRoot); var old = symbolRoot; symbolRoot = nextSymbolsRoot; nextSymbolsRoot = old; float offsetY = ComputeFallOffsetY(); nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
-        if (bufferSymbols.Count > 0) { symbols = bufferSymbols; bufferSymbols = new List<GameSymbol>(); }
-        if (bufferTopDummySymbols.Count > 0) { topDummySymbols = bufferTopDummySymbols; bufferTopDummySymbols = new List<GameSymbol>(); lastTopDummyCount = topDummySymbols.Count; }
-        if (bufferBottomDummySymbols.Count > 0) { bottomDummySymbols = bufferBottomDummySymbols; bufferBottomDummySymbols = new List<GameSymbol>(); lastBottomDummyCount = bottomDummySymbols.Count; }
+        if (bufferSymbols.Count > 0)
+        {
+            // Copy buffer contents into the active list to avoid aliasing the same list instance
+            symbols.Clear();
+            symbols.AddRange(bufferSymbols);
+            bufferSymbols = new List<GameSymbol>();
+        }
+        if (bufferTopDummySymbols.Count > 0)
+        {
+            topDummySymbols.Clear();
+            topDummySymbols.AddRange(bufferTopDummySymbols);
+            bufferTopDummySymbols = new List<GameSymbol>();
+            lastTopDummyCount = topDummySymbols.Count;
+        }
+        if (bufferBottomDummySymbols.Count > 0)
+        {
+            bottomDummySymbols.Clear();
+            bottomDummySymbols.AddRange(bufferBottomDummySymbols);
+            bufferBottomDummySymbols = new List<GameSymbol>();
+            lastBottomDummyCount = bottomDummySymbols.Count;
+        }
         if (!completeOnNextSpin) { FallOut(solution); }
         else { spinning = false; if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); }
+
+        // Run pool integrity diagnostics in editor/dev to help catch reuse or corruption issues
+        if ((Application.isEditor || Debug.isDebugBuild))
+        {
+            ValidatePoolIntegrity("CompleteReelSpin_end");
+        }
     }
 
     public void DimDummySymbols() { Color dim = new Color(0.5f, 0.5f, 0.5f); foreach (GameSymbol g in topDummySymbols) { var img = g.CachedImage; if (img != null) img.color = dim; } foreach (GameSymbol g in bottomDummySymbols) { var img = g.CachedImage; if (img != null) img.color = dim; } }

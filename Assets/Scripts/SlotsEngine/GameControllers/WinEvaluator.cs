@@ -545,6 +545,8 @@ public class WinEvaluator : Singleton<WinEvaluator>
                 if (cell.WinMode == SymbolWinMode.TotalCount)
                 {
                     int groupId = cell.MatchGroupId;
+                    // Skip unset/non-positive group ids
+                    if (groupId <= 0) continue;
                     if (totalCountProcessed.Contains(groupId)) continue;
                     totalCountProcessed.Add(groupId);
 
@@ -561,7 +563,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
                         if (other.IsWild) continue; // explicitly ignore wilds for TotalCount
 
                         // Use MatchGroupId equality for TotalCount matching to count grouped symbols together
-                        if (other.MatchGroupId != 0 && other.MatchGroupId == groupId)
+                        if (other.MatchGroupId > 0 && other.MatchGroupId == groupId)
                         {
                             matching.Add(j);
                             if (!string.IsNullOrEmpty(other.Name)) exactMatches++;

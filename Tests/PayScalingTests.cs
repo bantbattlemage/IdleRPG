@@ -17,10 +17,10 @@ namespace WinlineEvaluator.PayScalingTests
         public bool AllowWildMatch = true;
         public SymbolWinMode WinMode = SymbolWinMode.LineMatch;
         public int TotalCountTrigger = -1;
-        public int MatchGroupId = 0;
+        public int MatchGroupId = -1;
         public PayScaling PayScaling = PayScaling.DepthSquared;
 
-        public SymbolDataPS(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, SymbolWinMode winMode = SymbolWinMode.LineMatch, int totalCountTrigger = -1, int matchGroupId = 0, PayScaling scaling = PayScaling.DepthSquared)
+        public SymbolDataPS(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, SymbolWinMode winMode = SymbolWinMode.LineMatch, int totalCountTrigger = -1, int matchGroupId = -1, PayScaling scaling = PayScaling.DepthSquared)
         {
             Name = name;
             BaseValue = baseValue;
@@ -36,7 +36,7 @@ namespace WinlineEvaluator.PayScalingTests
         {
             if (other == null) return false;
             if (this.IsWild && other.IsWild) return true;
-            if (this.MatchGroupId != 0 && other.MatchGroupId != 0 && this.MatchGroupId == other.MatchGroupId) return true;
+            if (this.MatchGroupId > 0 && other.MatchGroupId > 0 && this.MatchGroupId == other.MatchGroupId) return true;
             if (this.IsWild && other.AllowWildMatch) return true;
             if (other.IsWild && this.AllowWildMatch) return true;
             return false;
@@ -145,6 +145,8 @@ namespace WinlineEvaluator.PayScalingTests
                 if (cell.WinMode == SymbolWinMode.TotalCount)
                 {
                     int groupId = cell.MatchGroupId;
+                    // Skip unset/non-positive group ids
+                    if (groupId <= 0) continue;
                     if (processed.Contains(groupId)) continue;
                     processed.Add(groupId);
 
@@ -159,7 +161,7 @@ namespace WinlineEvaluator.PayScalingTests
                         if (other == null) continue;
                         if (other.IsWild) continue;
 
-                        if (other.MatchGroupId != 0 && other.MatchGroupId == groupId)
+                        if (other.MatchGroupId > 0 && other.MatchGroupId == groupId)
                         {
                             matching.Add(j);
                             if (!string.IsNullOrEmpty(other.Name)) exactMatches++;

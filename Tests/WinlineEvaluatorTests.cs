@@ -16,9 +16,9 @@ namespace WinlineEvaluator.Tests
         public bool AllowWildMatch = true;
         public SymbolWinMode WinMode = SymbolWinMode.LineMatch;
         public int TotalCountTrigger = -1;
-        public int MatchGroupId = 0;
+        public int MatchGroupId = -1;
         public PayScaling PayScaling = PayScaling.DepthSquared;
-        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, SymbolWinMode winMode = SymbolWinMode.LineMatch, PayScaling scaling = PayScaling.DepthSquared, int totalCountTrigger = -1, int matchGroupId = 0, bool allowWild = true)
+        public SymbolData(string name, int baseValue = 0, int minWinDepth = -1, bool isWild = false, SymbolWinMode winMode = SymbolWinMode.LineMatch, PayScaling scaling = PayScaling.DepthSquared, int totalCountTrigger = -1, int matchGroupId = -1, bool allowWild = true)
         {
             Name = name; BaseValue = baseValue; MinWinDepth = minWinDepth; IsWild = isWild; WinMode = winMode; PayScaling = scaling; TotalCountTrigger = totalCountTrigger; MatchGroupId = matchGroupId; AllowWildMatch = allowWild;
         }
@@ -26,7 +26,7 @@ namespace WinlineEvaluator.Tests
         {
             if (other == null) return false;
             if (IsWild && other.IsWild) return true;
-            if (MatchGroupId != 0 && other.MatchGroupId != 0 && MatchGroupId == other.MatchGroupId) return true;
+            if (MatchGroupId > 0 && other.MatchGroupId > 0 && MatchGroupId == other.MatchGroupId) return true;
             if (IsWild && other.AllowWildMatch) return true;
             if (other.IsWild && AllowWildMatch) return true;
             return Name == other.Name; // direct name match fallback (production uses Name through data objects)
@@ -114,7 +114,7 @@ namespace WinlineEvaluator.Tests
                     for (int j = 0; j < grid.Length; j++)
                     {
                         var other = grid[j]; if (other == null || other.IsWild) continue;
-                        if (other.MatchGroupId != 0 && other.MatchGroupId == cell.MatchGroupId) memberIndexes.Add(j);
+                        if (other.MatchGroupId > 0 && other.MatchGroupId == cell.MatchGroupId) memberIndexes.Add(j);
                     }
                     int count = memberIndexes.Count;
                     if (count >= cell.TotalCountTrigger)
@@ -270,7 +270,7 @@ namespace WinlineEvaluator.Tests
         }
 
         [Test]
-        public void Wilds_DoNotTrigger_TotalCount_OnTheirOwn()
+        public void Wilds_DoNotTrigger_TotalCount_OnTheir_Own()
         {
             var wildCount = new SymbolData("W", baseValue:5, minWinDepth:-1, isWild:true, winMode: SymbolWinMode.TotalCount, scaling: PayScaling.PerSymbol, totalCountTrigger:1, matchGroupId:7);
             var grid = new[] { wildCount, wildCount };
@@ -283,7 +283,7 @@ namespace WinlineEvaluator.Tests
         {
             // PerSymbol payout should count wilds that are permitted to match the trigger
             var a = new SymbolData("A", 2, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
-            var w = new SymbolData("W", 0, -1, true, SymbolWinMode.LineMatch, PayScaling.PerSymbol, totalCountTrigger: -1, matchGroupId: 0, allowWild: true);
+            var w = new SymbolData("W", 0, -1, true, SymbolWinMode.LineMatch, PayScaling.PerSymbol, totalCountTrigger: -1, matchGroupId: -1, allowWild: true);
             var grid = new[] { a, w, a };
             var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
             var mults = new List<int> { 1 };

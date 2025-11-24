@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 18c30a28fe3d53d468d52a4a287ef3c4, type: 3}
   m_Name: Symbol4
   m_EditorClassIdentifier: Assembly-CSharp::SymbolDefinition
-  symbolName: 3
+  symbolName: 4
   symbolSprite: {fileID: 21300000, guid: d3d369a783c191d48b667bb76f473e6d, type: 3}
   baseValue: 5
   minWinDepth: 3
-  payScaling: 1
+  payScaling: 0
   weight: 1
   isWild: 0
   allowWildMatch: 1
   winMode: 0
   totalCountTrigger: -1
   maxPerReel: -1
-  matchGroupId: 0
+  matchGroupId: -1

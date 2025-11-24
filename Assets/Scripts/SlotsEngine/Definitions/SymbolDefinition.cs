@@ -38,17 +38,17 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 	// New: per-reel maximum count allowed within a single spin. -1 to ignore.
 	[SerializeField] private int maxPerReel = -1;
 
-	// New: integer match group identifier. 0 = unset; when unset, a stable hash of the asset name is used at runtime.
-	[SerializeField] private int matchGroupId = 0;
+	// New: integer match group identifier. -1 = unset; when unset, a stable hash of the asset name is used at runtime.
+	[SerializeField] private int matchGroupId = -1;
 
 	public string SymbolName => symbolName;
 	public Sprite SymbolSprite => symbolSprite;
 
 	/// <summary>
-	/// Returns an integer identifier used to group symbols for matching. If the serialized id is 0,
+	/// Returns an integer identifier used to group symbols for matching. If the serialized id is -1,
 	/// a stable hash of the asset name is returned so symbols match themselves by default.
 	/// </summary>
-	public int MatchGroupId => matchGroupId != 0 ? matchGroupId : ComputeStableHash(this.name);
+	public int MatchGroupId => matchGroupId != -1 ? matchGroupId : ComputeStableHash(this.name);
 
 	/// <summary>
 	/// Compute a deterministic 32-bit hash for a string. Uses a simple FNV-like algorithm to remain stable across runs.
@@ -108,6 +108,6 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 		winMode = SymbolWinMode.LineMatch;
 		totalCountTrigger = -1;
 		maxPerReel = -1;
-		matchGroupId = 0;
+		matchGroupId = -1;
 	}
 }

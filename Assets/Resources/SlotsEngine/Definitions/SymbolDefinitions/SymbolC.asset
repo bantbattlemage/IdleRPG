@@ -23,4 +23,4 @@ MonoBehaviour:
   winMode: 1
   totalCountTrigger: -1
   maxPerReel: -1
-  matchGroupId: 0
+  matchGroupId: -1

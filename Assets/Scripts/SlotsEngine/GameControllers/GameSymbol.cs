@@ -15,10 +15,14 @@ public class GameSymbol : MonoBehaviour
 	private Image cachedImage;
 	private RectTransform cachedRect;
 
+	// Store original local rotation so tweens can be safely killed/restored
+	private Quaternion originalLocalRotation;
+
 	private void Awake()
 	{
 		cachedImage = GetComponent<Image>();
 		cachedRect = GetComponent<RectTransform>();
+		originalLocalRotation = transform.localRotation;
 	}
 
 	public void InitializeSymbol(SymbolData symbol, EventManager slotsEventManager)
@@ -40,12 +44,16 @@ public class GameSymbol : MonoBehaviour
 		if (cachedImage == null) cachedImage = GetComponent<Image>();
 		cachedImage.sprite = symbol.Sprite;
 		cachedImage.color = Color.white;
+
+		// ensure transform rotation matches original when applying a new symbol
+		transform.localRotation = originalLocalRotation;
 	}
 
 	private void OnIdleExit(object obj)
 	{
 		if (cachedImage == null) cachedImage = GetComponent<Image>();
 		cachedImage.color = Color.white;
+		transform.localRotation = originalLocalRotation;
 	}
 
 	private void OnSymbolWin(object obj)
@@ -57,11 +65,10 @@ public class GameSymbol : MonoBehaviour
 			return;
 		}
 
-		if (activeTweener != null && activeTweener.IsPlaying())
-		{
-			return;
-		}
+		// Diagnostic: log when OnSymbolWin is invoked for this instance
+		//try { Debug.Log($"GameSymbol.OnSymbolWin invoked for {name}@{GetInstanceID()} symbolName={(currentSymbolData!=null?currentSymbolData.Name:"(null)")} "); } catch { }
 
+		// Always ensure cachedImage is available
 		if (cachedImage == null) cachedImage = GetComponent<Image>();
 
 		// Choose highlight color based on this symbol's win mode.
@@ -71,26 +78,44 @@ public class GameSymbol : MonoBehaviour
 			switch (currentSymbolData.WinMode)
 			{
 				case SymbolWinMode.LineMatch:
-				highlight = Color.green;
-				break;
+					highlight = Color.green;
+					break;
 				case SymbolWinMode.SingleOnReel:
-				highlight = Color.yellow;
-				break;
+					highlight = Color.yellow;
+					break;
 				case SymbolWinMode.TotalCount:
-				highlight = Color.red;
-				break;
+					highlight = Color.red;
+					break;
 				default:
-				highlight = Color.green;
-				break;
+					highlight = Color.green;
+					break;
 			}
 		}
 
-		cachedImage.color = highlight;
-		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
-		// set DOTween target so it can be killed via DOTween.Kill(this)
+		// Apply color immediately so it's visible even if a tween is restarted
+		if (cachedImage != null) cachedImage.color = highlight;
+
+		// Ensure transform rotation is reset before starting a new tween
+		transform.localRotation = originalLocalRotation;
+
+		// If an existing tweener is active, kill it so we reliably restart the animation and avoid stale state
 		if (activeTweener != null)
 		{
-			try { activeTweener.SetTarget(this); } catch { }
+			try { activeTweener.Kill(); } catch { }
+			activeTweener = null;
+		}
+
+		// Start a shake rotation tween and ensure rotation is restored when tween ends or is killed
+		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
+		if (activeTweener != null)
+		{
+			try
+			{
+				activeTweener.SetTarget(this);
+				activeTweener.OnComplete(() => { try { transform.localRotation = originalLocalRotation; } catch { } });
+				activeTweener.OnKill(() => { try { transform.localRotation = originalLocalRotation; } catch { } });
+			}
+			catch { }
 		}
 	}
 
@@ -119,7 +144,7 @@ public class GameSymbol : MonoBehaviour
 	{
 		if (activeTweener != null)
 		{
-			activeTweener.Kill();
+			try { activeTweener.Kill(); } catch { }
 			activeTweener = null;
 		}
 
@@ -129,6 +154,9 @@ public class GameSymbol : MonoBehaviour
 
 		// kill any tweens that targeted this object (replaces previous TweenPool behavior)
 		try { DOTween.Kill(this); } catch { }
+
+		// restore rotation to original so symbols don't stay rotated
+		try { transform.localRotation = originalLocalRotation; } catch { }
 	}
 
 	private void OnDestroy()

@@ -24,8 +24,8 @@ public class SymbolData : Data
 	// New: optional per-reel cap for this symbol during a single spin. -1 to ignore.
 	[SerializeField] private int maxPerReel = -1;
 
-	// New: integer match group identifier (set by definition). 0 indicates unknown/unset.
-	[SerializeField] private int matchGroupId = 0;
+	// New: integer match group identifier (set by definition). Use -1 to indicate unset/null.
+	[SerializeField] private int matchGroupId = -1;
 
 	public string Name => name;
 	public int MatchGroupId => matchGroupId;
@@ -65,12 +65,12 @@ public class SymbolData : Data
 
 	// Backwards-compatible constructor (previous signature)
 	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true)
-		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1, -1, 0)
+		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1, -1, -1)
 	{
 	}
 
 	// New constructor using baseValue/minWinDepth/scaling and explicit mode/totalTrigger
-	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true, SymbolWinMode mode = SymbolWinMode.LineMatch, int totalTrigger = -1, int maxPerReelParam = -1, int matchGroup = 0)
+	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true, SymbolWinMode mode = SymbolWinMode.LineMatch, int totalTrigger = -1, int maxPerReelParam = -1, int matchGroup = -1)
 	{
 		name = symbolName;
 		sprite = symbolSprite;
@@ -90,7 +90,7 @@ public class SymbolData : Data
 	/// <summary>
 	/// Determines if this symbol should be considered a match with <paramref name="other"/>.
 	/// Matching rules:
-	/// - Group id equality (non-zero) indicates match
+	/// - Group id equality (positive id) indicates match
 	/// - Wild symbol rules remain: two wilds match; wild matches non-wild when allowed
 	/// </summary>
 	public bool Matches(SymbolData other)
@@ -100,12 +100,15 @@ public class SymbolData : Data
 		// Both wild -> match
 		if (this.IsWild && other.IsWild) return true;
 
-		// Group match: if both have a non-zero MatchGroupId and they are equal
-		if (this.MatchGroupId != 0 && other.MatchGroupId != 0 && this.MatchGroupId == other.MatchGroupId) return true;
+		// Group match: if both have a positive MatchGroupId and they are equal
+		if (this.MatchGroupId > 0 && other.MatchGroupId > 0 && this.MatchGroupId == other.MatchGroupId) return true;
 
 		// Wild substitution rules
 		if (this.IsWild && other.AllowWildMatch) return true;
 		if (other.IsWild && this.AllowWildMatch) return true;
+
+		// Fallback: direct name equality (handles symbols without explicit match group)
+		if (!string.IsNullOrEmpty(this.Name) && !string.IsNullOrEmpty(other.Name) && this.Name == other.Name) return true;
 
 		return false;
 	}

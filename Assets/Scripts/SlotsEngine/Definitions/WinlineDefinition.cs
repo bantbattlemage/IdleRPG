@@ -98,12 +98,14 @@ public class WinlineDefinition : ScriptableObject
             case PatternType.StraightAcross:
             {
                 int requested = rowIndex;
-                // Anchor behavior: clamp for column0 then place column0 using clamped row, others use requested row (legacy semantics)
-                int base0 = ClampRow(requested, rowsPerColumn[0]);
-                if (rowsPerColumn[0] > 0 && base0 >= 0) result[0] = base0 * columns + 0;
-                for (int c = 1; c < columns; c++)
+                // For straight-across patterns used by presentation we must use the same visual row
+                // index across all columns. If a column does not contain that row, mark it invalid (-1).
+                for (int c = 0; c < columns; c++)
                 {
-                    if (requested >= 0 && requested < rowsPerColumn[c]) result[c] = requested * columns + c; else result[c] = -1;
+                    if (requested >= 0 && c < rowsPerColumn.Length && rowsPerColumn[c] > requested)
+                        result[c] = requested * columns + c;
+                    else
+                        result[c] = -1;
                 }
                 return result;
             }
