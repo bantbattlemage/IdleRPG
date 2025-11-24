@@ -318,8 +318,8 @@ namespace WinlineEvaluator.Tests
                 Assert.AreEqual(1, wins.Count, $"Expected a win for pattern [{string.Join(',', pattern)}]");
                 // PerSymbol scaling: base 4 * matches (4) = 16
                 Assert.AreEqual(16, wins[0].Value, $"Unexpected win value for pattern [{string.Join(',', pattern)}]");
-            }
-        }
+             }
+         }
 
         [Test]
         public void DiagonalDown_LeftmostMissing_PayingLaterTriggersWin()
@@ -348,10 +348,8 @@ namespace WinlineEvaluator.Tests
             grid[7] = null;
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
-            // Leading non-paying wilds should allow the later paying trigger to award
-            Assert.AreEqual(1, wins.Count, "Expected diagonal-down win to be recognized when leftmost positions are missing/wild and paying symbol appears later.");
-            Assert.AreEqual(0, wins[0].LineIndex, "Win should be reported for the provided pattern index 0");
-            Assert.IsTrue(wins[0].Indexes.Length >= 3, "Winning indexes should include at least the trigger depth");
+            // Leftmost pattern slot is invalid (-1) so no permissive fallback should be used
+            Assert.AreEqual(0, wins.Count, "Expected no win because pattern[0] is invalid and no fallback is allowed.");
         }
 
         [Test]
@@ -373,8 +371,8 @@ namespace WinlineEvaluator.Tests
             grid[11] = new SymbolData("X", 5, 3, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
-            // Leading non-paying wilds should allow the later paying trigger to award
-            Assert.AreEqual(1, wins.Count, "Expected diagonal-down win to be recognized when leftmost row4 has wilds followed by a paying symbol.");
+            // Leftmost slot is a non-paying wild; allow wild-only fallback to later paying trigger
+            Assert.AreEqual(1, wins.Count, "Expected diagonal-down win when leftmost is a non-paying wild followed by paying symbols.");
             Assert.AreEqual(0, wins[0].LineIndex);
             CollectionAssert.IsSubsetOf(new int[] { 32, 25, 18, 11 }, wins[0].Indexes);
         }
@@ -482,9 +480,66 @@ namespace WinlineEvaluator.Tests
             grid[10] = new SymbolData("W", 0, -1, true);
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            // Leftmost is non-paying wild; allow wild-only fallback to paying trigger at pattern[1]
             Assert.AreEqual(1, wins.Count, "Expected the diagonal containing W,3,W to be recognized as a win.");
             Assert.AreEqual(0, wins[0].LineIndex);
             CollectionAssert.IsSubsetOf(new int[] { 24, 17, 10 }, wins[0].Indexes);
+        }
+
+        [Test]
+        public void Wilds_Then_Paying_Then_Null_Then_Wilds_Yields_LeftWin()
+        {
+            var ev = new WinlineEvaluator();
+            int columns = 8;
+            int[] rowsPerColumn = Enumerable.Repeat(1, columns).ToArray();
+            SymbolData[] grid = new SymbolData[columns];
+
+            // pattern across columns 0..7
+            int[] pattern = Enumerable.Range(0, columns).ToArray();
+
+            // W,W,1,null,W,W,W,null -> expect win for the '1' at index 2 with depth 3 (indexes 0,1,2)
+            grid[0] = new SymbolData("W", 0, -1, true);
+            grid[1] = new SymbolData("W", 0, -1, true);
+            grid[2] = new SymbolData("X", 1, 3, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+            grid[3] = null; // break
+            grid[4] = new SymbolData("W", 0, -1, true);
+            grid[5] = new SymbolData("W", 0, -1, true);
+            grid[6] = new SymbolData("W", 0, -1, true);
+            grid[7] = null;
+
+            var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            Assert.AreEqual(1, wins.Count, "Expected one win for the left run before the null break");
+            Assert.AreEqual(1, wins[0].Value, "Expected base value 1 and depth equals min depth (no extra depth)");
+            CollectionAssert.IsSubsetOf(new int[] { 0, 1, 2 }, wins[0].Indexes);
+        }
+
+        [Test]
+        public void Wilds_Then_Paying_Then_Null_Then_OtherSymbol_DoesNotWin()
+        {
+            var ev = new WinlineEvaluator();
+            int columns = 8;
+            int[] rowsPerColumn = Enumerable.Repeat(1, columns).ToArray();
+            SymbolData[] grid = new SymbolData[columns];
+
+            int[] pattern = Enumerable.Range(0, columns).ToArray();
+
+            // W,W,1,null,2,W,W,null -> expecting only the left '1' to win (depth 3), not the '2'
+            grid[0] = new SymbolData("W", 0, -1, true);
+            grid[1] = new SymbolData("W", 0, -1, true);
+            grid[2] = new SymbolData("X", 1, 3, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+            grid[3] = null; // break
+            grid[4] = new SymbolData("Y", 5, 3, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+            grid[5] = new SymbolData("W", 0, -1, true);
+            grid[6] = new SymbolData("W", 0, -1, true);
+            grid[7] = null;
+
+            var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            // Should be only the left win
+            Assert.AreEqual(1, wins.Count, "Expected only the left-side win before the null break");
+            Assert.AreEqual(1, wins[0].Value);
+            CollectionAssert.IsSubsetOf(new int[] { 0, 1, 2 }, wins[0].Indexes);
+            // Ensure 'Y' at index 4 did not produce a separate win
+            Assert.IsFalse(wins.Any(w => w.Indexes != null && w.Indexes.Contains(4)), "Symbol at index 4 should not trigger a win because earlier anchor/blocks prevent it");
         }
 
     }

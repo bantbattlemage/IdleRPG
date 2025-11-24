@@ -9,36 +9,64 @@ namespace EvaluatorCore
 
     public static class CoreWinlineEvaluator
     {
+        /*
+         * Helper semantics (centralized):
+         * - IsPayingLineTrigger(s): true when a symbol is a valid paying trigger for line wins.
+         *   (WinMode == LineMatch, MinWinDepth >= 0, BaseValue > 0)
+         * - IsNonPayingWild(s): true when a symbol is a wild but is NOT a paying LineMatch trigger.
+         *   Non-paying wilds act as match extenders and may participate in a narrow "wild-only" fallback.
+         * - PatternPosValid(idx,...): verifies that a pattern index maps inside the grid bounds, the
+         *   row exists for the column (jagged column support), and the grid cell is non-null.
+         *
+         * Overall evaluation high-level rules (intended and enforced):
+         * 1) Anchoring: if the leftmost pattern slot (pattern[0]) maps to a valid, in-bounds, non-null cell,
+         *    the line is anchored to that leftmost column and matching/trigger selection must respect that anchor.
+         * 2) Wild-only fallback: If anchored and the anchored leftmost cell is a non-paying wild (IsNonPayingWild),
+         *    the evaluator will perform a "wild-only" fallback: search forward from the anchored slot to find the
+         *    first PAYING LineMatch trigger (IsPayingLineTrigger). That paying symbol becomes the chosen trigger,
+         *    but the pattern remains anchored to pattern[0] so leading wilds may extend the chosen trigger.
+         * 3) No permissive fallback when pattern[0] is missing: If pattern[0] is invalid/missing (e.g. -1 or maps
+         *    outside rows), the pattern is NOT considered anchored and -- to avoid ambiguity across reels -- the
+         *    evaluator will SKIP the pattern (no fallback to later reels). This enforces that wins only originate
+         *    from the owning slot's leftmost reel when an explicit anchor exists.
+         * 4) When pattern[0] is invalid (and we allowed permissive behavior previously), the earlier design allowed
+         *    searching from the first usable position for paying triggers. That permissive behavior is now disabled
+         *    by (3) to satisfy strict slot-leftmost semantics. Only the wild-only fallback when anchor exists is allowed.
+         * 5) Blocking rule: if any earlier usable pattern position before the first usable position could itself be a
+         *    paying trigger, the pattern is skipped so we don't prefer a later trigger over an earlier paying candidate.
+         * 6) Matching: once a trigger is chosen the evaluator computes a contiguous match starting at the earliest
+         *    matching slot between the anchored/usable leftmost and the chosen trigger. Matching stops on invalid
+         *    pattern entries (-1), out-of-bounds rows, or null cells. That means a null/invalid entry acts as a hard break.
+         * 7) Pay scaling: DepthSquared and PerSymbol behaviors are applied as before. PerSymbol counts all matches across
+         *    the pattern that Match the chosen trigger symbol (including wilds that match) and uses that to scale pay.
+         *
+         * Note: these rules were intentionally chosen to guarantee anchor semantics while allowing non-paying wilds to
+         * extend a later paying trigger in a narrow, predictable way. The helper functions below consolidate the
+         * predicates so future changes won't accidentally diverge behaviors in multiple places.
+         */
+
+        // Helper: true when symbol is a paying LineMatch trigger (can start a line win)
+        private static bool IsPayingLineTrigger(PlainSymbolData s)
+        {
+            return s != null && s.WinMode == SymbolWinMode.LineMatch && s.MinWinDepth >= 0 && s.BaseValue > 0;
+        }
+
+        // Helper: true when symbol is a wild but not a paying LineMatch trigger.
+        // Non-paying wilds are intended to act as extenders and can participate in wild-fallback logic.
+        private static bool IsNonPayingWild(PlainSymbolData s)
+        {
+            return s != null && s.IsWild && !IsPayingLineTrigger(s);
+        }
+
+        // Helper: validate that a pattern position maps to a usable grid cell
+        private static bool PatternPosValid(int candidate, PlainSymbolData[] grid, int columns, int[] rowsPerColumn)
+        {
+            if (candidate < 0 || candidate >= grid.Length) return false;
+            int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) return false;
+            return grid[candidate] != null;
+        }
+
         // Evaluate using PlainSymbolData and simple patterns (int[] per-column indexes)
-        //
-        // Semantics (detailed):
-        // - Patterns are arrays of per-column flat indexes (row*columns + col) produced by WinlineDefinition.GenerateIndexes.
-        //   Entries with -1 or that map outside a column's row count are treated as invalid/unused for that pattern.
-        // - pStart selection: the evaluator finds the first usable (valid, in-bounds and non-null) position in the pattern
-        //   and treats that as the primary leftmost usable candidate for a line. This accounts for jagged columns where some
-        //   early pattern slots may be invalid (-1).
-        // - Leftmost anchoring rule: if the pattern's leftmost slot (pattern[0]) maps to a valid, in-bounds, non-null cell in
-        //   the grid, the evaluator treats the pattern as anchored to column 0 and enforces that matching must begin from that
-        //   leftmost position. This prevents the evaluator from starting a match further right when a valid leftmost cell exists.
-        // - Wild-only fallback rule: to preserve wilds as match-extenders, when the leftmost anchored slot is a wild that is
-        //   intentionally non-paying (e.g. BaseValue==0 and MinWinDepth<=0), a narrow fallback is allowed: the evaluator will
-        //   search forward from the anchored position for the first *paying* LineMatch trigger and use that as the trigger while
-        //   still anchoring the pattern to the leftmost column. This lets leading wilds extend a later paying symbol without
-        //   treating wilds as independent triggers.
-        // - When pattern[0] is invalid (e.g. -1) the evaluator retains permissive behavior: the first usable candidate (pStart)
-        //   may be a wild; in that case the evaluator will search forward for the first paying LineMatch trigger and use it as
-        //   the trigger while allowing earlier wilds to contribute to the contiguous match.
-        // - Blocking rule: if there exists any earlier usable pattern position before the chosen pStart that itself could be a
-        //   paying LineMatch trigger, the evaluator treats that as an earlierValidExists blocker and skips the pattern. This
-        //   prevents the evaluator from ignoring an earlier paying start in favor of a later one.
-        // - Matching: once a trigger is chosen the evaluator computes a contiguous match starting at the earliest matching slot
-        //   between the anchored/usable leftmost and the chosen trigger position. Matching stops at the first non-matching or
-        //   invalid slot. If the contiguous match length >= trigger.MinWinDepth the line wins.
-        // - Pay scaling: two scaling modes are supported: DepthSquared (base * 2^extraDepth) and PerSymbol (base * totalMatchesAcrossLine).
-        //
-        // Note: these rules were chosen to keep a consistent visual leftmost anchoring while allowing wilds to act as extenders
-        // without requiring wilds to be configured as paying triggers. If desired, the wild-only fallback behavior can be made
-        // configurable.
         public static List<CoreWinData> EvaluateWins(PlainSymbolData[] grid, int columns, int[] rowsPerColumn, List<int[]> winlines, List<int> winMultipliers, int creditCost = 1)
         {
             var results = new List<CoreWinData>();
@@ -58,119 +86,73 @@ namespace EvaluatorCore
                 for (int pi = 0; pi < pattern.Length; pi++)
                 {
                     int candidate = pattern[pi];
-                    if (candidate < 0 || candidate >= grid.Length) continue;
-                    int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
-                    var candCell = grid[candidate]; if (candCell == null) continue;
+                    if (!PatternPosValid(candidate, grid, columns, rowsPerColumn)) continue;
+                    var candCell = grid[candidate];
                     pStart = pi; break;
                 }
                 if (pStart < 0) continue;
 
                 // Determine whether pattern[0] maps to a valid/non-null cell (leftmost column anchor)
-                bool pattern0Valid = false;
-                if (pattern.Length > 0)
-                {
-                    int idx0 = pattern[0];
-                    if (idx0 >= 0 && idx0 < grid.Length)
-                    {
-                        int col0 = idx0 % columns; int row0 = idx0 / columns;
-                        if (row0 < rowsPerColumn[col0])
-                        {
-                            var c0 = grid[idx0]; if (c0 != null) pattern0Valid = true;
-                        }
-                    }
-                }
+                bool pattern0Valid = (pattern.Length > 0) && PatternPosValid(pattern[0], grid, columns, rowsPerColumn);
 
-                int pStartOrig = pStart;
-                // If pattern[0] is valid/non-null, anchor to the leftmost column
-                if (pattern0Valid) pStartOrig = 0;
+                // Enforce rule: if leftmost pattern slot is invalid/missing, skip the pattern.
+                // This preserves strict slot-leftmost semantics. (No permissive fallback to later reels.)
+                if (!pattern0Valid) continue;
 
-                int first = pattern[pStartOrig];
+                // Preserve original first-usable position for blocker/matching logic. Anchor to leftmost slot (pattern[0]).
+                int firstUsable = pStart; // first usable index found earlier in pattern
+                int anchoredStart = 0; // pattern0Valid is true
+
+                int first = pattern[anchoredStart];
                 var trigger = (first >= 0 && first < grid.Length) ? grid[first] : null;
                 if (trigger == null) continue;
 
-                int chosenTriggerPatternPos = pStartOrig;
+                int chosenTriggerPatternPos = anchoredStart;
 
-                if (pattern0Valid)
+                // If anchored and the leftmost cell is a non-paying wild, allow a narrow forward search
+                // for the first paying trigger. The anchor remains pattern[0] so leading wilds may extend.
+                if (IsNonPayingWild(trigger))
                 {
-                    // If the leftmost slot is a wild that is intentionally non-paying, allow a narrow fallback to a later paying LineMatch trigger.
-                    // This preserves strict anchoring to column 0 while letting leading wilds behave as extenders.
-                    if (trigger.IsWild && (trigger.MinWinDepth < 0 || trigger.BaseValue <= 0 || trigger.WinMode != SymbolWinMode.LineMatch))
+                    int altPos = -1;
+                    for (int p = anchoredStart + 1; p < pattern.Length; p++)
                     {
-                        int altPos = -1;
-                        for (int p = pStartOrig + 1; p < pattern.Length; p++)
-                        {
-                            int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
-                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
-                            var cand = grid[idx]; if (cand == null) continue;
-                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
-                            {
-                                altPos = p; break;
-                            }
-                        }
-                        if (altPos < 0) continue; // no suitable forward paying trigger
+                        int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
+                        int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
+                        var cand = grid[idx]; if (cand == null) continue;
+                        if (IsPayingLineTrigger(cand)) { altPos = p; break; }
+                    }
+                    if (altPos < 0) continue; // no suitable forward paying trigger
 
-                        chosenTriggerPatternPos = altPos;
-                        first = pattern[chosenTriggerPatternPos];
-                        trigger = grid[first];
-                        if (trigger == null) continue;
-                    }
-                    else
-                    {
-                        // Otherwise the leftmost slot must itself be a paying LineMatch trigger
-                        bool isPayingLineMatch = (trigger.WinMode == SymbolWinMode.LineMatch && trigger.MinWinDepth >= 0 && trigger.BaseValue > 0);
-                        if (!isPayingLineMatch) continue;
-                    }
+                    chosenTriggerPatternPos = altPos;
+                    first = pattern[chosenTriggerPatternPos];
+                    trigger = grid[first];
+                    if (trigger == null) continue;
                 }
                 else
                 {
-                    // pattern[0] invalid: allow the previous permissive fallback behavior for wilds
-                    if (trigger.IsWild && (trigger.MinWinDepth < 0 || trigger.BaseValue <= 0 || trigger.WinMode != SymbolWinMode.LineMatch))
-                    {
-                        int altPos = -1;
-                        for (int p = pStartOrig + 1; p < pattern.Length; p++)
-                        {
-                            int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
-                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
-                            var cand = grid[idx]; if (cand == null) continue;
-                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
-                            {
-                                altPos = p; break;
-                            }
-                        }
-                        if (altPos < 0) continue; // no suitable forward paying trigger
-
-                        chosenTriggerPatternPos = altPos;
-                        first = pattern[chosenTriggerPatternPos];
-                        trigger = grid[first];
-                        if (trigger == null) continue;
-                    }
-                    else
-                    {
-                        bool isPayingLineMatch = (trigger.WinMode == SymbolWinMode.LineMatch && trigger.MinWinDepth >= 0 && trigger.BaseValue > 0);
-                        if (!isPayingLineMatch) continue;
-                    }
+                    // Otherwise the anchored leftmost slot must itself be a paying trigger
+                    if (!IsPayingLineTrigger(trigger)) continue;
                 }
 
-                // Ensure there are no earlier *paying* candidates before the original pStart that would block starting here
+                // Ensure there are no earlier *paying* candidates before the first usable position that would block starting here
                 bool earlierValidExists = false;
-                for (int pj = 0; pj < pStartOrig; pj++)
+                for (int pj = 0; pj < firstUsable; pj++)
                 {
                     int candidate = pattern[pj];
                     if (candidate < 0 || candidate >= grid.Length) continue;
                     int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
                     var candCell = grid[candidate]; if (candCell == null) continue;
-
-                    bool candCouldTrigger = (candCell.WinMode == SymbolWinMode.LineMatch && candCell.MinWinDepth >= 0 && candCell.BaseValue > 0) || (candCell.IsWild && candCell.WinMode == SymbolWinMode.LineMatch && candCell.BaseValue > 0);
-                    if (candCouldTrigger) { earlierValidExists = true; break; }
+                    if (IsPayingLineTrigger(candCell)) { earlierValidExists = true; break; }
                 }
                 if (earlierValidExists) continue;
 
-                // Perform contiguous matching starting from the earliest matching position between pStartOrig and chosenTriggerPatternPos
+                // Perform contiguous matching starting from the earliest matching position and the chosen trigger position.
+                // Matching stops on invalid pattern entries (-1), rows outside column, or null cells so null/invalid entries act as hard breaks.
                 var matched = new List<int>();
                 int matchStart = chosenTriggerPatternPos;
-                if (chosenTriggerPatternPos > pStartOrig)
+                if (chosenTriggerPatternPos > firstUsable)
                 {
-                    for (int kk = pStartOrig; kk < chosenTriggerPatternPos; kk++)
+                    for (int kk = firstUsable; kk < chosenTriggerPatternPos; kk++)
                     {
                         int gi = pattern[kk]; if (gi < 0 || gi >= grid.Length) continue;
                         int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) continue;
@@ -183,8 +165,38 @@ namespace EvaluatorCore
                 {
                     int gi = pattern[k]; if (gi < 0 || gi >= grid.Length) break;
                     int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) break;
-                    var cell = grid[gi]; if (cell == null) break;
+                    var cell = grid[gi]; if (cell == null) break; // null acts as break
                     if (cell.Matches(trigger)) matched.Add(gi); else break;
+                }
+
+                // Sanity check: ensure matched indexes are contiguous in pattern order (trim if necessary around trigger).
+                if (matched.Count > 0)
+                {
+                    // Map each matched index back to its pattern position
+                    var posMap = new Dictionary<int, int>();
+                    for (int pi = 0; pi < pattern.Length; pi++) if (pattern[pi] >= 0) posMap[pattern[pi]] = pi;
+                    var positions = matched.Select(mi => posMap.ContainsKey(mi) ? posMap[mi] : -1000).ToList();
+                    int triggerPos = chosenTriggerPatternPos;
+                    int idxInMatched = positions.FindIndex(p => p == triggerPos);
+                    if (idxInMatched >= 0)
+                    {
+                        // Expand contiguous block around triggerPos
+                        int startIdx = idxInMatched; int endIdx = idxInMatched;
+                        while (startIdx - 1 >= 0 && positions[startIdx - 1] == positions[startIdx] - 1) startIdx--;
+                        while (endIdx + 1 < positions.Count && positions[endIdx + 1] == positions[endIdx] + 1) endIdx++;
+                        // If the contiguous block doesn't cover entire matched list, trim
+                        if (startIdx != 0 || endIdx != positions.Count - 1)
+                        {
+                            // Trim matched to contiguous block
+                            matched = matched.GetRange(startIdx, endIdx - startIdx + 1);
+                            // If trimming removed the trigger or reduced below min depth, treat as no win
+                        }
+                    }
+                    else
+                    {
+                        // Trigger index not found among matched entries -> discard matched
+                        matched.Clear();
+                    }
                 }
 
                 if (matched.Count >= trigger.MinWinDepth)

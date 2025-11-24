@@ -970,7 +970,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 51f645173120a004f8d8e1128afcf595, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WinlineEvaluator
-  LoggingEnabled: 0
+  LoggingEnabled: 1
 --- !u!114 &1853545769 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 6574605966422305647, guid: 5d205dd4508c5c44782c3c6b5f867746, type: 3}
