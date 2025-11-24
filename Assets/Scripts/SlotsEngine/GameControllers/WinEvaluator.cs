@@ -17,6 +17,11 @@ public class WinEvaluator : Singleton<WinEvaluator>
     // Public toggle kept for editor convenience but logging implementation removed per instructions
     public bool LoggingEnabled = false;
 
+    // Scene-configurable cap for how many spin log files are retained in the SpinLogs folder.
+    // A value <= 0 means no pruning (retain all logs).
+    [Tooltip("Maximum number of spin log files to retain. Set to 0 or negative for no limit.")]
+    public int MaxSpinLogs = 100;
+
     private List<WinData> currentSpinWinData;
 
     public List<WinData> CurrentSpinWinData => currentSpinWinData ?? (currentSpinWinData = new List<WinData>());
@@ -150,6 +155,29 @@ public class WinEvaluator : Singleton<WinEvaluator>
             {
                 // If file write fails, still log consolidated message to editor log
                 Debug.LogWarning($"WinEvaluator: Failed to write spin log to '{fullPath}': {ex.Message}");
+            }
+
+            // Prune oldest logs if MaxSpinLogs is positive
+            try
+            {
+                if (MaxSpinLogs > 0)
+                {
+                    var files = Directory.Exists(dir) ? Directory.GetFiles(dir, "spin_*.log") : Array.Empty<string>();
+                    if (files.Length > MaxSpinLogs)
+                    {
+                        // Order by creation time then by name as fallback
+                        var ordered = files.Select(f => new FileInfo(f)).OrderBy(fi => fi.CreationTimeUtc).ThenBy(fi => fi.Name).ToList();
+                        int toRemove = ordered.Count - MaxSpinLogs;
+                        for (int r = 0; r < toRemove; r++)
+                        {
+                            try { ordered[r].Delete(); } catch { }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"WinEvaluator: Failed while pruning spin logs: {ex.Message}");
             }
 
             // Emit a single consolidated entry to the Unity Editor log to aid quick debugging

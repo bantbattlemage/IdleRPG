@@ -971,6 +971,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WinlineEvaluator
   LoggingEnabled: 1
+  MaxSpinLogs: 1
 --- !u!114 &1853545769 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 6574605966422305647, guid: 5d205dd4508c5c44782c3c6b5f867746, type: 3}
