@@ -6,9 +6,7 @@ using EvaluatorCore;
 namespace WinlineEvaluator.Tests
 {
     // Test-local lightweight types retained for clarity, but the evaluator logic itself will be the one in EvaluatorCore.
-    public enum SymbolWinMode { LineMatch, SingleOnReel, TotalCount }
-    public enum PayScaling { DepthSquared, PerSymbol }
-
+    
     public class SymbolData
     {
         public string Name;

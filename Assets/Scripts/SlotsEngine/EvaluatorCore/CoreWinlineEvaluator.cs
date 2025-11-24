@@ -5,7 +5,7 @@ using EvaluatorCore;
 
 namespace EvaluatorCore
 {
-    public class CoreWinData { public int LineIndex; public int WinValue; public int[] WinningSymbolIndexes; public CoreWinData(int l, int v, int[] idxs) { LineIndex = l; WinValue = v; WinningSymbolIndexes = idxs; } }
+	public class CoreWinData { public int LineIndex; public int WinValue; public int[] WinningSymbolIndexes; public CoreWinData(int l, int v, int[] idxs) { LineIndex = l; WinValue = v; WinningSymbolIndexes = idxs; } }
 
     public static class CoreWinlineEvaluator
     {
@@ -52,7 +52,6 @@ namespace EvaluatorCore
         }
 
         // Helper: true when symbol is a wild but not a paying LineMatch trigger.
-        // Non-paying wilds are intended to act as extenders and can participate in wild-fallback logic.
         private static bool IsNonPayingWild(PlainSymbolData s)
         {
             return s != null && s.IsWild && !IsPayingLineTrigger(s);
@@ -81,7 +80,6 @@ namespace EvaluatorCore
             {
                 var pattern = winlines[i]; if (pattern == null || pattern.Length == 0) continue;
 
-                // Find first usable index in pattern (handle jagged columns where some positions can be -1)
                 int pStart = -1;
                 for (int pi = 0; pi < pattern.Length; pi++)
                 {
@@ -92,16 +90,10 @@ namespace EvaluatorCore
                 }
                 if (pStart < 0) continue;
 
-                // Determine whether pattern[0] maps to a valid/non-null cell (leftmost column anchor)
                 bool pattern0Valid = (pattern.Length > 0) && PatternPosValid(pattern[0], grid, columns, rowsPerColumn);
-
-                // Enforce rule: if leftmost pattern slot is invalid/missing, skip the pattern.
-                // This preserves strict slot-leftmost semantics. (No permissive fallback to later reels.)
                 if (!pattern0Valid) continue;
 
-                // Preserve original first-usable position for blocker/matching logic. Anchor to leftmost slot (pattern[0]).
-                int firstUsable = pStart; // first usable index found earlier in pattern
-                int anchoredStart = 0; // pattern0Valid is true
+                int firstUsable = pStart; int anchoredStart = 0;
 
                 int first = pattern[anchoredStart];
                 var trigger = (first >= 0 && first < grid.Length) ? grid[first] : null;
@@ -109,8 +101,6 @@ namespace EvaluatorCore
 
                 int chosenTriggerPatternPos = anchoredStart;
 
-                // If anchored and the leftmost cell is a non-paying wild, allow a narrow forward search
-                // for the first paying trigger. The anchor remains pattern[0] so leading wilds may extend.
                 if (IsNonPayingWild(trigger))
                 {
                     int altPos = -1;
@@ -121,7 +111,7 @@ namespace EvaluatorCore
                         var cand = grid[idx]; if (cand == null) continue;
                         if (IsPayingLineTrigger(cand)) { altPos = p; break; }
                     }
-                    if (altPos < 0) continue; // no suitable forward paying trigger
+                    if (altPos < 0) continue;
 
                     chosenTriggerPatternPos = altPos;
                     first = pattern[chosenTriggerPatternPos];
@@ -130,11 +120,9 @@ namespace EvaluatorCore
                 }
                 else
                 {
-                    // Otherwise the anchored leftmost slot must itself be a paying trigger
                     if (!IsPayingLineTrigger(trigger)) continue;
                 }
 
-                // Ensure there are no earlier *paying* candidates before the first usable position that would block starting here
                 bool earlierValidExists = false;
                 for (int pj = 0; pj < firstUsable; pj++)
                 {
@@ -146,8 +134,6 @@ namespace EvaluatorCore
                 }
                 if (earlierValidExists) continue;
 
-                // Perform contiguous matching starting from the earliest matching position and the chosen trigger position.
-                // Matching stops on invalid pattern entries (-1), rows outside column, or null cells so null/invalid entries act as hard breaks.
                 var matched = new List<int>();
                 int matchStart = chosenTriggerPatternPos;
                 if (chosenTriggerPatternPos > firstUsable)
@@ -165,14 +151,12 @@ namespace EvaluatorCore
                 {
                     int gi = pattern[k]; if (gi < 0 || gi >= grid.Length) break;
                     int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) break;
-                    var cell = grid[gi]; if (cell == null) break; // null acts as break
+                    var cell = grid[gi]; if (cell == null) break;
                     if (cell.Matches(trigger)) matched.Add(gi); else break;
                 }
 
-                // Sanity check: ensure matched indexes are contiguous in pattern order (trim if necessary around trigger).
                 if (matched.Count > 0)
                 {
-                    // Map each matched index back to its pattern position
                     var posMap = new Dictionary<int, int>();
                     for (int pi = 0; pi < pattern.Length; pi++) if (pattern[pi] >= 0) posMap[pattern[pi]] = pi;
                     var positions = matched.Select(mi => posMap.ContainsKey(mi) ? posMap[mi] : -1000).ToList();
@@ -180,21 +164,16 @@ namespace EvaluatorCore
                     int idxInMatched = positions.FindIndex(p => p == triggerPos);
                     if (idxInMatched >= 0)
                     {
-                        // Expand contiguous block around triggerPos
                         int startIdx = idxInMatched; int endIdx = idxInMatched;
                         while (startIdx - 1 >= 0 && positions[startIdx - 1] == positions[startIdx] - 1) startIdx--;
                         while (endIdx + 1 < positions.Count && positions[endIdx + 1] == positions[endIdx] + 1) endIdx++;
-                        // If the contiguous block doesn't cover entire matched list, trim
                         if (startIdx != 0 || endIdx != positions.Count - 1)
                         {
-                            // Trim matched to contiguous block
                             matched = matched.GetRange(startIdx, endIdx - startIdx + 1);
-                            // If trimming removed the trigger or reduced below min depth, treat as no win
                         }
                     }
                     else
                     {
-                        // Trigger index not found among matched entries -> discard matched
                         matched.Clear();
                     }
                 }
@@ -229,7 +208,6 @@ namespace EvaluatorCore
                 }
             }
 
-            // Symbol-level wins
             const int NonLine = -1; var processed = new HashSet<int>();
             for (int idx = 0; idx < grid.Length; idx++)
             {

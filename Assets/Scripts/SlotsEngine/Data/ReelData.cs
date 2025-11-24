@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using EvaluatorCore;
 
 [Serializable]
 public class ReelData : Data

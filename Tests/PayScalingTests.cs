@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using EvaluatorCore;
 
 namespace WinlineEvaluator.PayScalingTests
 {
-    // Minimal stubs for PayScaling tests (isolated namespace to avoid conflicts)
-    public enum PayScaling { DepthSquared = 0, PerSymbol = 1 }
-    public enum SymbolWinMode { LineMatch = 0, SingleOnReel = 1, TotalCount = 2 }
+    // Tests now reference shared enums from EvaluatorCore instead of duplicating them.
 
     public class SymbolDataPS
     {

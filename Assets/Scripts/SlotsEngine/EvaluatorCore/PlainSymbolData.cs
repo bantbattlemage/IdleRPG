@@ -2,10 +2,20 @@ using System;
 
 namespace EvaluatorCore
 {
-    public enum PayScaling { DepthSquared = 0, PerSymbol = 1 }
-    public enum SymbolWinMode { LineMatch = 0, SingleOnReel = 1, TotalCount = 2 }
+	public enum PayScaling
+	{
+		DepthSquared = 0,
+		PerSymbol = 1
+	}
 
-    public class PlainSymbolData
+	public enum SymbolWinMode
+	{
+		LineMatch = 0,
+		SingleOnReel = 1,
+		TotalCount = 2
+	}
+
+	public class PlainSymbolData
     {
         public string Name;
         public int BaseValue;

@@ -1,17 +1,5 @@
 using UnityEngine;
-
-public enum PayScaling
-{
-	DepthSquared = 0,
-	PerSymbol = 1
-}
-
-public enum SymbolWinMode
-{
-	LineMatch = 0,
-	SingleOnReel = 1,
-	TotalCount = 2
-}
+using EvaluatorCore;
 
 /// <summary>
 /// Authoring-time definition for a symbol's behavior, payout, and matching characteristics.

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using EvaluatorCore;
 
 [Serializable]
 public class SymbolData : Data

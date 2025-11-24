@@ -39,6 +39,39 @@ public class GameReel : MonoBehaviour
     // Cached singleton references to avoid repeated Instance lookups
     private GameSymbolPool cachedSymbolPool;
 
+    // Helper to resolve persisted SymbolData candidate, attempt to recover missing sprite by name,
+    // and persist into SymbolDataManager when possible. Falls back to reelStrip selection when
+    // candidate is null or sprite could not be resolved.
+    private SymbolData ResolveAndPersistSymbol(SymbolData candidate, List<SymbolData> existingSelections)
+    {
+        SymbolData result = candidate;
+        try
+        {
+            if (result != null)
+            {
+                if (result.Sprite == null && !string.IsNullOrEmpty(result.Name))
+                {
+                    try { result.Sprite = AssetResolver.ResolveSprite(result.Name); } catch { }
+                }
+                if (result.Sprite == null)
+                {
+                    // fallback to strip selection
+                    result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : result;
+                }
+                else
+                {
+                    try { if (SymbolDataManager.Instance != null && result.AccessorId == 0) SymbolDataManager.Instance.AddNewData(result); } catch { }
+                }
+            }
+            else
+            {
+                result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : null;
+            }
+        }
+        catch { /* swallow - caller expects best-effort resolution */ }
+        return result;
+    }
+
     // Coroutine handles for delayed operations to avoid DOTween.Sequence allocations
     private Coroutine beginSpinCoroutine;
     private Coroutine stopReelCoroutine;
@@ -125,32 +158,9 @@ public class GameReel : MonoBehaviour
                 }
             }
 
-            // Safely obtain symbol definition from provided existingSymbolData if it contains this index and non-null;
-            // attempt to recover sprite by name when missing; otherwise pick from strip
-            SymbolData newSymbol = null;
-            if (existingSymbolData != null && existingSymbolData.Count > i && existingSymbolData[i] != null)
-            {
-                newSymbol = existingSymbolData[i];
-                if (newSymbol.Sprite == null && !string.IsNullOrEmpty(newSymbol.Name))
-                {
-                    try { newSymbol.Sprite = AssetResolver.ResolveSprite(newSymbol.Name); } catch { }
-                }
-
-                if (newSymbol.Sprite == null)
-                {
-                    // couldn't resolve sprite for persisted symbol -> fallback to strip selection
-                    newSymbol = reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
-                }
-                else
-                {
-                    // ensure symbol is registered with manager so future loads can resolve by accessor id
-                    try { if (SymbolDataManager.Instance != null && newSymbol.AccessorId == 0) SymbolDataManager.Instance.AddNewData(newSymbol); } catch { }
-                }
-            }
-            else
-            {
-                newSymbol = reelStrip.GetWeightedSymbol(tmpSelectedForThisReel);
-            }
+            // Resolve persisted candidate or pick from strip
+            SymbolData candidate = (existingSymbolData != null && existingSymbolData.Count > i) ? existingSymbolData[i] : null;
+            SymbolData newSymbol = ResolveAndPersistSymbol(candidate, tmpSelectedForThisReel);
 
             // If this symbol was freshly created it has been initialized. Apply the new data for reuse.
             if (sym != null) sym.ApplySymbol(newSymbol);
@@ -213,14 +223,14 @@ public class GameReel : MonoBehaviour
             if (sym == null) // defensive fallback
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
+                SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
+            SymbolData def = ResolveAndPersistSymbol(null, existingSelections);
             sym.ApplySymbol(def);
             sym.transform.SetParent(symbolRoot, false);
             float y = -step * (i + 1);
@@ -237,13 +247,13 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, false);
+                SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, false);
+            SymbolData def = ResolveAndPersistSymbol(null, existingSelections);
             sym.ApplySymbol(def);
             sym.transform.SetParent(symbolRoot, false);
             float y = step * (activeCount + i);
@@ -396,28 +406,9 @@ public class GameReel : MonoBehaviour
                     symbol = CreateSymbolInstance(nextSymbolsRoot);
                 }
             }
-            // Safely obtain definition from provided solution if it has enough entries and non-null; otherwise fallback to reelStrip selection
-            SymbolData def = null;
-            if (solution != null && solution.Count > i && solution[i] != null)
-            {
-                def = solution[i];
-                if (def.Sprite == null && !string.IsNullOrEmpty(def.Name))
-                {
-                    try { def.Sprite = AssetResolver.ResolveSprite(def.Name); } catch { }
-                }
-                if (def.Sprite == null)
-                {
-                    def = reelStrip.GetWeightedSymbol(tmpCombinedExisting);
-                }
-                else
-                {
-                    try { if (SymbolDataManager.Instance != null && def.AccessorId == 0) SymbolDataManager.Instance.AddNewData(def); } catch { }
-                }
-            }
-            else
-            {
-                def = reelStrip.GetWeightedSymbol(tmpCombinedExisting);
-            }
+            // Resolve provided solution candidate or pick from strip
+            SymbolData candidate = (solution != null && solution.Count > i) ? solution[i] : null;
+            SymbolData def = ResolveAndPersistSymbol(candidate, tmpCombinedExisting);
             if (symbol != null) symbol.ApplySymbol(def);
             if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
@@ -445,13 +436,13 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                SymbolData initDef = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
+                SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
+            SymbolData def = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
             sym.ApplySymbol(def);
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = -step * (i + 1);
@@ -469,13 +460,13 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                SymbolData initDef = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
+                SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = reelStrip.GetWeightedSymbol(tmpCombinedForBuffer, false);
+            SymbolData def = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
             sym.ApplySymbol(def);
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = step * (currentReelData.SymbolCount + i);
@@ -913,27 +904,8 @@ private void ValidateNoSharedInstances()
             for (int i = oldCount; i < newCount; i++)
             {
                 GameSymbol sym = cachedSymbolPool != null ? cachedSymbolPool.Get(symbolRoot) : GameSymbolPool.Instance?.Get(symbolRoot);
-                SymbolData def = null;
-                if (currentReelData.CurrentSymbolData.Count > i && currentReelData.CurrentSymbolData[i] != null)
-                {
-                    def = currentReelData.CurrentSymbolData[i];
-                    if (def.Sprite == null && !string.IsNullOrEmpty(def.Name))
-                    {
-                        try { def.Sprite = AssetResolver.ResolveSprite(def.Name); } catch { }
-                    }
-                    if (def.Sprite == null)
-                    {
-                        def = reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData);
-                    }
-                    else
-                    {
-                        try { if (SymbolDataManager.Instance != null && def.AccessorId == 0) SymbolDataManager.Instance.AddNewData(def); } catch { }
-                    }
-                }
-                else
-                {
-                    def = reelStrip.GetWeightedSymbol(currentReelData.CurrentSymbolData);
-                }
+                SymbolData candidate = (currentReelData.CurrentSymbolData.Count > i) ? currentReelData.CurrentSymbolData[i] : null;
+                SymbolData def = ResolveAndPersistSymbol(candidate, currentReelData.CurrentSymbolData);
 
                 sym.InitializeSymbol(def, eventManager);
                 symbols.Add(sym);
