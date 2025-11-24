@@ -178,11 +178,132 @@ public class WinEvaluator : Singleton<WinEvaluator>
         // Convert winlines to int[] patterns using their GenerateIndexes
         var patterns = new List<int[]>();
         var multipliers = new List<int>();
+        int maxRows = 0; for (int c = 0; c < rowsPerColumn.Length; c++) if (rowsPerColumn[c] > maxRows) maxRows = rowsPerColumn[c];
         for (int i = 0; i < winlines.Count; i++)
         {
             var wl = winlines[i]; if (wl == null) continue;
-            patterns.Add(wl.GenerateIndexes(columns, rowsPerColumn));
-            multipliers.Add(wl.WinMultiplier);
+            try
+            {
+                // Expand StraightAcross and diagonal definitions so every concrete pattern derived from a definition is evaluated.
+                if (wl.Pattern == WinlineDefinition.PatternType.DiagonalDown || wl.Pattern == WinlineDefinition.PatternType.DiagonalUp)
+                {
+                    for (int ro = 0; ro < maxRows; ro++)
+                    {
+                        var clone = wl.CloneForRuntime();
+                        clone.SetRowOffset(ro);
+                        patterns.Add(clone.GenerateIndexes(columns, rowsPerColumn));
+                        multipliers.Add(clone.WinMultiplier);
+                    }
+                }
+                else if (wl.Pattern == WinlineDefinition.PatternType.StraightAcross)
+                {
+                    // Evaluate every visual row as a straight-across candidate
+                    for (int r = 0; r < maxRows; r++)
+                    {
+                        var clone = wl.CloneForRuntime();
+                        clone.SetRowIndex(r);
+                        patterns.Add(clone.GenerateIndexes(columns, rowsPerColumn));
+                        multipliers.Add(clone.WinMultiplier);
+                    }
+                }
+                else
+                {
+                    patterns.Add(wl.GenerateIndexes(columns, rowsPerColumn));
+                    multipliers.Add(wl.WinMultiplier);
+                }
+            }
+            catch
+            {
+                // If expansion fails for unexpected reason, fall back to original single pattern
+                patterns.Add(wl.GenerateIndexes(columns, rowsPerColumn));
+                multipliers.Add(wl.WinMultiplier);
+            }
+        }
+
+        // Diagnostic: when logging is enabled, reproduce per-winline decision steps so we can trace misses
+        if (LoggingEnabled)
+        {
+            try
+            {
+                var diagSb = new StringBuilder();
+                diagSb.AppendLine("=== WinEvaluator per-winline diagnostics ===");
+                for (int i = 0; i < patterns.Count; i++)
+                {
+                    var pattern = patterns[i];
+                    diagSb.AppendLine($"Winline {i} (length={pattern?.Length ?? 0}):");
+                    if (pattern == null || pattern.Length == 0) { diagSb.AppendLine("  <empty pattern>"); continue; }
+
+                    int pStart = -1;
+                    for (int pi = 0; pi < pattern.Length; pi++)
+                    {
+                        int candidate = pattern[pi];
+                        if (candidate < 0 || candidate >= plain.Length) continue;
+                        int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
+                        var candCell = plain[candidate]; if (candCell == null) continue;
+                        pStart = pi; break;
+                    }
+                    diagSb.AppendLine($"  pStart={pStart}");
+
+                    bool earlierValidExists = false;
+                    for (int pj = 0; pj < pStart; pj++)
+                    {
+                        int candidate = pattern[pj];
+                        if (candidate < 0 || candidate >= plain.Length) continue;
+                        int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
+                        var candCell = plain[candidate]; if (candCell == null) continue;
+                        earlierValidExists = true; break;
+                    }
+                    diagSb.AppendLine($"  earlierValidExists={earlierValidExists}");
+
+                    if (pStart < 0)
+                    {
+                        diagSb.AppendLine("  No usable start candidate found");
+                        continue;
+                    }
+
+                    int first = pattern[pStart];
+                    var trigger = plain[first];
+                    diagSb.AppendLine($"  firstIndex={first} trigger={(trigger!=null?trigger.Name:"<null>")}, IsWild={trigger?.IsWild}, MinWinDepth={trigger?.MinWinDepth}, WinMode={trigger?.WinMode}, BaseValue={trigger?.BaseValue}");
+
+                    bool needsFallback = (trigger.MinWinDepth < 0 || trigger.WinMode != EvaluatorCore.SymbolWinMode.LineMatch) || (trigger.IsWild && trigger.BaseValue <= 0);
+                    diagSb.AppendLine($"  needsFallback={needsFallback}");
+                    int chosenTriggerIdx = first;
+                    if (needsFallback && trigger.IsWild)
+                    {
+                        int alt = -1;
+                        for (int p = pStart + 1; p < pattern.Length; p++)
+                        {
+                            int idx = pattern[p]; if (idx < 0 || idx >= plain.Length) continue;
+                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
+                            var cand = plain[idx]; if (cand == null) continue;
+                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == EvaluatorCore.SymbolWinMode.LineMatch) { alt = idx; chosenTriggerIdx = idx; break; }
+                        }
+                        diagSb.AppendLine($"  fallbackAltIndex={ (chosenTriggerIdx==first? -1: chosenTriggerIdx)}");
+                    }
+
+                    // Compute matched contiguously starting from pStart
+                    var matched = new List<int>();
+                    for (int k = pStart; k < pattern.Length; k++)
+                    {
+                        int gi = pattern[k]; if (gi < 0 || gi >= plain.Length) break;
+                        int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) break;
+                        var cell = plain[gi]; if (cell == null) break;
+                        if (cell.Matches(plain[chosenTriggerIdx])) matched.Add(gi); else break;
+                    }
+                    diagSb.AppendLine($"  matchedCount={matched.Count} matchedIndexes=[{string.Join(",", matched)}]");
+
+                    int minDepth = trigger.MinWinDepth;
+                    diagSb.AppendLine($"  trigger.MinWinDepth={minDepth}");
+                    bool wouldWin = (matched.Count >= minDepth && trigger.BaseValue > 0 && trigger.WinMode == EvaluatorCore.SymbolWinMode.LineMatch);
+                    diagSb.AppendLine($"  wouldWin={wouldWin}");
+                }
+                diagSb.AppendLine("=== End diagnostics ===");
+                Debug.Log(diagSb.ToString());
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"WinEvaluator: diagnostics failed: {ex.Message}");
+            }
         }
 
         var coreResults = CoreWinlineEvaluator.EvaluateWins(plain, columns, rowsPerColumn, patterns, multipliers, 1);

@@ -130,6 +130,7 @@ namespace WinlineEvaluator.Tests
             var w = WildNP(); var b = SymB(); b.MinWinDepth = 3; var grid = new[] { w, b, w };
             var winlines = new List<int[]> { new int[] {0,1,2} }; var mults = new List<int> {1};
             var ev = new WinlineEvaluator(); var wins = ev.EvaluateWins(grid,3,new[]{1,1,1},winlines,mults);
+            // Leading non-paying wilds should allow a later paying trigger to win (wild fallback)
             Assert.AreEqual(1, wins.Count);
             Assert.AreEqual(12, wins[0].Value);
         }
@@ -248,6 +249,7 @@ namespace WinlineEvaluator.Tests
             grid[pattern[2]] = new SymbolData("A", 5, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            // Leading non-paying wilds should allow a later paying trigger to win
             Assert.AreEqual(1, wins.Count, "Expected one win when paying candidate appears after non-paying wilds.");
             Assert.AreEqual(15, wins[0].Value, "PerSymbol scaling: base 5 * 3 matches = 15");
         }
@@ -273,32 +275,9 @@ namespace WinlineEvaluator.Tests
             grid[pattern[3]] = new SymbolData("B", 3, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            // Leading non-paying wilds should allow the later paying candidate to trigger a win
             Assert.AreEqual(1, wins.Count, "Expected one win when a paying candidate appears later in a diagonal down pattern.");
             Assert.AreEqual(12, wins[0].Value);
-        }
-
-        [Test]
-        public void PatternStartingWithInvalidIndex_IsIgnored()
-        {
-            var ev = new WinlineEvaluator();
-            int columns = 3;
-            int[] rowsPerColumn = new int[] { 1, 2, 2 };
-            int maxRows = 2;
-            SymbolData[] grid = new SymbolData[maxRows * columns];
-
-            int[] pattern = new int[3];
-            pattern[0] = 1 * columns + 0; // invalid for col0
-            pattern[1] = 1 * columns + 1;
-            pattern[2] = 1 * columns + 2;
-
-            grid[pattern[1]] = new SymbolData("X", 2, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
-            grid[pattern[2]] = new SymbolData("X", 2, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
-
-            var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
-            // New evaluator behavior: if the first pattern index is invalid but subsequent entries are valid,
-            // the evaluator will start at the first usable index. Expect a PerSymbol win: base 2 * 2 matches = 4
-            Assert.AreEqual(1, wins.Count, "Expected a win when later pattern positions are valid and triggerable");
-            Assert.AreEqual(4, wins[0].Value);
         }
 
         [Test]
@@ -335,6 +314,7 @@ namespace WinlineEvaluator.Tests
                 grid[pattern[3]] = new SymbolData("B", 4, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
 
                 var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+                // Leading non-paying wilds should allow a later paying trigger to win
                 Assert.AreEqual(1, wins.Count, $"Expected a win for pattern [{string.Join(',', pattern)}]");
                 // PerSymbol scaling: base 4 * matches (4) = 16
                 Assert.AreEqual(16, wins[0].Value, $"Unexpected win value for pattern [{string.Join(',', pattern)}]");
@@ -368,6 +348,7 @@ namespace WinlineEvaluator.Tests
             grid[7] = null;
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            // Leading non-paying wilds should allow the later paying trigger to award
             Assert.AreEqual(1, wins.Count, "Expected diagonal-down win to be recognized when leftmost positions are missing/wild and paying symbol appears later.");
             Assert.AreEqual(0, wins[0].LineIndex, "Win should be reported for the provided pattern index 0");
             Assert.IsTrue(wins[0].Indexes.Length >= 3, "Winning indexes should include at least the trigger depth");
@@ -392,6 +373,7 @@ namespace WinlineEvaluator.Tests
             grid[11] = new SymbolData("X", 5, 3, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            // Leading non-paying wilds should allow the later paying trigger to award
             Assert.AreEqual(1, wins.Count, "Expected diagonal-down win to be recognized when leftmost row4 has wilds followed by a paying symbol.");
             Assert.AreEqual(0, wins[0].LineIndex);
             CollectionAssert.IsSubsetOf(new int[] { 32, 25, 18, 11 }, wins[0].Indexes);

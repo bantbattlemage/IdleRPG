@@ -36,46 +36,121 @@ namespace EvaluatorCore
                 }
                 if (pStart < 0) continue;
 
-                // Ensure there are no earlier valid entries (preserve leftmost-visible start semantics)
+                // Determine whether pattern[0] maps to a valid/non-null cell (leftmost column anchor)
+                bool pattern0Valid = false;
+                if (pattern.Length > 0)
+                {
+                    int idx0 = pattern[0];
+                    if (idx0 >= 0 && idx0 < grid.Length)
+                    {
+                        int col0 = idx0 % columns; int row0 = idx0 / columns;
+                        if (row0 < rowsPerColumn[col0])
+                        {
+                            var c0 = grid[idx0]; if (c0 != null) pattern0Valid = true;
+                        }
+                    }
+                }
+
+                int pStartOrig = pStart;
+                // If pattern[0] is valid/non-null, anchor to the leftmost column
+                if (pattern0Valid) pStartOrig = 0;
+
+                int first = pattern[pStartOrig];
+                var trigger = (first >= 0 && first < grid.Length) ? grid[first] : null;
+                if (trigger == null) continue;
+
+                int chosenTriggerPatternPos = pStartOrig;
+
+                if (pattern0Valid)
+                {
+                    // If the leftmost slot is a wild that is intentionally non-paying, allow a narrow fallback to a later paying LineMatch trigger.
+                    // This preserves strict anchoring to column 0 while letting leading wilds behave as extenders.
+                    if (trigger.IsWild && (trigger.MinWinDepth < 0 || trigger.BaseValue <= 0 || trigger.WinMode != SymbolWinMode.LineMatch))
+                    {
+                        int altPos = -1;
+                        for (int p = pStartOrig + 1; p < pattern.Length; p++)
+                        {
+                            int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
+                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
+                            var cand = grid[idx]; if (cand == null) continue;
+                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
+                            {
+                                altPos = p; break;
+                            }
+                        }
+                        if (altPos < 0) continue; // no suitable forward paying trigger
+
+                        chosenTriggerPatternPos = altPos;
+                        first = pattern[chosenTriggerPatternPos];
+                        trigger = grid[first];
+                        if (trigger == null) continue;
+                    }
+                    else
+                    {
+                        // Otherwise the leftmost slot must itself be a paying LineMatch trigger
+                        bool isPayingLineMatch = (trigger.WinMode == SymbolWinMode.LineMatch && trigger.MinWinDepth >= 0 && trigger.BaseValue > 0);
+                        if (!isPayingLineMatch) continue;
+                    }
+                }
+                else
+                {
+                    // pattern[0] invalid: allow the previous permissive fallback behavior for wilds
+                    if (trigger.IsWild && (trigger.MinWinDepth < 0 || trigger.BaseValue <= 0 || trigger.WinMode != SymbolWinMode.LineMatch))
+                    {
+                        int altPos = -1;
+                        for (int p = pStartOrig + 1; p < pattern.Length; p++)
+                        {
+                            int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
+                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
+                            var cand = grid[idx]; if (cand == null) continue;
+                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch)
+                            {
+                                altPos = p; break;
+                            }
+                        }
+                        if (altPos < 0) continue; // no suitable forward paying trigger
+
+                        chosenTriggerPatternPos = altPos;
+                        first = pattern[chosenTriggerPatternPos];
+                        trigger = grid[first];
+                        if (trigger == null) continue;
+                    }
+                    else
+                    {
+                        bool isPayingLineMatch = (trigger.WinMode == SymbolWinMode.LineMatch && trigger.MinWinDepth >= 0 && trigger.BaseValue > 0);
+                        if (!isPayingLineMatch) continue;
+                    }
+                }
+
+                // Ensure there are no earlier *paying* candidates before the original pStart that would block starting here
                 bool earlierValidExists = false;
-                for (int pj = 0; pj < pStart; pj++)
+                for (int pj = 0; pj < pStartOrig; pj++)
                 {
                     int candidate = pattern[pj];
                     if (candidate < 0 || candidate >= grid.Length) continue;
                     int col = candidate % columns; int row = candidate / columns; if (row >= rowsPerColumn[col]) continue;
                     var candCell = grid[candidate]; if (candCell == null) continue;
-                    earlierValidExists = true; break;
+
+                    bool candCouldTrigger = (candCell.WinMode == SymbolWinMode.LineMatch && candCell.MinWinDepth >= 0 && candCell.BaseValue > 0) || (candCell.IsWild && candCell.WinMode == SymbolWinMode.LineMatch && candCell.BaseValue > 0);
+                    if (candCouldTrigger) { earlierValidExists = true; break; }
                 }
                 if (earlierValidExists) continue;
 
-                int first = pattern[pStart];
-                var trigger = grid[first]; if (trigger == null) continue;
-
-                bool needsFallback = (trigger.MinWinDepth < 0 || trigger.WinMode != SymbolWinMode.LineMatch) || (trigger.IsWild && trigger.BaseValue <= 0);
-                if (needsFallback)
+                // Perform contiguous matching starting from the earliest matching position between pStartOrig and chosenTriggerPatternPos
+                var matched = new List<int>();
+                int matchStart = chosenTriggerPatternPos;
+                if (chosenTriggerPatternPos > pStartOrig)
                 {
-                    if (trigger.IsWild)
+                    for (int kk = pStartOrig; kk < chosenTriggerPatternPos; kk++)
                     {
-                        int alt = -1;
-                        for (int p = pStart + 1; p < pattern.Length; p++)
-                        {
-                            int idx = pattern[p]; if (idx < 0 || idx >= grid.Length) continue;
-                            int col = idx % columns; int row = idx / columns; if (row >= rowsPerColumn[col]) continue;
-                            var cand = grid[idx]; if (cand == null) continue;
-                            // Allow using a paying symbol as fallback, including paying wilds
-                            if (cand.MinWinDepth >= 0 && cand.BaseValue > 0 && cand.WinMode == SymbolWinMode.LineMatch) { alt = idx; trigger = cand; break; }
-                        }
-                        if (alt < 0) continue;
+                        int gi = pattern[kk]; if (gi < 0 || gi >= grid.Length) continue;
+                        int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) continue;
+                        var cell = grid[gi]; if (cell == null) continue;
+                        if (cell.Matches(trigger)) { matchStart = kk; break; }
                     }
-                    else continue;
                 }
 
-                if (trigger.WinMode != SymbolWinMode.LineMatch) continue;
-                if (trigger.BaseValue <= 0) continue;
-
-                var matched = new List<int>();
-                // Match contiguously starting from the chosen pStart position
-                for (int k = pStart; k < pattern.Length; k++)
+                for (int k = matchStart; k < pattern.Length; k++)
                 {
                     int gi = pattern[k]; if (gi < 0 || gi >= grid.Length) break;
                     int col = gi % columns; int row = gi / columns; if (row >= rowsPerColumn[col]) break;

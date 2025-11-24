@@ -77,7 +77,18 @@ public class PresentationController : Singleton<PresentationController>
 			}
 		}
 
-		List<WinData> winData = WinEvaluator.Instance.EvaluateWinsFromColumns(visualColumns, evalWinlines);
+		// Prefer the wins already computed at spin completion to avoid evaluator/presentation snapshot mismatch.
+		List<WinData> winData = null;
+		if (WinEvaluator.Instance != null && WinEvaluator.Instance.CurrentSpinWinData != null && WinEvaluator.Instance.CurrentSpinWinData.Count > 0)
+		{
+			winData = WinEvaluator.Instance.CurrentSpinWinData;
+		}
+		else
+		{
+			// Fallback: evaluate wins from the current visual grid
+			winData = WinEvaluator.Instance != null ? WinEvaluator.Instance.EvaluateWinsFromColumns(visualColumns, evalWinlines) : new List<WinData>();
+		}
+
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
 		slotsData.SetCurrentWinData(winData);
 
@@ -101,9 +112,18 @@ public class PresentationController : Singleton<PresentationController>
 
 	private void PlayWinlines(SlotsEngine slotsToPresent, GameSymbol[] grid, List<WinData> winData)
 	{
+		int gridLen = grid != null ? grid.Length : 0;
 		foreach (WinData w in winData)
 		{
-			foreach (int index in w.WinningSymbolIndexes) slotsToPresent.BroadcastSlotsEvent(SlotsEvent.SymbolWin, grid[index]);
+			if (w.WinningSymbolIndexes != null)
+			{
+				foreach (int index in w.WinningSymbolIndexes)
+				{
+					if (index < 0 || index >= gridLen) continue; // skip invalid indexes
+					var gs = grid[index]; if (gs == null) continue; // skip null slots
+					slotsToPresent.BroadcastSlotsEvent(SlotsEvent.SymbolWin, gs);
+				}
+			}
 			string individualMsg = w.LineIndex >= 0 ? $"Won {w.WinValue} on line {w.LineIndex}!" : (w.WinningSymbolIndexes?.Length <= 1 ? $"Won {w.WinValue}!" : $"Won {w.WinValue} ({w.WinningSymbolIndexes.Length} symbols)!");
 			SlotConsoleController.Instance?.AppendPresentationMessage(slotsToPresent, individualMsg);
 		}
