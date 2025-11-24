@@ -3,7 +3,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/WinlineDefinition")]
 public class WinlineDefinition : ScriptableObject
 {
-    public enum PatternType { StraightAcross, DiagonalDown, DiagonalUp, Custom }
+    public enum PatternType { StraightAcross, DiagonalDown, DiagonalUp, Custom, ZigzagW, ZigzagM }
 
     [SerializeField] private PatternType pattern = PatternType.StraightAcross;
     [SerializeField] private int winMultiplier = 1;
@@ -56,6 +56,23 @@ public class WinlineDefinition : ScriptableObject
         }
         inst.ConfigureRuntime(PatternType.Custom, multiplier, 0, 0, copy);
         inst.name = "__runtime_Custom";
+        return inst;
+    }
+
+    // New runtime helpers for Zigzag patterns
+    public static WinlineDefinition CreateRuntimeZigzagW(int multiplier = 1)
+    {
+        var inst = CreateInstance<WinlineDefinition>();
+        inst.ConfigureRuntime(PatternType.ZigzagW, multiplier, 0, 0, null);
+        inst.name = "__runtime_ZigzagW";
+        return inst;
+    }
+
+    public static WinlineDefinition CreateRuntimeZigzagM(int multiplier = 1)
+    {
+        var inst = CreateInstance<WinlineDefinition>();
+        inst.ConfigureRuntime(PatternType.ZigzagM, multiplier, 0, 0, null);
+        inst.name = "__runtime_ZigzagM";
         return inst;
     }
 
@@ -147,6 +164,57 @@ public class WinlineDefinition : ScriptableObject
                 for (int c2 = 0; c2 < columns; c2++)
                 {
                     if (mid < rowsPerColumn[c2]) result[c2] = mid * columns + c2; else result[c2] = -1;
+                }
+                return result;
+            }
+            case PatternType.ZigzagW:
+            {
+                // Zigzag W: rows alternate between the starting anchor (rowOffset) and one row above it.
+                // This enforces a 1-up/1-down alternation rather than spanning full height.
+                int anchor = rowOffset; // treated as the starting anchor row
+                for (int c = 0; c < columns; c++)
+                {
+                    int row;
+                    if ((c % 2) == 0)
+                    {
+                        row = anchor;
+                    }
+                    else
+                    {
+                        // prefer one above (anchor + 1)
+                        row = anchor + 1;
+                        // if out of bounds for this column, try one below instead
+                        if (row < 0 || row >= rowsPerColumn[c]) row = anchor - 1;
+                        // if still invalid, fall back to anchor
+                        if (row < 0 || row >= rowsPerColumn[c]) row = (anchor >= 0 && anchor < rowsPerColumn[c]) ? anchor : -1;
+                    }
+
+                    if (row >= 0 && row < rowsPerColumn[c]) result[c] = row * columns + c; else result[c] = -1;
+                }
+                return result;
+            }
+            case PatternType.ZigzagM:
+            {
+                // Zigzag M: rows alternate between the starting anchor (rowOffset) and one row below it.
+                int anchor = rowOffset;
+                for (int c = 0; c < columns; c++)
+                {
+                    int row;
+                    if ((c % 2) == 0)
+                    {
+                        row = anchor;
+                    }
+                    else
+                    {
+                        // prefer one below (anchor - 1)
+                        row = anchor - 1;
+                        // if out of bounds for this column, try one above instead
+                        if (row < 0 || row >= rowsPerColumn[c]) row = anchor + 1;
+                        // if still invalid, fall back to anchor
+                        if (row < 0 || row >= rowsPerColumn[c]) row = (anchor >= 0 && anchor < rowsPerColumn[c]) ? anchor : -1;
+                    }
+
+                    if (row >= 0 && row < rowsPerColumn[c]) result[c] = row * columns + c; else result[c] = -1;
                 }
                 return result;
             }

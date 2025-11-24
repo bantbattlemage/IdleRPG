@@ -234,6 +234,17 @@ public class WinEvaluator : Singleton<WinEvaluator>
                         multipliers.Add(clone.WinMultiplier);
                     }
                 }
+                else if (wl.Pattern == WinlineDefinition.PatternType.ZigzagW || wl.Pattern == WinlineDefinition.PatternType.ZigzagM)
+                {
+                    // Expand zigzag patterns across every possible rowOffset so all vertical shifts are evaluated
+                    for (int ro = 0; ro < maxRows; ro++)
+                    {
+                        var clone = wl.CloneForRuntime();
+                        clone.SetRowOffset(ro);
+                        patterns.Add(clone.GenerateIndexes(columns, rowsPerColumn));
+                        multipliers.Add(clone.WinMultiplier);
+                    }
+                }
                 else
                 {
                     patterns.Add(wl.GenerateIndexes(columns, rowsPerColumn));

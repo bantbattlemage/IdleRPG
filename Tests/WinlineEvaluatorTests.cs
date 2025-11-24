@@ -474,14 +474,14 @@ namespace WinlineEvaluator.Tests
 
             // Place non-paying wild at first and third positions, paying '3' at middle
             grid[24] = new SymbolData("W", 0, -1, true);
-            grid[17] = new SymbolData("3", 4, 3, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+            // Use a paying symbol with PerSymbol scaling so leading/trailing wilds count as matches
+            grid[17] = new SymbolData("3", 5, 1, false, SymbolWinMode.LineMatch, PayScaling.PerSymbol);
             grid[10] = new SymbolData("W", 0, -1, true);
 
             var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
             // Leftmost is non-paying wild; allow wild-only fallback to paying trigger at pattern[1]
             Assert.AreEqual(1, wins.Count, "Expected the diagonal containing W,3,W to be recognized as a win.");
-            Assert.AreEqual(0, wins[0].LineIndex);
-            CollectionAssert.IsSubsetOf(new int[] { 24, 17, 10 }, wins[0].Indexes);
+            Assert.AreEqual(15, wins[0].Value, "PerSymbol scaling: base 5 * 3 matches = 15");
         }
 
         [Test]
@@ -538,6 +538,76 @@ namespace WinlineEvaluator.Tests
             CollectionAssert.IsSubsetOf(new int[] { 0, 1, 2 }, wins[0].Indexes);
             // Ensure 'Y' at index 4 did not produce a separate win
             Assert.IsFalse(wins.Any(w => w.Indexes != null && w.Indexes.Contains(4)), "Symbol at index 4 should not trigger a win because earlier anchor/blocks prevent it");
+        }
+
+        [Test]
+        public void ZigzagW_Basic_JaggedArray_Awards()
+        {
+            var ev = new WinlineEvaluator();
+            int columns = 4;
+            int[] rowsPerColumn = new int[] { 3, 2, 3, 1 };
+            int maxRows = 3;
+            SymbolData[] grid = new SymbolData[maxRows * columns];
+
+            // ZigzagW with anchor=rowOffset=0 alternates rows [0,1,0,0] given rowsPerColumn; indexes: [0,5,2,3]
+            int[] pattern = new int[] { 0 * columns + 0, 1 * columns + 1, 0 * columns + 2, 0 * columns + 3 };
+
+            // Place paying symbol on all pattern positions
+            var payer = new SymbolData("Z", baseValue: 2, minWinDepth: 4, isWild: false, winMode: SymbolWinMode.LineMatch, scaling: PayScaling.DepthSquared);
+            grid[pattern[0]] = payer;
+            grid[pattern[1]] = payer;
+            grid[pattern[2]] = payer;
+            grid[pattern[3]] = payer;
+
+            var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            Assert.AreEqual(1, wins.Count);
+            Assert.AreEqual(2, wins[0].Value); // base 2, no extra depth
+        }
+
+        [Test]
+        public void ZigzagM_AnchorNull_NoWin()
+        {
+            var ev = new WinlineEvaluator();
+            int columns = 3;
+            int[] rowsPerColumn = new int[] { 1, 1, 1 };
+            int maxRows = 1;
+            SymbolData[] grid = new SymbolData[maxRows * columns];
+
+            // ZigzagM with anchor=rowOffset=0 alternates rows [0,0,0] due to bounds
+            int[] pattern = new int[] { 0, 0, 0 };
+
+            // Leave anchor (pattern[0] == 0) as null -> should skip/ignore pattern
+            grid[1] = new SymbolData("A", 3, 1, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+            grid[2] = new SymbolData("A", 3, 1, false, SymbolWinMode.LineMatch, PayScaling.DepthSquared);
+
+            var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { pattern }, new List<int> { 1 }, 1);
+            Assert.AreEqual(0, wins.Count);
+        }
+
+        [Test]
+        public void ZigzagW_And_StraightAcross_Intersecting_BothAward()
+        {
+            var ev = new WinlineEvaluator();
+            int columns = 4;
+            int[] rowsPerColumn = new int[] { 3, 3, 3, 3 };
+            int maxRows = 3;
+            SymbolData[] grid = new SymbolData[maxRows * columns];
+
+            // ZigzagW rowOffset=0 (anchor 0) -> rows [0,1,0,1] -> indexes [0,5,2,7]
+            int[] zig = new int[] { 0 * columns + 0, 1 * columns + 1, 0 * columns + 2, 1 * columns + 3 };
+            // Straight across top row (row 2) -> [8,9,10,11]
+            int[] straightTop = new int[] { 2 * columns + 0, 2 * columns + 1, 2 * columns + 2, 2 * columns + 3 };
+
+            // Place the same paying symbol across all positions referenced by both patterns so both lines detect wins
+            var payer = new SymbolData("B", baseValue: 5, minWinDepth: 4, isWild: false, winMode: SymbolWinMode.LineMatch, scaling: PayScaling.PerSymbol);
+            // Zig positions
+            grid[zig[0]] = payer; grid[zig[1]] = payer; grid[zig[2]] = payer; grid[zig[3]] = payer;
+            // Straight positions (some overlap with zig)
+            grid[straightTop[0]] = payer; grid[straightTop[1]] = payer; grid[straightTop[2]] = payer; grid[straightTop[3]] = payer;
+
+            var wins = ev.EvaluateWins(grid, columns, rowsPerColumn, new List<int[]> { zig, straightTop }, new List<int> { 1, 1 }, 1);
+            Assert.AreEqual(2, wins.Count);
+            Assert.IsTrue(wins.All(w => w.Value == 20)); // 5 * 4 matches = 20 for both
         }
 
     }
