@@ -105,8 +105,17 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		if (slotsToDestroy != null)
 		{
 			try { SlotConsoleController.Instance?.ClearMessagesForSlot(slotsToDestroy); } catch { }
-			if (slotsToDestroy.ReelsRootTransform != null) Destroy(slotsToDestroy.ReelsRootTransform.gameObject);
-			Destroy(slotsToDestroy.gameObject);
+
+			// Collect roots to destroy: reels root and slot GameObject
+			var roots = new List<GameObject>();
+			if (slotsToDestroy.ReelsRootTransform != null) roots.Add(slotsToDestroy.ReelsRootTransform.gameObject);
+			if (slotsToDestroy.gameObject != null) roots.Add(slotsToDestroy.gameObject);
+
+			// Destroy roots immediately (incremental coroutine removed)
+			for (int i = 0; i < roots.Count; i++)
+			{
+				if (roots[i] != null) GameObject.Destroy(roots[i]);
+			}
 		}
 
 		if (slotsDisplayPages.Count == 0)
@@ -122,7 +131,8 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 			nextPageButton.gameObject.SetActive(currentSlotPageIndex != slotsDisplayPages.Count - 1);
 			prevPageButton.gameObject.SetActive(currentSlotPageIndex != 0);
 		}
-		// Slot count changed -> adjust whole page layout
+
+		// Adjust layout immediately
 		AdjustSlotsCanvases();
 	}
 
@@ -152,7 +162,8 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount; grid.constraintCount = columns; grid.cellSize = new Vector2(cellWidth, cellHeight);
 		foreach (SlotsEngine s in currentSlotsDisplayPage.slotsToDisplay)
 		{
-			ApplyCellSizeToSlot(s, cellWidth, cellHeight);
+			// Use the specialized height-change path which avoids regenerating dummies and reassigning sprites
+			ApplyCellSizeToSlotForHeightChange(s, cellWidth, cellHeight);
 		}
 		currentSlotsDisplayPage.AdjustPlaceholderGroup();
 	}

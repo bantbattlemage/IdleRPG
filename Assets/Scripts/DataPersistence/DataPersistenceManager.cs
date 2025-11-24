@@ -30,6 +30,9 @@ public class DataPersistenceManager : MonoBehaviour
 
 	public static DataPersistenceManager Instance { get; private set; }
 
+	// Debounce coroutine handle for batching save requests
+	private Coroutine saveCoroutine;
+
 	private void Awake()
 	{
 		if (Instance != null)
@@ -123,6 +126,7 @@ public class DataPersistenceManager : MonoBehaviour
 		selectedProfileId = SanitizeProfileId(name);
 		gameData = new GameData();
 
+		// perform immediate save for new game
 		SaveGame();
 	}
 
@@ -171,6 +175,7 @@ public class DataPersistenceManager : MonoBehaviour
 	/// <summary>
 	/// Saves the current in-memory `GameData` to disk after gathering changes from registered `IDataPersistence` objects.
 	/// Adds a timestamp and attempts an atomic file write via <see cref="FileDataHandler"/>.
+	/// This performs the actual synchronous write; prefer <see cref="RequestSave(float)"/> for debounce/batched saves.
 	/// </summary>
 	public void SaveGame()
 	{
@@ -216,6 +221,25 @@ public class DataPersistenceManager : MonoBehaviour
 		{
 			Debug.LogError($"Failed to save game data: {e}");
 		}
+	}
+
+	/// <summary>
+	/// Request a save operation with an optional debounce delay. Multiple calls within the delay window
+	/// will be coalesced into a single save. Use this from code paths that may trigger frequent changes
+	/// (e.g., during slot/reel updates) to avoid blocking the main thread repeatedly.
+	/// </summary>
+	public void RequestSave(float debounceSeconds = 0.25f)
+	{
+		if (disableDataPersistence) return;
+		if (saveCoroutine != null) StopCoroutine(saveCoroutine);
+		saveCoroutine = StartCoroutine(DeferredSave(debounceSeconds));
+	}
+
+	private IEnumerator DeferredSave(float delay)
+	{
+		yield return new WaitForSeconds(delay);
+		try { SaveGame(); } catch (Exception ex) { Debug.LogError($"Deferred save failed: {ex}"); }
+		saveCoroutine = null;
 	}
 
 	/// <summary>

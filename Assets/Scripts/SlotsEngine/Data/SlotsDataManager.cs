@@ -62,7 +62,8 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 			LocalData[slotsData.AccessorId] = slotsData;
 		}
 
-		DataPersistenceManager.Instance.SaveGame();
+		// Debounced save request instead of immediate disk write
+		DataPersistenceManager.Instance?.RequestSave();
 	}
 
 	public void RemoveSlotsDataIfExists(SlotsData data)
@@ -78,7 +79,8 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 			}
 
 			LocalData.Remove(data.AccessorId);
-			DataPersistenceManager.Instance.SaveGame();
+			// Debounced save
+			DataPersistenceManager.Instance?.RequestSave();
 		}
 	}
 
@@ -87,6 +89,6 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		ClearData();
 		ReelDataManager.Instance.ClearData();
 		SymbolDataManager.Instance.ClearData();
-		DataPersistenceManager.Instance.SaveGame();
+		DataPersistenceManager.Instance?.RequestSave();
 	}
 }

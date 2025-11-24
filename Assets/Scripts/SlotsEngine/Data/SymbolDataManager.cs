@@ -18,7 +18,8 @@ public class SymbolDataManager : DataManager<SymbolDataManager, SymbolData>
 		if (LocalData != null && LocalData.ContainsKey(data.AccessorId))
 		{
 			LocalData.Remove(data.AccessorId);
-			DataPersistenceManager.Instance.SaveGame();
+			// Debounced save request
+			DataPersistenceManager.Instance?.RequestSave();
 		}
 	}
 }

@@ -31,7 +31,8 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 			newData.SetCurrentSymbolData(newData.CurrentSymbolData);
 		}
 
-		DataPersistenceManager.Instance.SaveGame();
+		// Debounced save request
+		DataPersistenceManager.Instance?.RequestSave();
 	}
 
 	public void RemoveDataIfExists(ReelData data)
@@ -53,7 +54,8 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 		if (LocalData != null && LocalData.ContainsKey(data.AccessorId))
 		{
 			LocalData.Remove(data.AccessorId);
-			DataPersistenceManager.Instance.SaveGame();
+			// Debounced save
+			DataPersistenceManager.Instance?.RequestSave();
 		}
 	}
 
@@ -80,6 +82,7 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 		}
 
 		reelData.SetCurrentSymbolData(list);
-		DataPersistenceManager.Instance.SaveGame();
+		// Debounced save
+		DataPersistenceManager.Instance?.RequestSave();
 	}
 }

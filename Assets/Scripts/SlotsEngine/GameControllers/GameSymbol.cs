@@ -96,13 +96,13 @@ public class GameSymbol : MonoBehaviour
 		{
 			switch (currentSymbolData.WinMode)
 			{
-				case SymbolWinMode.LineMatch:
+				case EvaluatorCore.SymbolWinMode.LineMatch:
 					highlight = Color.green;
 					break;
-				case SymbolWinMode.SingleOnReel:
+				case EvaluatorCore.SymbolWinMode.SingleOnReel:
 					highlight = Color.yellow;
 					break;
-				case SymbolWinMode.TotalCount:
+				case EvaluatorCore.SymbolWinMode.TotalCount:
 					highlight = Color.red;
 					break;
 				default:
@@ -171,8 +171,8 @@ public class GameSymbol : MonoBehaviour
 		if (cachedImage != null) cachedImage.DOKill();
 		transform.DOKill();
 
-		// kill any tweens that targeted this object (replaces previous TweenPool behavior)
-		try { DOTween.Kill(this); } catch { }
+		// Note: Avoid calling DOTween.Kill(this) here — killing by target can be expensive when many symbols
+		// and is largely redundant because we already kill known tween handles above.
 
 		// restore rotation to original so symbols don't stay rotated
 		try { transform.localRotation = originalLocalRotation; } catch { }

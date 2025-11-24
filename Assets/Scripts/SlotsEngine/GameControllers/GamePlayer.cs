@@ -204,16 +204,6 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		// Destroy engine (SlotsEngineManager will broadcast AllSlotsRemoved if it becomes empty)
 		SlotsEngineManager.Instance.DestroySlots(slotsToRemove);
-
-		// Allow zero-slot state: do NOT auto-respawn.
-		if (playerSlots.Count == 0)
-		{
-			// Optional broadcast (manager already broadcasts); keep single source -> no extra action here.
-			return;
-		}
-
-		// Adjust layout for remaining slots
-		SlotsEngineManager.Instance.AdjustSlotsCanvases();
 	}
 
 	public bool RequestSpinPurchase()

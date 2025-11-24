@@ -331,7 +331,7 @@ public class SlotsEngine : MonoBehaviour
 		ReelData firstDef = currentSlotsData.CurrentReelData[0]; bool sizeMatches = Mathf.Approximately(firstDef.SymbolSize, chosenSymbolSize) && Mathf.Approximately(firstDef.SymbolSpacing, chosenSpacing); bool reelsCountMatches = reels.Count == currentSlotsData.CurrentReelData.Count; if (sizeMatches && reelsCountMatches) return;
 		
 		foreach (ReelData r in currentSlotsData.CurrentReelData) r.SetSymbolSize(chosenSymbolSize, chosenSpacing);
-		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; reel.UpdateSymbolLayout(chosenSymbolSize, chosenSpacing); float x = (chosenSpacing + chosenSymbolSize) * i; reel.transform.localPosition = new Vector3(x, 0f, 0f); }
+		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; /* use lightweight resize to avoid regenerating dummies */ reel.ResizeVisuals(chosenSymbolSize, chosenSpacing); float x = (chosenSpacing + chosenSymbolSize) * i; reel.transform.localPosition = new Vector3(x, 0f, 0f); }
 		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidthComputed / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidthComputed / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
 		// Note: Do NOT call RegenerateAllReelDummies here - that was already done selectively by the caller
 	}

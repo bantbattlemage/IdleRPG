@@ -164,6 +164,8 @@ public class GameReel : MonoBehaviour
 
             // If this symbol was freshly created it has been initialized. Apply the new data for reuse.
             if (sym != null) sym.ApplySymbol(newSymbol);
+            // Ensure visible symbols are shown with full color (not dimmed)
+            var visImg = sym?.CachedImage; if (visImg != null) visImg.color = Color.white;
             if (sym != null) sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             // ensure proper parenting
             if (sym != null) sym.transform.SetParent(symbolRoot, false);
@@ -235,6 +237,8 @@ public class GameReel : MonoBehaviour
             sym.transform.SetParent(symbolRoot, false);
             float y = -step * (i + 1);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
+            // ensure dummy visuals are dimmed when not spinning to match presentation state
+            var imgBottom = sym.CachedImage; if (imgBottom != null) { if (!spinning) imgBottom.color = new Color(0.5f, 0.5f, 0.5f); else imgBottom.color = Color.white; }
             if (def != null) existingSelections?.Add(def);
             bottomDummySymbols.Add(sym);
         }
@@ -258,6 +262,8 @@ public class GameReel : MonoBehaviour
             sym.transform.SetParent(symbolRoot, false);
             float y = step * (activeCount + i);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
+            // ensure dummy visuals are dimmed when not spinning to match presentation state
+            var imgTop = sym.CachedImage; if (imgTop != null) { if (!spinning) imgTop.color = new Color(0.5f, 0.5f, 0.5f); else imgTop.color = Color.white; }
             if (def != null) existingSelections?.Add(def);
             topDummySymbols.Add(sym);
         }
@@ -332,8 +338,12 @@ public class GameReel : MonoBehaviour
         ClearPreSpinTweens();
         BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () =>
         {
-            FallOut(solution, true);
+            // Mark reel as spinning before we spawn the next symbols so SpawnNextReel/GenerateActiveDummies
+            // will treat buffer/next symbols as active (not dimmed). This prevents the incoming strip
+            // from appearing faded while it falls.
             spinning = true;
+            // Now perform the fall-out which will position and animate the incoming symbols
+            FallOut(solution, true);
             eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
         });
     }
@@ -410,6 +420,8 @@ public class GameReel : MonoBehaviour
             SymbolData candidate = (solution != null && solution.Count > i) ? solution[i] : null;
             SymbolData def = ResolveAndPersistSymbol(candidate, tmpCombinedExisting);
             if (symbol != null) symbol.ApplySymbol(def);
+            // Explicitly ensure the incoming visible buffer symbols have correct color state
+            try { var sImg = symbol?.CachedImage; if (sImg != null) sImg.color = spinning ? Color.white : new Color(0.5f, 0.5f, 0.5f); } catch { }
             if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
             tmpNextReelSymbols.Add(symbol);
@@ -447,7 +459,8 @@ public class GameReel : MonoBehaviour
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = -step * (i + 1);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-            var img = sym.CachedImage; if (img != null) { img.color = Color.white; }
+            // ensure dummy visuals are dimmed when not spinning to match presentation state
+            var img = sym.CachedImage; if (img != null) { img.color = !spinning ? new Color(0.5f, 0.5f, 0.5f) : Color.white; }
             if (def != null) tmpCombinedForBuffer.Add(def);
             bufferBottomDummySymbols.Add(sym);
         }
@@ -471,7 +484,8 @@ public class GameReel : MonoBehaviour
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = step * (currentReelData.SymbolCount + i);
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
-            var img = sym.CachedImage; if (img != null) { img.color = Color.white; }
+            // ensure dummy visuals are dimmed when not spinning to match presentation state
+            var img = sym.CachedImage; if (img != null) { img.color = !spinning ? new Color(0.5f, 0.5f, 0.5f) : Color.white; }
             if (def != null) tmpCombinedForBuffer.Add(def);
             bufferTopDummySymbols.Add(sym);
         }
@@ -799,6 +813,26 @@ public class GameReel : MonoBehaviour
         if (!spinning) DimDummySymbols();
     }
 
+    // Public API: update visual sizes/positions without regenerenerating or reassigning symbols/dummies
+    public void ResizeVisuals(float newSymbolSize, float newSpacing)
+    {
+        if (currentReelData == null) return;
+
+        // update stored sizes so other logic remains consistent
+        currentReelData.SetSymbolSize(newSymbolSize, newSpacing);
+
+        // recompute positions for active and dummy lists
+        RecomputeAllPositions();
+
+        // reposition nextSymbolsRoot to preserve correct fall offset
+        float offsetY = ComputeFallOffsetY();
+        if (nextSymbolsRoot != null) nextSymbolsRoot.localPosition = new Vector3(0, offsetY, 0);
+
+        // if not spinning, ensure dummies are reset to normal visual state
+        // After a visuals-only resize we should keep dummies dimmed when not spinning
+        if (!spinning) DimDummySymbols();
+    }
+
     public void RegenerateDummies()
     {
         if (symbolRoot == null) return;
@@ -1043,6 +1077,10 @@ private void ValidateNoSharedInstances()
             if (allocatedPooledSet.Contains(s)) continue; // defensive
             allocatedPooledSet.Add(s);
             if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
+
+            // Ensure reused symbol has clean visual and tween state so it doesn't carry over a dim/rotated state
+            try { s.StopAndClearTweens(); } catch { }
+            try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch { }
             return s;
         }
 
@@ -1057,6 +1095,10 @@ private void ValidateNoSharedInstances()
             if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
             allPooledSymbols.Add(newSym); allPooledSet.Add(newSym);
             allocatedPooledSet.Add(newSym);
+
+            // newly created symbol should start clean
+            try { newSym.StopAndClearTweens(); } catch { }
+            try { var img2 = newSym.CachedImage; if (img2 != null) img2.color = Color.white; } catch { }
             return newSym;
         }
         return null;
@@ -1065,6 +1107,11 @@ private void ValidateNoSharedInstances()
     private void ReleasePooledSymbol(GameSymbol s)
     {
         if (s == null) return;
+
+        // clear tweens and visual state before returning to pool
+        try { s.StopAndClearTweens(); } catch { }
+        try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch { }
+
         allocatedPooledSet.Remove(s);
         // hide the pooled symbol to avoid visual orphaning
         if (s.gameObject.activeSelf) s.gameObject.SetActive(false);
