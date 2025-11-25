@@ -7,6 +7,9 @@ public class PresentationController : Singleton<PresentationController>
 {
 	private List<SlotsPresentationData> slots = new List<SlotsPresentationData>();
 
+	// Whether a grouped presentation session is currently active
+	private bool presentationSessionActive = false;
+
 	public void AddSlotsToPresentation(EventManager eventManager, SlotsEngine parentSlots)
 	{
 		SlotsPresentationData newData = new SlotsPresentationData()
@@ -22,11 +25,7 @@ public class PresentationController : Singleton<PresentationController>
 	private void OnBeginSlotPresentation(object obj)
 	{
 		SlotsEngine slotsToPresent = (SlotsEngine)obj;
-
-		if (SlotConsoleController.Instance != null)
-		{
-			SlotConsoleController.Instance.BeginPresentationSession();
-		}
+		if (slotsToPresent == null) return;
 
 		var reels = slotsToPresent.CurrentReels;
 		if (reels == null || reels.Count == 0) return;
@@ -56,17 +55,64 @@ public class PresentationController : Singleton<PresentationController>
 			: new List<WinData>();
 
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
-		slotsData.SetCurrentWinData(winData);
+		if (slotsData == null) return;
 
-		if (winData.Count > 0)
+		slotsData.SetCurrentWinData(winData);
+		slotsData.SetCurrentGrid(currentSymbolGrid);
+		slotsData.SetReadyToPresent(true);
+		slotsData.SetPresentationCompleted(false);
+
+		// Determine which slots are participating in this presentation group: those that are in Presentation state.
+		var presentingEngines = slots.Where(s => s.slotsEngine != null && s.slotsEngine.CurrentState == State.Presentation).ToList();
+
+		// If any presenting engine hasn't signaled readiness yet, wait until they do (they will call this handler when ready).
+		bool allPresentingReady = presentingEngines.Count > 0 && presentingEngines.All(s => s.readyToPresent);
+
+		if (!presentationSessionActive)
 		{
-			PlayWinlines(slotsToPresent, currentSymbolGrid, winData);
-			// use coroutine instead of DOTween.Sequence to avoid allocations from Sequence/Callback closures
-			StartCoroutine(DelayedCompletePresentation(slotsData, 1f));
+			if (allPresentingReady)
+			{
+				StartGroupPresentation(presentingEngines);
+			}
+			// else: wait for remaining engines to call BeginSlotPresentation
 		}
 		else
 		{
-			CompletePresentation(slotsData);
+			// If session already active (shouldn't normally happen), start this slot immediately
+			StartIndividualPresentation(slotsData);
+		}
+	}
+
+	private void StartGroupPresentation(List<SlotsPresentationData> participants)
+	{
+		if (presentationSessionActive) return;
+		if (participants == null || participants.Count == 0) return;
+
+		presentationSessionActive = true;
+		SlotConsoleController.Instance?.BeginPresentationSession();
+
+		// For now start all participants simultaneously. Structure is in place to sequence or selectively play later.
+		foreach (var p in participants)
+		{
+			StartIndividualPresentation(p);
+		}
+	}
+
+	private void StartIndividualPresentation(SlotsPresentationData p)
+	{
+		if (p == null) return;
+		if (p.presentationStarted) return;
+		p.presentationStarted = true;
+
+		if (p.currentWinData != null && p.currentWinData.Count > 0)
+		{
+			PlayWinlines(p.slotsEngine, p.currentGrid, p.currentWinData);
+			StartCoroutine(DelayedCompletePresentation(p, 1f));
+		}
+		else
+		{
+			// No wins: mark completed immediately (but DO NOT broadcast PresentationComplete yet — wait for group completion)
+			CompletePresentation(p);
 		}
 	}
 
@@ -102,10 +148,51 @@ public class PresentationController : Singleton<PresentationController>
 
 	private void CompletePresentation(SlotsPresentationData slotsToComplete)
 	{
+		if (slotsToComplete == null) return;
+
+		// Mark this slot as completed locally but DO NOT broadcast PresentationComplete yet — wait until group completes.
 		slotsToComplete.SetPresentationCompleted(true);
-		slotsToComplete.slotsEngine.BroadcastSlotsEvent(SlotsEvent.PresentationComplete);
 		slotsToComplete.ClearCurrentWinData();
+
+		// After marking, check if the overall group presentation can finish
+		CheckGroupCompletion();
+	}
+
+	private void CheckGroupCompletion()
+	{
+		if (!presentationSessionActive) return;
+
+		// Participants are those that were in Presentation state when the group started (readyToPresent was set)
+		var participants = slots.Where(s => s.readyToPresent).ToList();
+		if (participants.Count == 0)
+		{
+			// no participants — end session defensively
+			presentationSessionActive = false;
+			SlotConsoleController.Instance?.EndPresentationSession();
+			return;
+		}
+
+		bool allDone = participants.All(p => p.presentationCompleted);
+		if (!allDone) return;
+
+		// All participants finished, now broadcast PresentationComplete for each and end session
+		foreach (var p in participants)
+		{
+			try { p.slotsEngine.BroadcastSlotsEvent(SlotsEvent.PresentationComplete); } catch { }
+		}
+
+		presentationSessionActive = false;
 		SlotConsoleController.Instance?.EndPresentationSession();
+
+		// Reset per-participant staging flags so future spins can reuse structure
+		foreach (var p in participants)
+		{
+			p.SetPresentationCompleted(false);
+			p.SetReadyToPresent(false);
+			p.presentationStarted = false;
+			p.ClearCurrentGrid();
+			p.ClearCurrentWinData();
+		}
 	}
 }
 
@@ -114,8 +201,16 @@ class SlotsPresentationData
 	public EventManager slotsEventManager;
 	public SlotsEngine slotsEngine;
 	public List<WinData> currentWinData;
+	public GameSymbol[] currentGrid;
 	public bool presentationCompleted;
+	public bool readyToPresent;
+	public bool presentationStarted;
+
 	public void SetCurrentWinData(List<WinData> newWinData) { currentWinData = newWinData; }
 	public void ClearCurrentWinData() { currentWinData = null; }
 	public void SetPresentationCompleted(bool complete) { presentationCompleted = complete; }
+
+	public void SetCurrentGrid(GameSymbol[] grid) { currentGrid = grid; }
+	public void ClearCurrentGrid() { currentGrid = null; }
+	public void SetReadyToPresent(bool ready) { readyToPresent = ready; }
 }
