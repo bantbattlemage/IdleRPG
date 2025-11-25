@@ -243,8 +243,8 @@ public class FileDataHandler
 			string fullPath = Path.Combine(dataDirPath, profileId, dataFileName);
 			if (!File.Exists(fullPath))
 			{
-				Debug.LogWarning("Skipping directory when loading all profiles because it does not contain data: "
-					+ profileId);
+				//Debug.LogWarning("Skipping directory when loading all profiles because it does not contain data: "
+				//	+ profileId);
 				continue;
 			}
 

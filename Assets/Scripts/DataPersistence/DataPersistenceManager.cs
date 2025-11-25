@@ -110,7 +110,7 @@ public class DataPersistenceManager : MonoBehaviour
 			selectedProfileId = defaultProfileId;
 		}
 
-		Debug.Log($"Selected data profile {this.selectedProfileId}");
+		//Debug.Log($"Selected data profile {this.selectedProfileId}");
 	}
 
 	/// <summary>
