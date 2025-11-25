@@ -19,8 +19,18 @@ public class GameSymbol : MonoBehaviour
 	// Store original local rotation so tweens can be safely killed/restored
 	private Quaternion originalLocalRotation;
 
+	// Cached reference to owning reel (set by GameReel when creating/allocating symbols)
+	public GameReel OwnerReel { get; set; }
+
+	// Backwards-compatible setter for owners (useful when other code can't access the property)
+	public void SetOwnerReel(GameReel owner)
+	{
+		OwnerReel = owner;
+	}
+
 	private void Awake()
 	{
+		// Cache common components once
 		cachedImage = GetComponent<Image>();
 		cachedRect = GetComponent<RectTransform>();
 		originalLocalRotation = transform.localRotation;
@@ -41,26 +51,26 @@ public class GameSymbol : MonoBehaviour
 	{
 		currentSymbolData = symbol;
 
-		if (cachedImage == null) cachedImage = GetComponent<Image>();
+		var img = CachedImage;
 		if (symbol == null)
 		{
 			// Clear visual state when no symbol provided to avoid showing stale sprites
-			if (cachedImage != null)
+			if (img != null)
 			{
-				cachedImage.enabled = true;
-				cachedImage.sprite = null;
-				cachedImage.color = Color.white;
+				img.enabled = true;
+				img.sprite = null;
+				img.color = Color.white;
 			}
 			return;
 		}
 
 		// Ensure sprite is obtained from the data object (may trigger runtime resolution)
 		var s = symbol.Sprite;
-		if (cachedImage != null)
+		if (img != null)
 		{
-			cachedImage.enabled = true; // ensure image component is enabled so visible sprites render
-			cachedImage.sprite = s;
-			cachedImage.color = Color.white;
+			img.enabled = true; // ensure image component is enabled so visible sprites render
+			img.sprite = s;
+			img.color = Color.white;
 		}
 
 		// ensure transform rotation matches original when applying a new symbol
@@ -69,8 +79,8 @@ public class GameSymbol : MonoBehaviour
 
 	private void OnIdleExit(object obj)
 	{
-		if (cachedImage == null) cachedImage = GetComponent<Image>();
-		cachedImage.color = Color.white;
+		var img = CachedImage;
+		if (img != null) img.color = Color.white;
 		transform.localRotation = originalLocalRotation;
 	}
 
@@ -83,11 +93,8 @@ public class GameSymbol : MonoBehaviour
 			return;
 		}
 
-		// Diagnostic: log when OnSymbolWin is invoked for this instance
-		//try { Debug.Log($"GameSymbol.OnSymbolWin invoked for {name}@{GetInstanceID()} symbolName={(currentSymbolData!=null?currentSymbolData.Name:"(null)")} "); } catch { }
-
 		// Always ensure cachedImage is available
-		if (cachedImage == null) cachedImage = GetComponent<Image>();
+		var img = CachedImage;
 
 		// Choose highlight color based on this symbol's win mode.
 		Color highlight = Color.green; // default for line wins
@@ -111,7 +118,7 @@ public class GameSymbol : MonoBehaviour
 		}
 
 		// Apply color immediately so it's visible even if a tween is restarted
-		if (cachedImage != null) cachedImage.color = highlight;
+		if (img != null) img.color = highlight;
 
 		// Ensure transform rotation is reset before starting a new tween
 		transform.localRotation = originalLocalRotation;
@@ -121,6 +128,18 @@ public class GameSymbol : MonoBehaviour
 		{
 			try { activeTweener.Kill(); } catch { }
 			activeTweener = null;
+		}
+
+		// Use cached OwnerReel instead of GetComponentInParent to avoid expensive calls
+		var parentReel = OwnerReel;
+		if (parentReel != null)
+		{
+			var engine = parentReel.OwnerEngine;
+			if (engine != null && !engine.IsPageActive)
+			{
+				// Do not start DOTween shake when page is hidden
+				return;
+			}
 		}
 
 		// Start a shake rotation tween and ensure rotation is restored when tween ends or is killed

@@ -1054,6 +1054,50 @@ private void ValidateNoSharedInstances()
         return Mathf.Min(estimate, maxReasonable);
     }
 
+    private GameSymbol AcquireFreePooledSymbol()
+    {
+        // Fast path: use stack to pop free symbols
+        while (freePooledStack.Count > 0)
+        {
+            var s = freePooledStack.Pop();
+            if (s == null) continue;
+            if (allocatedPooledSet.Contains(s)) continue; // defensive
+            allocatedPooledSet.Add(s);
+            if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
+
+            // Ensure reused symbol has clean visual and tween state so it doesn't carry over a dim/rotated state
+            try { s.StopAndClearTweens(); } catch { }
+            try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch { }
+
+            // NEW: cache owner reel reference to avoid GetComponentInParent in GameSymbol
+            try { s.OwnerReel = this; } catch { }
+
+            return s;
+        }
+
+        // No free symbol available: create one and return it
+        EnsureRootsCreated();
+        var newSym = CreateSymbolInstance(dummyContainer);
+        if (newSym != null)
+        {
+            // NEW: assign owner before initialization so symbol can reference it immediately
+            try { newSym.OwnerReel = this; } catch { }
+
+            // initialize with non-consuming pick to get a sprite
+            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
+            if (def != null) newSym.InitializeSymbol(def, eventManager);
+            if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
+            allPooledSymbols.Add(newSym); allPooledSet.Add(newSym);
+            allocatedPooledSet.Add(newSym);
+
+            // newly created symbol should start clean
+            try { newSym.StopAndClearTweens(); } catch { }
+            try { var img2 = newSym.CachedImage; if (img2 != null) img2.color = Color.white; } catch { }
+            return newSym;
+        }
+        return null;
+    }
+
     // Robust symbol creation: prefer GameSymbolPool, fallback to manual GameObject if needed
     private GameSymbol CreateSymbolInstance(Transform parent)
     {
@@ -1064,6 +1108,8 @@ private void ValidateNoSharedInstances()
                 var s = cachedSymbolPool.Get(parent);
                 if (s != null)
                 {
+                    // assign owner when pulled from pool
+                    try { s.OwnerReel = this; } catch { }
                     return s;
                 }
             }
@@ -1080,44 +1126,11 @@ private void ValidateNoSharedInstances()
         // ensure it has an Image & RectTransform for layout - add minimal components if missing
         if (go.GetComponent<UnityEngine.UI.Image>() == null) go.AddComponent<UnityEngine.UI.Image>();
         if (go.GetComponent<RectTransform>() == null) go.AddComponent<RectTransform>();
+
+        // assign owner for newly created instance
+        try { gs.OwnerReel = this; } catch { }
+
         return gs;
-    }
-
-    private GameSymbol AcquireFreePooledSymbol()
-    {
-        // Fast path: use stack to pop free symbols
-        while (freePooledStack.Count > 0)
-        {
-            var s = freePooledStack.Pop();
-            if (s == null) continue;
-            if (allocatedPooledSet.Contains(s)) continue; // defensive
-            allocatedPooledSet.Add(s);
-            if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
-
-            // Ensure reused symbol has clean visual and tween state so it doesn't carry over a dim/rotated state
-            try { s.StopAndClearTweens(); } catch { }
-            try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch { }
-            return s;
-        }
-
-        // No free symbol available: create one and return it
-        EnsureRootsCreated();
-        var newSym = CreateSymbolInstance(dummyContainer);
-        if (newSym != null)
-        {
-            // initialize with non-consuming pick to get a sprite
-            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
-            if (def != null) newSym.InitializeSymbol(def, eventManager);
-            if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
-            allPooledSymbols.Add(newSym); allPooledSet.Add(newSym);
-            allocatedPooledSet.Add(newSym);
-
-            // newly created symbol should start clean
-            try { newSym.StopAndClearTweens(); } catch { }
-            try { var img2 = newSym.CachedImage; if (img2 != null) img2.color = Color.white; } catch { }
-            return newSym;
-        }
-        return null;
     }
 
     private void ReleasePooledSymbol(GameSymbol s)
