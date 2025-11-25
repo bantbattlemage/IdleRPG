@@ -50,44 +50,10 @@ public class PresentationController : Singleton<PresentationController>
 
 		GameSymbol[] currentSymbolGrid = Helpers.CombineColumnsToGrid(visualColumns);
 
-		// Build evaluation winlines: clone asset winlines first (preserve original asset state)
-		List<WinlineDefinition> evalWinlines = new List<WinlineDefinition>();
-		var assetWinlines = slotsToPresent.CurrentSlotsData?.WinlineDefinitions;
-		if (assetWinlines != null)
-		{
-			for (int i = 0; i < assetWinlines.Count; i++)
-			{
-				var wl = assetWinlines[i];
-				if (wl == null) continue;
-				// create runtime clone instead of editing asset in-place (replaces prior reflection mutation semantics)
-				var clone = wl.CloneForRuntime();
-				evalWinlines.Add(clone);
-			}
-		}
-
-		int maxRows = 0; for (int i = 0; i < rowsPerColumn.Length; i++) if (rowsPerColumn[i] > maxRows) maxRows = rowsPerColumn[i];
-		// Add missing straight lines for each row index that is not already represented
-		for (int r = 0; r < maxRows; r++)
-		{
-			bool exists = evalWinlines.Any(w => w.Pattern == WinlineDefinition.PatternType.StraightAcross && w.RowIndex == r);
-			if (!exists)
-			{
-				var temp = WinlineDefinition.CreateRuntimeStraightAcross(r, 1);
-				evalWinlines.Add(temp);
-			}
-		}
-
-		// Prefer the wins already computed at spin completion to avoid evaluator/presentation snapshot mismatch.
-		List<WinData> winData = null;
-		if (WinEvaluator.Instance != null && WinEvaluator.Instance.CurrentSpinWinData != null && WinEvaluator.Instance.CurrentSpinWinData.Count > 0)
-		{
-			winData = WinEvaluator.Instance.CurrentSpinWinData;
-		}
-		else
-		{
-			// Fallback: evaluate wins from the current visual grid
-			winData = WinEvaluator.Instance != null ? WinEvaluator.Instance.EvaluateWinsFromColumns(visualColumns, evalWinlines) : new List<WinData>();
-		}
+		// Use a single source of truth for win information: prefer the wins computed by the evaluator at spin completion.
+		List<WinData> winData = WinEvaluator.Instance != null && WinEvaluator.Instance.CurrentSpinWinData != null
+			? WinEvaluator.Instance.CurrentSpinWinData
+			: new List<WinData>();
 
 		SlotsPresentationData slotsData = slots.FirstOrDefault(x => x.slotsEngine == slotsToPresent);
 		slotsData.SetCurrentWinData(winData);
