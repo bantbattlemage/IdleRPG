@@ -228,6 +228,7 @@ public class GameReel : MonoBehaviour
             if (sym == null) // defensive fallback
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
+                try { sym?.SetOwnerReel(this); } catch { }
                 SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
@@ -254,6 +255,7 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
+                try { sym?.SetOwnerReel(this); } catch { }
                 SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -505,9 +507,10 @@ public class GameReel : MonoBehaviour
         for (int i = 0; i < bottomCount; i++)
         {
             var sym = AcquireFreePooledSymbol();
-            if (sym == null)
+            if (sym == null) // defensive fallback
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
+                try { sym?.SetOwnerReel(this); } catch { }
                 SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -533,6 +536,7 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
+                try { sym?.SetOwnerReel(this); } catch { }
                 SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -605,6 +609,7 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(root) : GameSymbolPool.Instance?.Get(root);
+                try { sym?.SetOwnerReel(this); } catch { }
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -1070,7 +1075,7 @@ private void ValidateNoSharedInstances()
             try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch { }
 
             // NEW: cache owner reel reference to avoid GetComponentInParent in GameSymbol
-            try { s.OwnerReel = this; } catch { }
+            try { s.SetOwnerReel(this); } catch { }
 
             return s;
         }
@@ -1081,7 +1086,7 @@ private void ValidateNoSharedInstances()
         if (newSym != null)
         {
             // NEW: assign owner before initialization so symbol can reference it immediately
-            try { newSym.OwnerReel = this; } catch { }
+            try { newSym.SetOwnerReel(this); } catch { }
 
             // initialize with non-consuming pick to get a sprite
             SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
@@ -1109,7 +1114,7 @@ private void ValidateNoSharedInstances()
                 if (s != null)
                 {
                     // assign owner when pulled from pool
-                    try { s.OwnerReel = this; } catch { }
+                    try { s.SetOwnerReel(this); } catch { }
                     return s;
                 }
             }
@@ -1128,7 +1133,7 @@ private void ValidateNoSharedInstances()
         if (go.GetComponent<RectTransform>() == null) go.AddComponent<RectTransform>();
 
         // assign owner for newly created instance
-        try { gs.OwnerReel = this; } catch { }
+        try { gs.SetOwnerReel(this); } catch { }
 
         return gs;
     }
