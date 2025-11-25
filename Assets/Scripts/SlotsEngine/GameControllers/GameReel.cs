@@ -93,6 +93,7 @@ public class GameReel : MonoBehaviour
     private List<GameSymbol> tmpNextReelSymbols = new List<GameSymbol>();
 
     private const float ResumeStaggerStep = 0.025f; // NEW: per-index stagger applied when resuming from page suspension
+    private const float KickupDuration = 0.25f; // NEW: unified duration used for initial kickup and landing bounce timing
 
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition, SlotsEngine owner)
     {
@@ -338,22 +339,40 @@ public class GameReel : MonoBehaviour
         completeOnNextSpin = false;
 
         ClearPreSpinTweens();
-        BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: 0.25f, onComplete: () =>
+
+        if (pageActive)
         {
-            spinning = true;
-            if (!pageActive)
+            // normal visual kickup
+            BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: KickupDuration, onComplete: () =>
             {
-                pendingLandingSolution = solution; // store intended first solution
-                suspendedAwaitingResume = true;
-                if (waitForPageResumeCoroutine != null) StopCoroutine(waitForPageResumeCoroutine);
-                waitForPageResumeCoroutine = StartCoroutine(WaitForInitialPageActivation());
-            }
-            else
-            {
+                spinning = true;
                 FallOut(solution, true);
-            }
-            eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
-        });
+                eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
+            });
+        }
+        else
+        {
+            // skip tween, but preserve timing before broadcasting ReelSpinStarted and starting fallout (or suspending)
+            StartCoroutine(SkipKickupDelay(solution));
+        }
+    }
+
+    private IEnumerator SkipKickupDelay(List<SymbolData> solution)
+    {
+        yield return new WaitForSeconds(KickupDuration);
+        spinning = true;
+        if (!pageActive)
+        {
+            pendingLandingSolution = solution; // store intended first solution
+            suspendedAwaitingResume = true;
+            if (waitForPageResumeCoroutine != null) StopCoroutine(waitForPageResumeCoroutine);
+            waitForPageResumeCoroutine = StartCoroutine(WaitForInitialPageActivation());
+        }
+        else
+        {
+            FallOut(solution, true);
+        }
+        eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
     }
 
     private IEnumerator WaitForInitialPageActivation()
@@ -731,11 +750,18 @@ public class GameReel : MonoBehaviour
 
         if (completeOnNextSpin)
         {
-            BounceReel(Vector3.down, peak: 0.25f, duration: 0.25f, onComplete: () => CompleteReelSpin(sol));
+            if (pageActive)
+            {
+                BounceReel(Vector3.down, peak: 0.25f, duration: KickupDuration, onComplete: () => CompleteReelSpin(sol));
+            }
+            else
+            {
+                // skip landing bounce visuals but preserve timing
+                StartCoroutine(SkipLandingBounceDelay(sol));
+            }
         }
         else
         {
-            // If page not active, suspend before starting next cycle
             if (!pageActive)
             {
                 suspendedAwaitingResume = true;
@@ -749,42 +775,10 @@ public class GameReel : MonoBehaviour
         }
     }
 
-    private IEnumerator WaitForPageResume(List<SymbolData> solution)
+    private IEnumerator SkipLandingBounceDelay(List<SymbolData> solution)
     {
-        // Wait until page becomes active OR a stop is requested (completeOnNextSpin gets set)
-        while (!pageActive && !completeOnNextSpin)
-        {
-            yield return null;
-        }
-        suspendedAwaitingResume = false;
-        waitForPageResumeCoroutine = null;
-        if (completeOnNextSpin)
-        {
-            // finalize spin immediately (no new fallout)
-            spinning = false;
-            if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled)
-            {
-                var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray();
-                Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]");
-            }
-            for (int i = 0; i < symbols.Count; i++) eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]);
-            eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID);
-        }
-        else
-        {
-            float delay = ID * ResumeStaggerStep;
-            StartCoroutine(ResumeFallOutAfterDelay(solution, delay, false));
-        }
-    }
-
-    private void OnDestroy()
-    {
-        // Ensure any running coroutines are stopped to avoid lingering callbacks
-        if (beginSpinCoroutine != null) StopCoroutine(beginSpinCoroutine);
-        if (stopReelCoroutine != null) StopCoroutine(stopReelCoroutine);
-        if (activeSpinCoroutines[0] != null) StopCoroutine(activeSpinCoroutines[0]);
-        if (activeSpinCoroutines[1] != null) StopCoroutine(activeSpinCoroutines[1]);
-        if (waitForPageResumeCoroutine != null) StopCoroutine(waitForPageResumeCoroutine);
+        yield return new WaitForSeconds(KickupDuration);
+        CompleteReelSpin(solution);
     }
 
     private void CompleteReelSpin(List<SymbolData> solution)
@@ -1236,4 +1230,22 @@ private void ValidateNoSharedInstances()
         }
     }
 #endif
+
+    // Ensure WaitForPageResume is declared before usage in LandingTweenCompleted
+    private IEnumerator WaitForPageResume(List<SymbolData> solution)
+    {
+        while (!pageActive && !completeOnNextSpin) yield return null;
+        suspendedAwaitingResume = false; waitForPageResumeCoroutine = null;
+        if (completeOnNextSpin)
+        {
+            spinning = false;
+            for (int i = 0; i < symbols.Count; i++) eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]);
+            eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID);
+        }
+        else
+        {
+            float delay = ID * ResumeStaggerStep;
+            StartCoroutine(ResumeFallOutAfterDelay(solution, delay, false));
+        }
+    }
 }
