@@ -31,7 +31,6 @@ public class GameSymbol : MonoBehaviour
 		eventManager = slotsEventManager;
 
 		// register to slot events
-		eventManager.RegisterEvent(SlotsEvent.SymbolLanded, OnSymbolLanded);
 		eventManager.RegisterEvent(SlotsEvent.SymbolWin, OnSymbolWin);
 		eventManager.RegisterEvent(State.Idle, "Exit", OnIdleExit);
 
@@ -138,21 +137,10 @@ public class GameSymbol : MonoBehaviour
 		}
 	}
 
-	private void OnSymbolLanded(object obj)
-	{
-		GameSymbol symbol = (GameSymbol)obj;
-
-		if (symbol != this)
-		{
-			return;
-		}
-	}
-
 	public void UnregisterFromEventManager()
 	{
 		if (eventManager == null) return;
 
-		eventManager.UnregisterEvent(SlotsEvent.SymbolLanded, OnSymbolLanded);
 		eventManager.UnregisterEvent(SlotsEvent.SymbolWin, OnSymbolWin);
 		eventManager.UnregisterEvent(State.Idle, "Exit", OnIdleExit);
 
