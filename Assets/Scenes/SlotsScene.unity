@@ -970,7 +970,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 51f645173120a004f8d8e1128afcf595, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WinlineEvaluator
-  LoggingEnabled: 1
+  LoggingEnabled: 0
   MaxSpinLogs: 1
 --- !u!114 &1853545769 stripped
 MonoBehaviour:

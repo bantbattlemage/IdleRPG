@@ -34,5 +34,11 @@ public class SlotsDisplayPage : MonoBehaviour
 	public void ToggleRenderers(bool shouldEnable)
 	{
 		transform.GetComponentsInChildren<Canvas>().ToList().ForEach(x => { x.enabled = shouldEnable; });
+		// NEW: inform engines of page visibility so they can pause spins
+		foreach (var engine in slotsToDisplay)
+		{
+			if (engine == null) continue;
+			try { engine.SetPageActive(shouldEnable); } catch { }
+		}
 	}
 }

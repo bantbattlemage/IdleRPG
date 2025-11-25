@@ -13,6 +13,16 @@ public class SlotsEngine : MonoBehaviour
 	public State CurrentState => stateMachine.CurrentState;
 	public void SetState(State state) => stateMachine.SetState(state);
 
+	// NEW: page activation flag for suspension
+	private bool pageActive = true;
+	public void SetPageActive(bool active)
+	{
+		pageActive = active;
+		foreach (var r in reels)
+			try { r?.SetPageActive(active); } catch { }
+	}
+	public bool IsPageActive => pageActive;
+
 	/// <summary>
 	/// Creates a fresh `SlotsData` instance from the provided definition and initializes the engine.
 	/// </summary>
