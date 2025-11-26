@@ -28,6 +28,9 @@ public class SymbolData : Data
 	// New: integer match group identifier (set by definition). Use -1 to indicate unset/null.
 	[SerializeField] private int matchGroupId = -1;
 
+	[SerializeField] private ScriptableObject eventTriggerScript;
+	[NonSerialized] public IEventTriggerScript RuntimeEventTrigger;
+
 	public string Name => name;
 	public int MatchGroupId => matchGroupId;
 	public Sprite Sprite
@@ -64,6 +67,16 @@ public class SymbolData : Data
 
 	public int MaxPerReel => maxPerReel;
 
+	public ScriptableObject EventTriggerScript
+	{
+		get => eventTriggerScript;
+		set
+		{
+			eventTriggerScript = value;
+			RuntimeEventTrigger = eventTriggerScript as IEventTriggerScript;
+		}
+	}
+
 	// Backwards-compatible constructor (previous signature)
 	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true)
 		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1, -1, -1)
@@ -86,6 +99,7 @@ public class SymbolData : Data
 		totalCountTrigger = totalTrigger;
 		maxPerReel = maxPerReelParam;
 		matchGroupId = matchGroup;
+		RuntimeEventTrigger = eventTriggerScript as IEventTriggerScript;
 	}
 
 	/// <summary>

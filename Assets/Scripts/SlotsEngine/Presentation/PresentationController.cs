@@ -47,6 +47,7 @@ public class PresentationController : Singleton<PresentationController>
         sd.SetCurrentWinData(winData);
         sd.SetReadyToPresent(true);
         sd.SetPresentationCompleted(false);
+        sd.ResetPendingCallbacks();
 
         // Determine participants (those currently in Presentation state)
         var presentingEngines = slots.Where(s => s.slotsEngine != null && s.slotsEngine.CurrentState == State.Presentation).ToList();
@@ -63,24 +64,27 @@ public class PresentationController : Singleton<PresentationController>
         else
         {
             // if session already active, start this slot immediately as part of the session
-            if (sd.currentWinData != null) PlayWinlines(sd.slotsEngine, sd.currentGrid, sd.currentWinData);
+            if (sd.currentWinData != null) PlayWinlines(sd, sd.slotsEngine, sd.currentGrid, sd.currentWinData);
             float d = (sd.currentWinData != null && sd.currentWinData.Count > 0) ? 1f : 0f;
             StartCoroutine(NotifyPresentationCompleteAfterDelay(sd, d));
         }
     }
 
-    private void PlayWinlines(SlotsEngine slotsToPresent, GameSymbol[] grid, List<WinData> winData)
+    private void PlayWinlines(SlotsPresentationData sd, SlotsEngine slotsToPresent, GameSymbol[] grid, List<WinData> winData)
     {
         int gridLen = grid != null ? grid.Length : 0;
         foreach (WinData w in winData)
         {
             if (w.WinningSymbolIndexes != null)
             {
+                // collect distinct triggers for this evaluated win so each is executed once
+                var distinctTriggers = new List<IEventTriggerScript>();
+
                 foreach (int index in w.WinningSymbolIndexes)
                 {
                     if (index < 0 || index >= gridLen) continue; // skip invalid indexes
                     var gs = grid[index]; if (gs == null) continue; // skip null slots
-                    // Highlight symbol directly instead of broadcasting per-symbol events.
+
                     try
                     {
                         bool doShake = true;
@@ -95,9 +99,41 @@ public class PresentationController : Singleton<PresentationController>
                                 case EvaluatorCore.SymbolWinMode.TotalCount: hi = Color.red; break;
                             }
                         }
-                        gs.HighlightForWin(hi, doShake);
+
+                        // determine if this symbol should play the standard highlight
+                        var runtimeTrigger = gs.CurrentSymbolData?.RuntimeEventTrigger;
+                        bool playStandard = true;
+                        if (runtimeTrigger is WinEventTrigger et)
+                        {
+                            playStandard = et.PlayStandardPresentation;
+                        }
+
+                        if (playStandard)
+                        {
+                            gs.HighlightForWin(hi, doShake);
+                        }
+
+                        // collect distinct triggers to execute once-per-win
+                        if (runtimeTrigger != null && !distinctTriggers.Contains(runtimeTrigger))
+                        {
+                            distinctTriggers.Add(runtimeTrigger);
+                        }
                     }
                     catch { }
+                }
+
+                // execute each distinct trigger once for this evaluated win
+                foreach (var trigger in distinctTriggers)
+                {
+                    sd.IncrementPendingCallbacks();
+                    try
+                    {
+                        trigger.Execute(w, () => { sd.DecrementPendingCallbacks(); });
+                    }
+                    catch
+                    {
+                        sd.DecrementPendingCallbacks();
+                    }
                 }
             }
             string individualMsg = w.LineIndex >= 0 ? $"Won {w.WinValue} on line {w.LineIndex}!" : (w.WinningSymbolIndexes?.Length <= 1 ? $"Won {w.WinValue}!" : $"Won {w.WinValue} ({w.WinningSymbolIndexes.Length} symbols)!");
@@ -159,7 +195,7 @@ public class PresentationController : Singleton<PresentationController>
             if (p == null) continue;
             if (p.currentWinData != null && p.currentWinData.Count > 0)
             {
-                PlayWinlines(p.slotsEngine, p.currentGrid, p.currentWinData);
+                PlayWinlines(p, p.slotsEngine, p.currentGrid, p.currentWinData);
                 StartCoroutine(NotifyPresentationCompleteAfterDelay(p, 1f));
             }
             else
@@ -172,6 +208,13 @@ public class PresentationController : Singleton<PresentationController>
     private System.Collections.IEnumerator NotifyPresentationCompleteAfterDelay(SlotsPresentationData sd, float delay)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
+
+        // wait for any event trigger executions to complete
+        while (sd.PendingCallbacks > 0)
+        {
+            yield return null;
+        }
+
         try { sd.slotsEngine.BroadcastSlotsEvent(SlotsEvent.PresentationComplete); } catch { }
         sd.SetPresentationCompleted(true);
         sd.ClearCurrentWinData();
@@ -188,6 +231,13 @@ class SlotsPresentationData
     public GameSymbol[] currentGrid;
     public bool presentationCompleted;
     public bool readyToPresent;
+    private int pendingCallbacks;
+
+    public int PendingCallbacks { get { return pendingCallbacks; } }
+
+    public void ResetPendingCallbacks() { pendingCallbacks = 0; }
+    public void IncrementPendingCallbacks() { pendingCallbacks++; }
+    public void DecrementPendingCallbacks() { pendingCallbacks = Mathf.Max(0, pendingCallbacks - 1); }
 
     public void SetCurrentWinData(List<WinData> newWinData) { currentWinData = newWinData; }
     public void ClearCurrentWinData() { currentWinData = null; }

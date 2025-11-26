@@ -29,8 +29,12 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 	// New: integer match group identifier. -1 = unset; when unset, a stable hash of the asset name is used at runtime.
 	[SerializeField] private int matchGroupId = -1;
 
+	// New: optional event trigger script to run when awarded (for PayScaling.EventTrigger)
+	[SerializeField] private ScriptableObject eventTriggerScript;
+
 	public string SymbolName => symbolName;
 	public Sprite SymbolSprite => symbolSprite;
+	public ScriptableObject EventTriggerScript => eventTriggerScript;
 
 	/// <summary>
 	/// Returns an integer identifier used to group symbols for matching. If the serialized id is -1,
@@ -81,7 +85,10 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 	public override SymbolData CreateInstance()
 	{
 		// pass match group id and definition asset name into runtime SymbolData
-		return new SymbolData(symbolName, symbolSprite, BaseValue, MinWinDepth, weight, payScaling, isWild, allowWildMatch, winMode, totalCountTrigger, maxPerReel, MatchGroupId);
+		return new SymbolData(symbolName, symbolSprite, BaseValue, MinWinDepth, weight, payScaling, isWild, allowWildMatch, winMode, totalCountTrigger, maxPerReel, MatchGroupId)
+		{
+			EventTriggerScript = eventTriggerScript
+		};
 	}
 
 	public override void InitializeDefaults()
@@ -97,5 +104,6 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 		totalCountTrigger = -1;
 		maxPerReel = -1;
 		matchGroupId = -1;
+		eventTriggerScript = null;
 	}
 }

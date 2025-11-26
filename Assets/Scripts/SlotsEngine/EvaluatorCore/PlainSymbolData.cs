@@ -5,7 +5,8 @@ namespace EvaluatorCore
 	public enum PayScaling
 	{
 		DepthSquared = 0,
-		PerSymbol = 1
+		PerSymbol = 1,
+		EventTrigger = 2
 	}
 
 	public enum SymbolWinMode

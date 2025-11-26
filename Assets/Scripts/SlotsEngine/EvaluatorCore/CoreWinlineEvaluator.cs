@@ -48,7 +48,7 @@ namespace EvaluatorCore
         // Helper: true when symbol is a paying LineMatch trigger (can start a line win)
         private static bool IsPayingLineTrigger(PlainSymbolData s)
         {
-            return s != null && s.WinMode == SymbolWinMode.LineMatch && s.MinWinDepth >= 0 && s.BaseValue > 0;
+            return s != null && s.WinMode == SymbolWinMode.LineMatch && s.MinWinDepth >= 0 && (s.BaseValue > 0 || s.PayScaling == PayScaling.EventTrigger);
         }
 
         // Helper: true when symbol is a wild but not a paying LineMatch trigger.
@@ -212,7 +212,7 @@ namespace EvaluatorCore
             for (int idx = 0; idx < grid.Length; idx++)
             {
                 var cell = grid[idx]; if (cell == null) continue; if (cell.IsWild) continue;
-                if (cell.WinMode == SymbolWinMode.SingleOnReel && cell.BaseValue > 0)
+                if (cell.WinMode == SymbolWinMode.SingleOnReel && (cell.BaseValue > 0 || cell.PayScaling == PayScaling.EventTrigger))
                 {
                     long scaled = cell.BaseValue;
                     switch (cell.PayScaling)
@@ -231,7 +231,7 @@ namespace EvaluatorCore
                     if (processed.Contains(groupId)) continue;
                     processed.Add(groupId);
                     if (cell.TotalCountTrigger <= 0) continue;
-                    if (cell.BaseValue <= 0) continue;
+                    if (cell.BaseValue <= 0 && cell.PayScaling != PayScaling.EventTrigger) continue;
 
                     var matching = new List<int>(); int exactMatches = 0;
                     for (int j = 0; j < grid.Length; j++)

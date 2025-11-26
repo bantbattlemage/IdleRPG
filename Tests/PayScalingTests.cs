@@ -106,6 +106,7 @@ namespace WinlineEvaluator.PayScalingTests
                             scaled = (long)baseVal * matchCount;
                             break;
                         default:
+                            // EventTrigger and other unknown scalings do not change payout at evaluator stage
                             scaled = baseVal; break;
                     }
                     long total = scaled * winMultipliers[i] * creditCostArg; if (total > int.MaxValue) total = int.MaxValue;
@@ -237,6 +238,38 @@ namespace WinlineEvaluator.PayScalingTests
         }
 
         [Test]
+        public void LineMatch_EventTrigger_DoesNotAffectPAYOUT()
+        {
+            int cols = 3; int[] rows = new int[] { 1, 1, 1 };
+            var a = new SymbolDataPS("A", 10, 1, false, SymbolWinMode.LineMatch, -1, 1, PayScaling.EventTrigger);
+            var b = new SymbolDataPS("A", 10, 1, false, SymbolWinMode.LineMatch, -1, 1, PayScaling.EventTrigger);
+            var c = new SymbolDataPS("A", 10, 1, false, SymbolWinMode.LineMatch, -1, 1, PayScaling.EventTrigger);
+            var grid = new SymbolDataPS[] { a, b, c };
+            var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
+            var multipliers = new List<int> { 1 };
+            var ev = new PayScalingEvaluator();
+            var wins = ev.EvaluateWins(grid, cols, rows, winlines, multipliers, 1);
+            Assert.AreEqual(1, wins.Count);
+            // EventTrigger should not scale; default evaluator behavior uses base value
+            Assert.AreEqual(10, wins[0].WinValue);
+        }
+
+        [Test]
+        public void TotalCount_EventTrigger_DoesNotAffectPayout()
+        {
+            int cols = 3; int[] rows = new int[] { 1, 1, 1 };
+            var a = new SymbolDataPS("A", 5, -1, false, SymbolWinMode.TotalCount, 2, 7, PayScaling.EventTrigger);
+            var b = new SymbolDataPS("A", 5, -1, false, SymbolWinMode.TotalCount, 2, 7, PayScaling.EventTrigger);
+            var c = new SymbolDataPS("A", 5, -1, false, SymbolWinMode.TotalCount, 2, 7, PayScaling.EventTrigger);
+            var grid = new SymbolDataPS[] { a, b, c };
+            var ev = new PayScalingEvaluator();
+            var wins = ev.EvaluateWins(grid, cols, rows, new List<int[]>(), new List<int>(), 1);
+            Assert.AreEqual(1, wins.Count);
+            // default/unknown scaling -> base value
+            Assert.AreEqual(5, wins[0].WinValue);
+        }
+
+        [Test]
         public void TotalCount_PerSymbol_PaysBaseTimesCount()
         {
             int cols = 3; int[] rows = new int[] { 1, 1, 1 };
@@ -262,6 +295,24 @@ namespace WinlineEvaluator.PayScalingTests
             var wins = ev.EvaluateWins(grid, cols, rows, new List<int[]>(), new List<int>(), 1);
             Assert.AreEqual(1, wins.Count);
             Assert.AreEqual(10, wins[0].WinValue);
+        }
+
+        // EventTrigger: evaluator produces one WinData per evaluated win. Presentation will invoke event once per WinData.
+        [Test]
+        public void EventTrigger_WinProduced_OncePerEvaluatedWin()
+        {
+            int cols = 3; int[] rows = new int[] { 1, 1, 1 };
+            var a = new SymbolDataPS("A", 5, 1, false, SymbolWinMode.LineMatch, -1, 1, PayScaling.EventTrigger);
+            var b = new SymbolDataPS("A", 5, 1, false, SymbolWinMode.LineMatch, -1, 1, PayScaling.EventTrigger);
+            var c = new SymbolDataPS("A", 5, 1, false, SymbolWinMode.LineMatch, -1, 1, PayScaling.EventTrigger);
+            var grid = new SymbolDataPS[] { a, b, c };
+            var winlines = new List<int[]> { new int[] { 0, 1, 2 } };
+            var ev = new PayScalingEvaluator();
+            var wins = ev.EvaluateWins(grid, cols, rows, winlines, new List<int> { 1 }, 1);
+            Assert.AreEqual(1, wins.Count, "Evaluator should produce one WinData for the matching line");
+            var indexes = wins[0].WinningSymbolIndexes;
+            Assert.IsNotNull(indexes);
+            CollectionAssert.AreEqual(new int[] { 0, 1, 2 }, indexes, "Winning indexes should reflect the contiguous match for the win");
         }
     }
 }

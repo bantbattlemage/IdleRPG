@@ -184,6 +184,29 @@ namespace WinlineEvaluator.Tests
         }
 
         [Test]
+        public void EventTrigger_TotalCount_WithZeroBase_ProducesWin()
+        {
+            var cnt = new SymbolData("CNT", 0, -1, false, SymbolWinMode.TotalCount, PayScaling.EventTrigger, totalCountTrigger: 2, matchGroupId: 11);
+            var grid = new[] { cnt, cnt, cnt };
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid, 3, new[] { 1, 1, 1 }, new List<int[]>(), new List<int>());
+            Assert.AreEqual(1, wins.Count, "EventTrigger TotalCount should produce a win even when BaseValue is zero");
+            Assert.AreEqual(0, wins[0].Value, "WinValue should reflect BaseValue (zero) for EventTrigger symbols");
+            CollectionAssert.AreEqual(new int[] { 0, 1, 2 }, wins[0].Indexes);
+        }
+
+        [Test]
+        public void EventTrigger_SingleOnReel_WithZeroBase_ProducesInstances()
+        {
+            var s = new SymbolData("S", baseValue: 0, minWinDepth: -1, isWild: false, winMode: SymbolWinMode.SingleOnReel, scaling: PayScaling.EventTrigger);
+            var grid = new[] { s, s, s };
+            var ev = new WinlineEvaluator();
+            var wins = ev.EvaluateWins(grid, 3, new[] { 1, 1, 1 }, new List<int[]>(), new List<int>());
+            Assert.AreEqual(3, wins.Count, "SingleOnReel EventTrigger symbols should produce one WinData per instance even with zero BaseValue");
+            Assert.AreEqual(0, wins.Sum(x => x.Value));
+        }
+
+        [Test]
         public void TotalCount_IgnoresWilds_GroupAwards()
         {
             var cnt = SymCount(); var w = WildNP();

@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SymbolDefinition
   symbolName: B
   symbolSprite: {fileID: 21300000, guid: c1fc39e782e1fdc458c44c191452dae0, type: 3}
-  baseValue: 5
+  baseValue: 0
   minWinDepth: 3
-  payScaling: 1
+  payScaling: 2
   weight: 1
   isWild: 0
   allowWildMatch: 1
@@ -24,3 +24,4 @@ MonoBehaviour:
   totalCountTrigger: 3
   maxPerReel: 1
   matchGroupId: -1
+  eventTriggerScript: {fileID: 11400000, guid: e976f7a91d628d5449e55914ba42a6b6, type: 2}
