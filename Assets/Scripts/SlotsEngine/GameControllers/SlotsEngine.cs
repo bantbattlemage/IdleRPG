@@ -263,11 +263,34 @@ public class SlotsEngine : MonoBehaviour
 		{
 			ReelData data = currentSlotsData.CurrentReelData[i]; GameObject g = Instantiate(reelPrefab, reelsGroup.transform); GameReel reel = g.GetComponent<GameReel>();
 			if (data.CurrentReelStrip != null) reel.InitializeReel(data, i, eventManager, data.CurrentReelStrip, this); else reel.InitializeReel(data, i, eventManager, data.DefaultReelStrip, this);
-			g.transform.localPosition = new Vector3((data.SymbolSpacing + data.SymbolSize) * i, 0, 0); reels.Add(reel);
+			// Defer precise horizontal positioning until after all reels are created to avoid incremental drift
+			reels.Add(reel);
 		}
+
 		// Prewarm per-reel pools immediately after creating reels to avoid gaps on first spins
 		foreach (var r in reels) r?.PrewarmPooledSymbols();
-		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidth / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidth / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); reelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0); currentReelsGroup = reelsGroup;
+
+		// Compute stable centered X positions using a single step value (derived from the first reel definition)
+		if (reels.Count > 0)
+		{
+			ReelData reelDef = currentSlotsData.CurrentReelData[0];
+			float stepX = reelDef.SymbolSize + reelDef.SymbolSpacing;
+			int n = reels.Count;
+			// startX positions the first reel so that reels are centered around x=0
+			float startX = -((n - 1) * stepX) / 2f;
+			for (int i = 0; i < reels.Count; i++)
+			{
+				var g = reels[i]?.gameObject;
+				if (g != null) g.transform.localPosition = new Vector3(startX + stepX * i, 0f, 0f);
+			}
+
+			// Compute vertical centering based on tallest reel (max symbol rows)
+			int maxRows = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+			float stepY = reelDef.SymbolSize + reelDef.SymbolSpacing;
+			float startY = -((maxRows - 1) * stepY) / 2f;
+			reelsGroup.transform.localPosition = new Vector3(0f, startY, 0f);
+		}
+		currentReelsGroup = reelsGroup;
 		RegenerateAllReelDummies();
 
 		// Prewarm the GameSymbol pool to avoid runtime expansion: estimate needed based on reels * max symbols per reel
@@ -288,95 +311,9 @@ public class SlotsEngine : MonoBehaviour
 		catch { }
 	}
 
-	private void RegenerateAllReelDummies()
+	public void RegenerateAllReelDummies()
 	{
 		foreach (var r in reels) if (r != null) r.RegenerateDummies();
-	}
-
-	/// <summary>
-	/// Regenerates dummies for all reels when a height change in one reel affects the max height context.
-	/// This is called from GameReel.SetSymbolCount when it detects a height change that impacts other reels.
-	/// </summary>
-	public void RegenerateAllReelDummiesForHeightChange()
-	{
-		foreach (var r in reels) if (r != null) r.RegenerateDummies();
-	}
-
-	/// <summary>
-	/// Adds a new reel to the right side using the provided `ReelData` and repositions existing reels.
-	/// Broadcasts a ReelAdded event.
-	/// </summary>
-	public void AddReel(ReelData newReelData)
-	{
-		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot add reel while spinning."); return; }
-		if (currentSlotsData == null) throw new InvalidOperationException("CurrentSlotsData is null");
-		if (currentSlotsData.CurrentReelData.Count > 0) { var template = currentSlotsData.CurrentReelData[0]; newReelData.SetSymbolSize(template.SymbolSize, template.SymbolSpacing); }
-		currentSlotsData.AddNewReel(newReelData); ReelDataManager.Instance.AddNewData(newReelData); SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
-		if (currentReelsGroup == null) { SpawnReels(reelsRootTransform); return; }
-		GameObject g = Instantiate(reelPrefab, currentReelsGroup); GameReel reel = g.GetComponent<GameReel>(); int newIndex = reels.Count;
-		if (newReelData.CurrentReelStrip != null) reel.InitializeReel(newReelData, newIndex, eventManager, newReelData.CurrentReelStrip, this); else reel.InitializeReel(newReelData, newIndex, eventManager, newReelData.DefaultReelStrip, this);
-		reels.Add(reel); RepositionReels();
-		// When adding a reel, all existing reels need to check if their dummy counts should change due to new max height
-		RegenerateAllReelDummies();
-		eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
-	}
-	public void AddReel(ReelDefinition definition) { if (definition == null) throw new ArgumentNullException(nameof(definition)); AddReel(definition.CreateInstance()); }
-	/// <summary>
-	/// Adds a new reel using a template from current data/definition when available.
-	/// </summary>
-	public void AddReel()
-	{
-		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot add reel while spinning."); return; }
-		if (currentSlotsData == null || currentSlotsData.CurrentReelData.Count == 0) { Debug.LogWarning("No template reel available to create a new reel."); return; }
-		var template = currentSlotsData.CurrentReelData[0]; var def = template.BaseDefinition;
-		if (def == null)
-		{
-			try { var slotsDef = currentSlotsData?.BaseDefinition; if (slotsDef?.ReelDefinitions?.Length > 0) { int idx = currentSlotsData.CurrentReelData.IndexOf(template); if (idx < 0 || idx >= slotsDef.ReelDefinitions.Length) idx = 0; def = slotsDef.ReelDefinitions[idx]; } } catch { }
-		}
-		if (def != null) AddReel(def); else Debug.LogWarning("Template reel does not have a BaseDefinition and no fallback was found. Cannot create new reel.");
-	}
-
-	/// <summary>
-	/// Inserts a reel at the specified index and refreshes reel indices/positions. Broadcasts a ReelAdded event.
-	/// </summary>
-	public void InsertReelAt(int index, ReelData newReelData)
-	{
-		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot insert reel while spinning."); return; }
-		if (currentSlotsData == null) throw new InvalidOperationException("CurrentSlotsData is null");
-		if (index < 0 || index > currentSlotsData.CurrentReelData.Count) throw new ArgumentOutOfRangeException(nameof(index));
-		if (currentSlotsData.CurrentReelData.Count > 0) { var template = currentSlotsData.CurrentReelData[0]; newReelData.SetSymbolSize(template.SymbolSize, template.SymbolSpacing); }
-		currentSlotsData.InsertReelAt(index, newReelData); ReelDataManager.Instance.AddNewData(newReelData); SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
-		GameObject g = Instantiate(reelPrefab, currentReelsGroup); GameReel reel = g.GetComponent<GameReel>();
-		if (newReelData.CurrentReelStrip != null) reel.InitializeReel(newReelData, index, eventManager, newReelData.CurrentReelStrip, this); else reel.InitializeReel(newReelData, index, eventManager, newReelData.DefaultReelStrip, this);
-		reels.Insert(index, reel); RefreshReelsAfterModification();
-		// When inserting a reel, all reels need to check if their dummy counts should change due to new max height
-		RegenerateAllReelDummies();
-		eventManager.BroadcastEvent(SlotsEvent.ReelAdded, reel);
-	}
-
-	/// <summary>
-	/// Removes a reel at the specified index, destroys visuals, and repositions remaining reels. Broadcasts a ReelRemoved event.
-	/// </summary>
-	public void RemoveReelAt(int index)
-	{
-		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) { Debug.LogWarning("Cannot remove reel while spinning."); return; }
-		if (index < 0 || index >= reels.Count) throw new ArgumentOutOfRangeException(nameof(index));
-		var dataToRemove = currentSlotsData.CurrentReelData[index]; currentSlotsData.RemoveReel(dataToRemove); ReelDataManager.Instance.RemoveDataIfExists(dataToRemove); SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData);
-		GameReel reel = reels[index]; if (reel != null && reel.gameObject != null) Destroy(reel.gameObject); reels.RemoveAt(index); RefreshReelsAfterModification();
-		// When removing a reel, all remaining reels need to check if their dummy counts should change due to new max height
-		RegenerateAllReelDummies();
-		eventManager.BroadcastEvent(SlotsEvent.ReelRemoved, reel);
-	}
-	public void RemoveReel(GameReel reelToRemove) { int idx = reels.IndexOf(reelToRemove); if (idx == -1) throw new ArgumentException("Reel not part of this SlotsEngine", nameof(reelToRemove)); RemoveReelAt(idx); }
-
-	private void RefreshReelsAfterModification()
-	{
-		for (int i = 0; i < reels.Count; i++)
-		{
-			var r = reels[i]; if (r == null) continue; ReelData data = r.CurrentReelData; ReelStripData strip = r.ReelStrip;
-			if (strip != null) r.InitializeReel(data, i, eventManager, strip, this); else r.InitializeReel(data, i, eventManager, data.DefaultReelStrip, this);
-		}
-		RepositionReels();
 	}
 
 	/// <summary>
@@ -384,9 +321,24 @@ public class SlotsEngine : MonoBehaviour
 	/// </summary>
 	private void RepositionReels()
 	{
-		if (reels.Count == 0 || currentSlotsData.CurrentReelData.Count == 0) return; ReelData reelDef = currentSlotsData.CurrentReelData[0];
-		for (int i = 0; i < reels.Count; i++) { var data = currentSlotsData.CurrentReelData[i]; var g = reels[i].gameObject; if (g != null) g.transform.localPosition = new Vector3((data.SymbolSpacing + data.SymbolSize) * i, 0, 0); }
-		int count = reels.Count; float totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidth / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidth = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidth / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
+		if (reels.Count == 0 || currentSlotsData.CurrentReelData.Count == 0) return;
+		// Use first reel definition as authoritative for spacing step to ensure consistent layout
+		ReelData reelDef = currentSlotsData.CurrentReelData[0];
+		float stepX = reelDef.SymbolSize + reelDef.SymbolSpacing;
+		int n = reels.Count;
+		float startX = -((n - 1) * stepX) / 2f;
+		for (int i = 0; i < reels.Count; i++)
+		{
+			var data = currentSlotsData.CurrentReelData[i];
+			var g = reels[i].gameObject;
+			if (g != null) g.transform.localPosition = new Vector3(startX + stepX * i, 0f, 0f);
+		}
+
+		// Vertical centering based on tallest reel
+		int maxRows = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		float stepY = reelDef.SymbolSize + reelDef.SymbolSpacing;
+		float startY = -((maxRows - 1) * stepY) / 2f;
+		if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(0f, startY, 0f);
 	}
 
 	/// <summary>
@@ -398,16 +350,31 @@ public class SlotsEngine : MonoBehaviour
 		if (stateMachine.CurrentState == State.Spinning) throw new InvalidOperationException("Should not adjust reels while they are spinning!");
 		if (reels == null || reels.Count == 0)
 		{
-			int maxSymbolsPre = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); float availableStepPre = (totalHeight / maxSymbolsPre) * 0.8f; float spacingPre = availableStepPre * 0.2f; foreach (ReelData r in currentSlotsData.CurrentReelData) r.SetSymbolSize(availableStepPre - spacingPre, spacingPre); SpawnReels(reelsRootTransform); return;
+			int maxSymbolsPre = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+			float availableStepPre = (totalHeight / maxSymbolsPre) * 0.8f;
+			float spacingPre = availableStepPre * 0.2f;
+			foreach (ReelData r in currentSlotsData.CurrentReelData) r.SetSymbolSize(availableStepPre - spacingPre, spacingPre);
+			SpawnReels(reelsRootTransform);
+			return;
 		}
-		int maxSymbols = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); int reelCount = currentSlotsData.CurrentReelData.Count; const float heightFill = 0.8f; const float widthFill = 0.95f; const float spacingFactor = 0.1f;
+		int maxSymbols = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		int reelCount = currentSlotsData.CurrentReelData.Count;
+		const float heightFill = 0.8f; const float widthFill = 0.95f; const float spacingFactor = 0.1f;
 		float symbolMaxByHeight = float.MaxValue; if (totalHeight > 0f && maxSymbols > 0) { float stepPerSymbol = 1f + spacingFactor; symbolMaxByHeight = (totalHeight * heightFill) / (maxSymbols * stepPerSymbol); }
 		float symbolMaxByWidth = float.MaxValue; if (totalWidth > 0f && reelCount > 0) { float denom = reelCount + (reelCount - 1) * spacingFactor; if (denom > 0f) symbolMaxByWidth = (totalWidth * widthFill) / denom; }
-		float chosenSymbolSize = Math.Min(symbolMaxByHeight, symbolMaxByWidth); if (float.IsInfinity(chosenSymbolSize) || float.IsNaN(chosenSymbolSize) || chosenSymbolSize <= 0f) chosenSymbolSize = currentSlotsData.CurrentReelData[0].SymbolSize; float chosenSpacing = chosenSymbolSize * spacingFactor;
-		ReelData firstDef = currentSlotsData.CurrentReelData[0]; bool sizeMatches = Mathf.Approximately(firstDef.SymbolSize, chosenSymbolSize) && Mathf.Approximately(firstDef.SymbolSpacing, chosenSpacing); bool reelsCountMatches = reels.Count == currentSlotsData.CurrentReelData.Count; if (sizeMatches && reelsCountMatches) return;
+		float chosenSymbolSize = Math.Min(symbolMaxByHeight, symbolMaxByWidth); if (float.IsInfinity(chosenSymbolSize) || float.IsNaN(chosenSymbolSize) || chosenSymbolSize <= 0f) chosenSymbolSize = currentSlotsData.CurrentReelData[0].SymbolSize;
+		float chosenSpacing = chosenSymbolSize * spacingFactor;
+		ReelData firstDef = currentSlotsData.CurrentReelData[0]; bool sizeMatches = Mathf.Approximately(firstDef.SymbolSize, chosenSymbolSize) && Mathf.Approximately(firstDef.SymbolSpacing, chosenSpacing);
+		bool reelsCountMatches = reels.Count == currentSlotsData.CurrentReelData.Count; if (sizeMatches && reelsCountMatches) return;
 		foreach (ReelData r in currentSlotsData.CurrentReelData) r.SetSymbolSize(chosenSymbolSize, chosenSpacing);
-		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; reel.UpdateSymbolLayout(chosenSymbolSize, chosenSpacing); float x = (chosenSpacing + chosenSymbolSize) * i; reel.transform.localPosition = new Vector3(x, 0f, 0f); }
-		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidthComputed / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidthComputed / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
+		// Use stable centered positions when updating transforms
+		float step = chosenSpacing + chosenSymbolSize;
+		int nCount = reels.Count;
+		float start = -((nCount - 1) * step) / 2f;
+		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; reel.UpdateSymbolLayout(chosenSymbolSize, chosenSpacing); reel.transform.localPosition = new Vector3(start + step * i, 0f, 0f); }
+		int maxRowsNow = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		float startY = -((maxRowsNow - 1) * (chosenSymbolSize + chosenSpacing)) / 2f;
+		if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(0f, startY, 0f);
 		RegenerateAllReelDummies();
 	}
 
@@ -427,8 +394,14 @@ public class SlotsEngine : MonoBehaviour
 		ReelData firstDef = currentSlotsData.CurrentReelData[0]; bool sizeMatches = Mathf.Approximately(firstDef.SymbolSize, chosenSymbolSize) && Mathf.Approximately(firstDef.SymbolSpacing, chosenSpacing); bool reelsCountMatches = reels.Count == currentSlotsData.CurrentReelData.Count; if (sizeMatches && reelsCountMatches) return;
 		
 		foreach (ReelData r in currentSlotsData.CurrentReelData) r.SetSymbolSize(chosenSymbolSize, chosenSpacing);
-		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; /* use lightweight resize to avoid regenerating dummies */ reel.ResizeVisuals(chosenSymbolSize, chosenSpacing); float x = (chosenSpacing + chosenSymbolSize) * i; reel.transform.localPosition = new Vector3(x, 0f, 0f); }
-		ReelData reelDef = currentSlotsData.CurrentReelData[0]; int count = reels.Count; float totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); float offset = totalWidthComputed / 2f; float xPos = (-offset + (reelDef.SymbolSize / 2f)); count = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount); totalWidthComputed = (count * reelDef.SymbolSize) + ((count - 1) * reelDef.SymbolSpacing); offset = totalWidthComputed / 2f; float yPos = (-offset + (reelDef.SymbolSize / 2f)); if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(xPos, yPos, 0);
+		// Use lightweight resize and stable centered positions
+		float step = chosenSpacing + chosenSymbolSize;
+		int nCount = reels.Count;
+		float start = -((nCount - 1) * step) / 2f;
+		for (int i = 0; i < reels.Count; i++) { var reel = reels[i]; if (reel == null) continue; /* use lightweight resize to avoid regenerating dummies */ reel.ResizeVisuals(chosenSymbolSize, chosenSpacing); reel.transform.localPosition = new Vector3(start + step * i, 0f, 0f); }
+		int maxRowsNow = currentSlotsData.CurrentReelData.Max(x => x.SymbolCount);
+		float startY = -((maxRowsNow - 1) * (chosenSymbolSize + chosenSpacing)) / 2f;
+		if (currentReelsGroup != null) currentReelsGroup.transform.localPosition = new Vector3(0f, startY, 0f);
 		// Note: Do NOT call RegenerateAllReelDummies here - that was already done selectively by the caller
 	}
 	
@@ -559,5 +532,58 @@ public class SlotsEngine : MonoBehaviour
 
 		// Unregister global handlers
 		try { GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.PresentationCompleteGroup, OnPresentationCompleteGroup); } catch { }
+	}
+
+	// Adds a new reel to this engine at runtime. Creates a matching `ReelData`, spawns its GameReel and updates layout.
+	public void AddReel()
+	{
+		if (currentSlotsData == null) return;
+
+		// Create new ReelData using last reel as template if possible
+		ReelData template = (currentSlotsData.CurrentReelData != null && currentSlotsData.CurrentReelData.Count > 0) ? currentSlotsData.CurrentReelData.Last() : null;
+		ReelData newData;
+		if (template != null)
+		{
+			// Use existing strip data and base definition where available
+			newData = new ReelData(template.ReelSpinDuration, template.SymbolCount, null, template.BaseDefinition, template.CurrentReelStrip);
+		}
+		else if (currentSlotsData.BaseDefinition != null && currentSlotsData.BaseDefinition.ReelDefinitions != null && currentSlotsData.BaseDefinition.ReelDefinitions.Length > 0)
+		{
+			newData = currentSlotsData.BaseDefinition.ReelDefinitions[0].CreateInstance();
+		}
+		else
+		{
+			// Fallback conservative defaults
+			newData = new ReelData(0.5f, 3, null, null, null);
+		}
+
+		// Add to data model
+		currentSlotsData.AddNewReel(newData);
+
+		// Spawn visual reel under existing group
+		Transform parent = currentReelsGroup != null ? currentReelsGroup : reelsRootTransform;
+		if (parent == null) parent = reelsRootTransform;
+		GameObject g = Instantiate(reelPrefab, parent);
+		var reel = g.GetComponent<GameReel>();
+		int newIndex = currentSlotsData.CurrentReelData.Count - 1;
+		try
+		{
+			reel.InitializeReel(newData, newIndex, eventManager, newData.CurrentReelStrip ?? newData.DefaultReelStrip, this);
+		}
+		catch
+		{
+			// best-effort: try other overload
+			try { reel.InitializeReel(newData, newIndex, eventManager, newData.CurrentReelStrip, this); } catch { }
+		}
+
+		reels.Add(reel);
+
+		// Prewarm and reposition
+		reel.PrewarmPooledSymbols();
+		RepositionReels();
+		RegenerateAllReelDummies();
+
+		// Inform listeners
+		try { eventManager?.BroadcastEvent(SlotsEvent.ReelAdded, reel); } catch { }
 	}
 }

@@ -179,18 +179,67 @@ public class GameReel : MonoBehaviour
 
     private void ComputeDummyCounts(out int topCount, out int bottomCount)
     {
-        int baseTop = currentReelData.SymbolCount; int baseBottom = currentReelData.SymbolCount - 1; if (baseBottom < 0) baseBottom = 0;
-        int bufferSteps = 3; // bounce/spin buffer
-        float step = currentReelData.SymbolSpacing + currentReelData.SymbolSize; float thisActiveHeight = currentReelData.SymbolCount * step; float maxActiveHeight = thisActiveHeight;
-        if (ownerEngine != null)
+        // Default safe values
+        topCount = 0;
+        bottomCount = 0;
+
+        if (currentReelData == null)
         {
-            foreach (var r in ownerEngine.CurrentReels)
+            return;
+        }
+
+        // Determine the pitch (height) of one symbol including spacing
+        float symbolPitch = Mathf.Max(1f, currentReelData.SymbolSize + currentReelData.SymbolSpacing);
+
+        // Try to find the visible height for this reel. Prefer the nearest RectTransform parent that likely represents the reel viewport.
+        float visibleHeight = 0f;
+        try
+        {
+            if (symbolRoot != null)
             {
-                if (r?.CurrentReelData == null) continue; float s = r.CurrentReelData.SymbolSpacing + r.CurrentReelData.SymbolSize; float h = r.CurrentReelData.SymbolCount * s; if (h > maxActiveHeight) maxActiveHeight = h;
+                var rt = symbolRoot.GetComponentInParent<RectTransform>();
+                if (rt != null)
+                {
+                    visibleHeight = Mathf.Abs(rt.rect.height);
+                }
+            }
+            // Fallback to owner engine's reels root transform (if present)
+            if (visibleHeight <= 0f && ownerEngine != null)
+            {
+                var ownerRt = ownerEngine.ReelsRootTransform as RectTransform;
+                if (ownerRt != null) visibleHeight = Mathf.Abs(ownerRt.rect.height);
             }
         }
-        float ratio = thisActiveHeight > 0f ? maxActiveHeight / thisActiveHeight : 1f; if (ratio < 1f) ratio = 1f; if (ratio > 1.25f) { baseTop = Mathf.CeilToInt(baseTop * ratio); baseBottom = Mathf.CeilToInt(baseBottom * ratio); }
-        topCount = baseTop + bufferSteps; bottomCount = baseBottom + bufferSteps; int maxClamp = currentReelData.SymbolCount * 6 + 12; if (topCount > maxClamp) topCount = maxClamp; if (bottomCount > maxClamp) bottomCount = maxClamp;
+        catch { visibleHeight = 0f; }
+
+        // If we couldn't determine a visible height, fallback to using configured symbol count
+        if (visibleHeight <= 0f)
+        {
+            int configured = Mathf.Max(1, currentReelData.SymbolCount);
+            // leave room for a couple extra dummies to avoid gaps during motion
+            int totalNeeded = configured + 4;
+            topCount = totalNeeded;
+            bottomCount = totalNeeded;
+            lastTopDummyCount = topCount;
+            lastBottomDummyCount = bottomCount;
+            return;
+        }
+
+        // Compute how many symbols are required to cover visible height plus a safety buffer on each side
+        int visibleRows = Mathf.CeilToInt(visibleHeight / symbolPitch);
+        int safetyBuffer = 2; // extra rows above and below to ensure continuous coverage during movement
+        int totalPerSide = visibleRows + safetyBuffer;
+
+        // Distribute into top and bottom; make them equal for simplicity
+        topCount = totalPerSide;
+        bottomCount = totalPerSide;
+
+        // Ensure we never shrink too aggressively compared to last known (avoid popping)
+        if (lastTopDummyCount > 0) topCount = Mathf.Max(topCount, lastTopDummyCount);
+        if (lastBottomDummyCount > 0) bottomCount = Mathf.Max(bottomCount, lastBottomDummyCount);
+
+        lastTopDummyCount = topCount;
+        lastBottomDummyCount = bottomCount;
     }
 
     private void RecomputeAllPositions()
@@ -1135,7 +1184,7 @@ public class GameReel : MonoBehaviour
         if (affectsOtherReels)
         {
             // First regenerate dummies for all reels (since max height changed)
-            if (ownerEngine != null) ownerEngine.RegenerateAllReelDummiesForHeightChange();
+            if (ownerEngine != null) ownerEngine.RegenerateAllReelDummies();
             // Then trigger layout rescaling through the manager (which will NOT regenerate dummies again)
             if (SlotsEngineManager.Instance != null) SlotsEngineManager.Instance.AdjustSlotCanvasForHeightChange(ownerEngine);
         }
