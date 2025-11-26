@@ -289,11 +289,17 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	private string GetSlotDisplayName(SlotsEngine slot)
 	{
 		if (slot == null) return "General";
+		// Accessing simple properties shouldn't throw; if it does, surface in dev builds
 		try
 		{
 			if (slot.CurrentSlotsData != null) return $"Slot {slot.CurrentSlotsData.Index}";
 		}
-		catch { }
+		catch (Exception ex)
+		{
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+			Debug.LogException(ex);
+#endif
+		}
 		return slot.name ?? "Slot";
 	}
 
@@ -382,6 +388,6 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	private void OnReelsAllStarted(object obj)
 	{
 		// Engine reports all reels have entered their visible kickup; enable the Stop button now
-		try { StopButton.interactable = true; } catch { }
+		StopButton.interactable = true;
 	}
 }

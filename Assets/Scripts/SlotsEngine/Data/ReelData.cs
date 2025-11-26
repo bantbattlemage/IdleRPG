@@ -137,36 +137,32 @@ public class ReelData : Data
 				int accessor = currentSymbolAccessorIds[i];
 				if (accessor > 0)
 				{
-					try
+					if (SymbolDataManager.Instance != null && SymbolDataManager.Instance.TryGetData(accessor, out var fromManager))
 					{
-						if (SymbolDataManager.Instance != null && SymbolDataManager.Instance.TryGetData(accessor, out var fromManager))
+						resolved = fromManager;
+						// if manager-provided symbol lacks a sprite/key, try to resolve using persisted key or name
+						if (resolved != null && resolved.Sprite == null)
 						{
-							resolved = fromManager;
-							// if manager-provided symbol lacks a sprite/key, try to resolve using persisted key or name
-							if (resolved != null && resolved.Sprite == null)
+							string nameKey = null;
+							if (currentSymbolKeys != null && i < currentSymbolKeys.Length && !string.IsNullOrEmpty(currentSymbolKeys[i])) nameKey = currentSymbolKeys[i];
+							if (string.IsNullOrEmpty(nameKey) && !string.IsNullOrEmpty(resolved.Name)) nameKey = resolved.Name;
+							if (!string.IsNullOrEmpty(nameKey))
 							{
-								string nameKey = null;
-								if (currentSymbolKeys != null && i < currentSymbolKeys.Length && !string.IsNullOrEmpty(currentSymbolKeys[i])) nameKey = currentSymbolKeys[i];
-								if (string.IsNullOrEmpty(nameKey) && !string.IsNullOrEmpty(resolved.Name)) nameKey = resolved.Name;
+								resolved.Sprite = AssetResolver.ResolveSprite(nameKey);
+								// ensure persisted key is populated so future resolution doesn't rely solely on accessor
 								if (!string.IsNullOrEmpty(nameKey))
 								{
-									try { resolved.Sprite = AssetResolver.ResolveSprite(nameKey); } catch { }
-									// ensure persisted key is populated so future resolution doesn't rely solely on accessor
-									if (!string.IsNullOrEmpty(nameKey))
+									if (currentSymbolKeys == null || i >= currentSymbolKeys.Length)
 									{
-										if (currentSymbolKeys == null || i >= currentSymbolKeys.Length)
-										{
-											var newKeys = new string[len];
-											if (currentSymbolKeys != null) Array.Copy(currentSymbolKeys, newKeys, Math.Min(currentSymbolKeys.Length, newKeys.Length));
-											currentSymbolKeys = newKeys;
-										}
-										currentSymbolKeys[i] = nameKey;
+										var newKeys = new string[len];
+										if (currentSymbolKeys != null) Array.Copy(currentSymbolKeys, newKeys, Math.Min(currentSymbolKeys.Length, newKeys.Length));
+										currentSymbolKeys = newKeys;
 									}
+									currentSymbolKeys[i] = nameKey;
 								}
 							}
 						}
 					}
-					catch { }
 				}
 			}
 
@@ -184,22 +180,18 @@ public class ReelData : Data
 				resolved = new SymbolData(key, sprite, 0, -1, 1f, PayScaling.DepthSquared, false, true);
 
 				// If we can persist this runtime-created symbol into the SymbolDataManager, do so so accessor ids are available later
-				try
+				if (SymbolDataManager.Instance != null && resolved != null && resolved.AccessorId == 0)
 				{
-					if (SymbolDataManager.Instance != null && resolved != null && resolved.AccessorId == 0)
+					SymbolDataManager.Instance.AddNewData(resolved);
+					// record assigned accessor id for future resolution
+					if (currentSymbolAccessorIds == null || i >= currentSymbolAccessorIds.Length)
 					{
-						SymbolDataManager.Instance.AddNewData(resolved);
-						// record assigned accessor id for future resolution
-						if (currentSymbolAccessorIds == null || i >= currentSymbolAccessorIds.Length)
-						{
-							var newArr = new int[len];
-							if (currentSymbolAccessorIds != null) Array.Copy(currentSymbolAccessorIds, newArr, Math.Min(currentSymbolAccessorIds.Length, newArr.Length));
-							currentSymbolAccessorIds = newArr;
-						}
-						currentSymbolAccessorIds[i] = resolved.AccessorId;
+						var newArr = new int[len];
+						if (currentSymbolAccessorIds != null) Array.Copy(currentSymbolAccessorIds, newArr, Math.Min(currentSymbolAccessorIds.Length, newArr.Length));
+						currentSymbolAccessorIds = newArr;
 					}
+					currentSymbolAccessorIds[i] = resolved.AccessorId;
 				}
-				catch { }
 			}
 
 			result.Add(resolved);

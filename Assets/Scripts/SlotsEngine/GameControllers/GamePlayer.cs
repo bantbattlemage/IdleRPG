@@ -285,7 +285,7 @@ public class GamePlayer : Singleton<GamePlayer>
 			else
 			{
 				// Request stop at engine level; engines will defer or ignore repeated requests.
-				try { slots.RequestStopWhenReady(); } catch { /* defensive */ }
+				slots.RequestStopWhenReady();
 			}
 		}
 	}
