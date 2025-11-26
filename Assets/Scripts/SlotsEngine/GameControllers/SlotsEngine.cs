@@ -1,7 +1,23 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using UnityEngine;
+// NOTE: Exception handling and external dependencies
+//
+// This class uses many "best-effort" empty catch blocks (e.g. `try { ... } catch { }`) in order to avoid
+// breaking gameplay when non-critical subsystems fail (event broadcasts, pool prewarm, or optional singletons).
+// These catches intentionally swallow exceptions; replace them with logging (e.g., `Debug.LogException`) when
+// more visibility is required for debugging.
+//
+// Dependencies (singletons):
+// - `GameSymbolPool.Instance`
+// - `SlotsDataManager.Instance`
+// - `WinEvaluator.Instance`
+// - `GlobalEventManager.Instance`
+// - `GamePlayer.Instance`
+// - `SlotConsoleController.Instance`
+// - `DataPersistenceManager.Instance`
+// Callers should ensure these singletons are initialized when needed.
+//
+// Unity context:
+// - Methods in this class assume they run on the Unity main thread. They create/destroy GameObjects and
+//   start/stop coroutines; invoking them from background threads is unsafe.
 
 public class SlotsEngine : MonoBehaviour
 {
@@ -11,16 +27,28 @@ public class SlotsEngine : MonoBehaviour
 	private List<GameReel> reels = new List<GameReel>(); public List<GameReel> CurrentReels => reels;
 	private EventManager eventManager; private SlotsStateMachine stateMachine; private bool spinInProgress = false; private Transform currentReelsGroup;
 	public State CurrentState => stateMachine.CurrentState;
+	/// <summary>
+	/// Sets the current state on the internal <see cref="SlotsStateMachine"/> instance.
+	/// </summary>
+	/// <param name="state">Target state to apply.</param>
 	public void SetState(State state) => stateMachine.SetState(state);
 
 	// NEW: page activation flag for suspension
 	private bool pageActive = true;
+	/// <summary>
+	/// Activates or deactivates the page for this engine. When deactivated reels may suspend animations/updates.
+	/// The flag is propagated to child `GameReel` instances.
+	/// </summary>
+	/// <param name="active">True to mark the page active, false to deactivate.</param>
 	public void SetPageActive(bool active)
 	{
 		pageActive = active;
 		foreach (var r in reels)
 			try { r?.SetPageActive(active); } catch { }
 	}
+	/// <summary>
+	/// Indicates whether this engine's page is currently active. When false, reels may be suspended.
+	/// </summary>
 	public bool IsPageActive => pageActive;
 
 	/// <summary>
@@ -534,7 +562,9 @@ public class SlotsEngine : MonoBehaviour
 		try { GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.PresentationCompleteGroup, OnPresentationCompleteGroup); } catch { }
 	}
 
-	// Adds a new reel to this engine at runtime. Creates a matching `ReelData`, spawns its GameReel and updates layout.
+	/// <summary>
+	/// Adds a new reel to this engine at runtime. Creates a matching `ReelData`, spawns its GameReel and updates layout.
+	/// </summary>
 	public void AddReel()
 	{
 		if (currentSlotsData == null) return;
