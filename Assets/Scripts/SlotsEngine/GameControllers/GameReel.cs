@@ -50,7 +50,8 @@ public class GameReel : MonoBehaviour
         {
             if (result.Sprite == null && !string.IsNullOrEmpty(result.Name))
             {
-                try { result.Sprite = AssetResolver.ResolveSprite(result.Name); } catch (Exception ex) { LogDevException(ex); }
+                // Let failures surface; do not swallow exceptions here so callers can detect issues
+                result.Sprite = AssetResolver.ResolveSprite(result.Name);
             }
             if (result.Sprite == null)
             {
@@ -59,7 +60,8 @@ public class GameReel : MonoBehaviour
             }
             else
             {
-                try { if (SymbolDataManager.Instance != null && result.AccessorId == 0) SymbolDataManager.Instance.AddNewData(result); } catch (Exception ex) { LogDevException(ex); }
+                if (SymbolDataManager.Instance != null && result.AccessorId == 0)
+                    SymbolDataManager.Instance.AddNewData(result);
             }
         }
         else
@@ -92,14 +94,6 @@ public class GameReel : MonoBehaviour
 
     private const float ResumeStaggerStep = 0.025f; // NEW: per-index stagger applied when resuming from page suspension
     private const float KickupDuration = 0.25f; // NEW: unified duration used for initial kickup and landing bounce timing
-
-    // Dev-only exception logger helper
-    private static void LogDevException(Exception ex)
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.LogException(ex);
-#endif
-    }
 
     public void InitializeReel(ReelData data, int reelID, EventManager slotsEventManager, ReelStripDefinition stripDefinition, SlotsEngine owner)
     {
@@ -199,24 +193,21 @@ public class GameReel : MonoBehaviour
 
         // Try to find the visible height for this reel. Prefer the nearest RectTransform parent that likely represents the reel viewport.
         float visibleHeight = 0f;
-        try
+        // Let any unexpected errors surface rather than silently falling back
+        if (symbolRoot != null)
         {
-            if (symbolRoot != null)
+            var rt = symbolRoot.GetComponentInParent<RectTransform>();
+            if (rt != null)
             {
-                var rt = symbolRoot.GetComponentInParent<RectTransform>();
-                if (rt != null)
-                {
-                    visibleHeight = Mathf.Abs(rt.rect.height);
-                }
-            }
-            // Fallback to owner engine's reels root transform (if present)
-            if (visibleHeight <= 0f && ownerEngine != null)
-            {
-                var ownerRt = ownerEngine.ReelsRootTransform as RectTransform;
-                if (ownerRt != null) visibleHeight = Mathf.Abs(ownerRt.rect.height);
+                visibleHeight = Mathf.Abs(rt.rect.height);
             }
         }
-        catch (Exception ex) { LogDevException(ex); visibleHeight = 0f; }
+        // Fallback to owner engine's reels root transform (if present)
+        if (visibleHeight <= 0f && ownerEngine != null)
+        {
+            var ownerRt = ownerEngine.ReelsRootTransform as RectTransform;
+            if (ownerRt != null) visibleHeight = Mathf.Abs(ownerRt.rect.height);
+        }
 
         // If we couldn't determine a visible height, fallback to using configured symbol count
         if (visibleHeight <= 0f)
@@ -283,7 +274,7 @@ public class GameReel : MonoBehaviour
             if (sym == null) // defensive fallback
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                try { sym?.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+                sym?.SetOwnerReel(this);
                 SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
@@ -310,7 +301,7 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                try { sym?.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+                sym?.SetOwnerReel(this);
                 SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -375,19 +366,11 @@ public class GameReel : MonoBehaviour
         reelStrip.ResetSpinCounts(); // start fresh spin counts
 
         // Cancel any pending stop so a leftover stop doesn't apply mid-spin
-        if (stopReelCoroutine != null) { try { StopCoroutine(stopReelCoroutine); } catch (Exception ex) { LogDevException(ex); } stopReelCoroutine = null; }
+        if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; }
 
         // Clear any previous active coroutines to avoid interacting with stale references
-        try
-        {
-            if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
-        }
-        catch (Exception ex) { LogDevException(ex); activeSpinCoroutines[0] = null; }
-        try
-        {
-            if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
-        }
-        catch (Exception ex) { LogDevException(ex); activeSpinCoroutines[1] = null; }
+        if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
+        if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
 
         // reset speed multiplier
         spinSpeedMultiplier = 1f;
@@ -417,9 +400,9 @@ public class GameReel : MonoBehaviour
                     {
                         for (int i = 0; i < symbols.Count; i++)
                         {
-                            try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception ex) { LogDevException(ex); }
+                            eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]);
                         }
-                        try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception ex) { LogDevException(ex); }
+                        eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID);
                     }
                     stopRequestedBeforeKickup = false;
                     return;
@@ -428,7 +411,7 @@ public class GameReel : MonoBehaviour
                 stopRequestedBeforeKickup = false;
                 spinning = true;
                 FallOut(solution, true);
-                try { eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); } catch (Exception ex) { LogDevException(ex); }
+                eventManager?.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
             });
         }
         else
@@ -456,9 +439,9 @@ public class GameReel : MonoBehaviour
             {
                 for (int i = 0; i < symbols.Count; i++)
                 {
-                    try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception ex) { LogDevException(ex); }
+                    eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]);
                 }
-                try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception ex) { LogDevException(ex); }
+                eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID);
             }
             yield break;
         }
@@ -468,14 +451,14 @@ public class GameReel : MonoBehaviour
         {
             pendingLandingSolution = solution; // store intended first solution
             suspendedAwaitingResume = true;
-            if (waitForPageResumeCoroutine != null) try { StopCoroutine(waitForPageResumeCoroutine); } catch (Exception ex) { LogDevException(ex); }
+            if (waitForPageResumeCoroutine != null) StopCoroutine(waitForPageResumeCoroutine);
             waitForPageResumeCoroutine = StartCoroutine(WaitForInitialPageActivation());
         }
         else
         {
             FallOut(solution, true);
         }
-        try { eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID); } catch (Exception ex) { LogDevException(ex); }
+        eventManager?.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
     }
 
     private IEnumerator WaitForInitialPageActivation()
@@ -492,8 +475,8 @@ public class GameReel : MonoBehaviour
         {
             // Stop requested before initial fallout: mark complete immediately
             spinning = false;
-            for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception ex) { LogDevException(ex); }
-            try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception ex) { LogDevException(ex); }
+            for (int i = 0; i < symbols.Count; i++) eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]);
+            eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID);
             suspendedAwaitingResume = false;
         }
         else
@@ -507,7 +490,7 @@ public class GameReel : MonoBehaviour
     private IEnumerator ResumeFallOutAfterDelay(List<SymbolData> solution, float delay, bool initialKickback)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
-        try { FallOut(solution, initialKickback); } catch (Exception ex) { LogDevException(ex); }
+        FallOut(solution, initialKickback);
     }
 
     public void BeginSpin(List<SymbolData> solution = null, float startDelay = 0f)
@@ -519,7 +502,7 @@ public class GameReel : MonoBehaviour
         completeOnNextSpin = false;
 
         // Cancel any existing begin coroutine for this reel and start a lightweight coroutine to schedule the delayed start
-        if (beginSpinCoroutine != null) try { StopCoroutine(beginSpinCoroutine); } catch (Exception ex) { LogDevException(ex); }
+        if (beginSpinCoroutine != null) StopCoroutine(beginSpinCoroutine);
         beginSpinCoroutine = StartCoroutine(DelayedBeginSpin(startDelay, solution));
     }
 
@@ -539,7 +522,7 @@ public class GameReel : MonoBehaviour
         if (!IsEffectivelyPageActive())
         {
             // Cancel any existing stop coroutine
-            if (stopReelCoroutine != null) { try { StopCoroutine(stopReelCoroutine); } catch (Exception ex) { LogDevException(ex); } stopReelCoroutine = null; }
+            if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; }
             if (delay > 0f)
             {
                 stopReelCoroutine = StartCoroutine(DelayedLightStop(delay));
@@ -553,7 +536,7 @@ public class GameReel : MonoBehaviour
 
         EnsureUnpausedForStop();
         // Cancel any existing stop coroutine and schedule a lightweight delayed stop to avoid DOTween.Sequence allocations
-        if (stopReelCoroutine != null) try { StopCoroutine(stopReelCoroutine); } catch (Exception ex) { LogDevException(ex); }
+        if (stopReelCoroutine != null) StopCoroutine(stopReelCoroutine);
         stopReelCoroutine = StartCoroutine(DelayedStopReel(delay));
     }
 
@@ -579,10 +562,10 @@ public class GameReel : MonoBehaviour
     private void LightStopImmediate()
     {
         // Cancel spin/landing coroutines
-        try { if (beginSpinCoroutine != null) { StopCoroutine(beginSpinCoroutine); beginSpinCoroutine = null; } } catch (Exception ex) { LogDevException(ex); beginSpinCoroutine = null; }
-        try { if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; } } catch (Exception ex) { LogDevException(ex); stopReelCoroutine = null; }
-        try { if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; } } catch (Exception ex) { LogDevException(ex); activeSpinCoroutines[0] = null; }
-        try { if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; } } catch (Exception ex) { LogDevException(ex); activeSpinCoroutines[1] = null; }
+        if (beginSpinCoroutine != null) { StopCoroutine(beginSpinCoroutine); beginSpinCoroutine = null; }
+        if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; }
+        if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
+        if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
 
         // Capture pending landing solution and clear transient state
         var sol = pendingLandingSolution;
@@ -602,32 +585,28 @@ public class GameReel : MonoBehaviour
                          (nextSymbolsRoot != null && nextSymbolsRoot.childCount > 0);
 
         // Ensure any DOTween tweens affecting the roots are killed so they can't later override our forced positions
-        try { DG.Tweening.DOTween.Kill(symbolRoot, false); } catch (Exception ex) { LogDevException(ex); }
-        try { DG.Tweening.DOTween.Kill(nextSymbolsRoot, false); } catch (Exception ex) { LogDevException(ex); }
+        DG.Tweening.DOTween.Kill(symbolRoot, false);
+        DG.Tweening.DOTween.Kill(nextSymbolsRoot, false);
 
         // If coroutines were paused while the page was inactive the roots may be at intermediate positions.
         // Force the roots to the final landed positions so visuals are correct when the page is later shown.
-        try
+        if (symbolRoot != null && nextSymbolsRoot != null)
         {
-            if (symbolRoot != null && nextSymbolsRoot != null)
+            if (hasBuffer)
             {
-                if (hasBuffer)
-                {
-                    // When a buffer exists the final targeted positions during fallout are:
-                    // symbolRoot -> fallDistance (which equals -nextSymbolsRoot.localPosition.y)
-                    // nextSymbolsRoot -> 0
-                    float desiredSymbolY = -nextSymbolsRoot.localPosition.y;
-                    var sLp = symbolRoot.localPosition; sLp.y = desiredSymbolY; symbolRoot.localPosition = sLp;
-                    var nLp = nextSymbolsRoot.localPosition; nLp.y = 0f; nextSymbolsRoot.localPosition = nLp;
-                }
-                else
-                {
-                    // No buffer: ensure active root is reset to origin so visible symbols are aligned
-                    var sLp = symbolRoot.localPosition; sLp.y = 0f; symbolRoot.localPosition = sLp;
-                }
+                // When a buffer exists the final targeted positions during fallout are:
+                // symbolRoot -> fallDistance (which equals -nextSymbolsRoot.localPosition.y)
+                // nextSymbolsRoot -> 0
+                float desiredSymbolY = -nextSymbolsRoot.localPosition.y;
+                var sLp = symbolRoot.localPosition; sLp.y = desiredSymbolY; symbolRoot.localPosition = sLp;
+                var nLp = nextSymbolsRoot.localPosition; nLp.y = 0f; nextSymbolsRoot.localPosition = nLp;
+            }
+            else
+            {
+                // No buffer: ensure active root is reset to origin so visible symbols are aligned
+                var sLp = symbolRoot.localPosition; sLp.y = 0f; symbolRoot.localPosition = sLp;
             }
         }
-        catch (Exception ex) { LogDevException(ex); }
 
         if (hasBuffer)
         {
@@ -636,14 +615,13 @@ public class GameReel : MonoBehaviour
             {
                 CompleteReelSpin(sol);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Fallback: broadcast minimal events so engine isn't left waiting
-                LogDevException(ex);
                 if (eventManager != null)
                 {
-                    for (int i = 0; i < symbols.Count; i++) { try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception e) { LogDevException(e); } }
-                    try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception e) { LogDevException(e); }
+                    for (int i = 0; i < symbols.Count; i++) { try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { } }
+                    try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
                 }
             }
         }
@@ -654,9 +632,9 @@ public class GameReel : MonoBehaviour
             {
                 for (int i = 0; i < symbols.Count; i++)
                 {
-                    try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception ex) { LogDevException(ex); }
+                    try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { }
                 }
-                try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception ex) { LogDevException(ex); }
+                try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
             }
         }
     }
@@ -697,7 +675,7 @@ public class GameReel : MonoBehaviour
             SymbolData def = ResolveAndPersistSymbol(candidate, tmpCombinedExisting);
             if (symbol != null) symbol.ApplySymbol(def);
             // Explicitly ensure the incoming visible buffer symbols have correct color state
-            try { var sImg = symbol?.CachedImage; if (sImg != null) sImg.color = spinning ? Color.white : new Color(0.5f, 0.5f, 0.5f); } catch (Exception ex) { LogDevException(ex); }
+            var sImg = symbol?.CachedImage; if (sImg != null) sImg.color = spinning ? Color.white : new Color(0.5f, 0.5f, 0.5f);
             if (symbol != null) symbol.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
             if (symbol != null) symbol.transform.SetParent(nextSymbolsRoot, false);
             tmpNextReelSymbols.Add(symbol);
@@ -724,7 +702,7 @@ public class GameReel : MonoBehaviour
             if (sym == null) // defensive fallback
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                try { sym?.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+                sym?.SetOwnerReel(this);
                 SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -750,7 +728,7 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
-                try { sym?.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+                sym?.SetOwnerReel(this);
                 SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -823,7 +801,7 @@ public class GameReel : MonoBehaviour
             if (sym == null)
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(root) : GameSymbolPool.Instance?.Get(root);
-                try { sym?.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+                sym?.SetOwnerReel(this);
                 SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
@@ -869,8 +847,8 @@ public class GameReel : MonoBehaviour
         pendingLandingSolution = solution;
         landingPendingCount = 2;
 
-        if (activeSpinCoroutines[0] != null) { try { StopCoroutine(activeSpinCoroutines[0]); } catch (Exception ex) { LogDevException(ex); } activeSpinCoroutines[0] = null; }
-        if (activeSpinCoroutines[1] != null) { try { StopCoroutine(activeSpinCoroutines[1]); } catch (Exception ex) { LogDevException(ex); } activeSpinCoroutines[1] = null; }
+        if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; }
+        if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; }
         spinSpeedMultiplier = 1f;
 
         if (symbolRoot != null)
@@ -943,7 +921,7 @@ public class GameReel : MonoBehaviour
                 suspendedAwaitingResume = false;
                 if (waitForPageResumeCoroutine != null)
                 {
-                    try { StopCoroutine(waitForPageResumeCoroutine); } catch (Exception ex) { LogDevException(ex); }
+                    StopCoroutine(waitForPageResumeCoroutine);
                     waitForPageResumeCoroutine = null;
                 }
                 var sol = pendingLandingSolution; pendingLandingSolution = null;
@@ -1003,7 +981,7 @@ public class GameReel : MonoBehaviour
             if (!IsEffectivelyPageActive())
             {
                 suspendedAwaitingResume = true;
-                if (waitForPageResumeCoroutine != null) try { StopCoroutine(waitForPageResumeCoroutine); } catch (Exception ex) { LogDevException(ex); }
+                if (waitForPageResumeCoroutine != null) StopCoroutine(waitForPageResumeCoroutine);
                 waitForPageResumeCoroutine = StartCoroutine(WaitForPageResume(sol));
             }
             else
@@ -1044,7 +1022,7 @@ public class GameReel : MonoBehaviour
             lastBottomDummyCount = bottomDummySymbols.Count;
         }
         if (!completeOnNextSpin) { FallOut(solution); }
-        else { spinning = false; if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception ex) { LogDevException(ex); } try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception ex) { LogDevException(ex); } }
+        else { spinning = false; if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { } try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { } }
 
 #if UNITY_EDITOR
         // Run pool integrity diagnostics in editor/dev to help catch reuse or corruption issues
@@ -1295,11 +1273,11 @@ public class GameReel : MonoBehaviour
             if (!s.gameObject.activeSelf) s.gameObject.SetActive(true);
 
             // Ensure reused symbol has clean visual and tween state so it doesn't carry over a dim/rotated state
-            try { s.StopAndClearTweens(); } catch (Exception ex) { LogDevException(ex); }
-            try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch (Exception ex) { LogDevException(ex); }
+            s.StopAndClearTweens();
+            var img = s.CachedImage; if (img != null) img.color = Color.white;
 
             // NEW: cache owner reel reference to avoid GetComponentInParent in GameSymbol
-            try { s.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+            s.SetOwnerReel(this);
 
             return s;
         }
@@ -1310,7 +1288,7 @@ public class GameReel : MonoBehaviour
         if (newSym != null)
         {
             // NEW: assign owner before initialization so symbol can reference it immediately
-            try { newSym.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+            newSym.SetOwnerReel(this);
 
             // initialize with non-consuming pick to get a sprite
             SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
@@ -1320,8 +1298,8 @@ public class GameReel : MonoBehaviour
             allocatedPooledSet.Add(newSym);
 
             // newly created symbol should start clean
-            try { newSym.StopAndClearTweens(); } catch (Exception ex) { LogDevException(ex); }
-            try { var img2 = newSym.CachedImage; if (img2 != null) img2.color = Color.white; } catch (Exception ex) { LogDevException(ex); }
+            newSym.StopAndClearTweens();
+            var img2 = newSym.CachedImage; if (img2 != null) img2.color = Color.white;
             return newSym;
         }
         return null;
@@ -1338,14 +1316,13 @@ public class GameReel : MonoBehaviour
                 if (s != null)
                 {
                     // assign owner when pulled from pool
-                    try { s.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+                    s.SetOwnerReel(this);
                     return s;
                 }
             }
         }
-        catch (Exception ex)
+        catch
         {
-            LogDevException(ex);
             // ignore and fallback to manual creation
         }
 
@@ -1358,7 +1335,7 @@ public class GameReel : MonoBehaviour
         if (go.GetComponent<RectTransform>() == null) go.AddComponent<RectTransform>();
 
         // assign owner for newly created instance
-        try { gs.SetOwnerReel(this); } catch (Exception ex) { LogDevException(ex); }
+        gs.SetOwnerReel(this);
 
         return gs;
     }
@@ -1368,8 +1345,8 @@ public class GameReel : MonoBehaviour
         if (s == null) return;
 
         // clear tweens and visual state before returning to pool
-        try { s.StopAndClearTweens(); } catch (Exception ex) { LogDevException(ex); }
-        try { var img = s.CachedImage; if (img != null) img.color = Color.white; } catch (Exception ex) { LogDevException(ex); }
+        s.StopAndClearTweens();
+        var img = s.CachedImage; if (img != null) img.color = Color.white;
 
         allocatedPooledSet.Remove(s);
         // hide the pooled symbol to avoid visual orphaning
@@ -1399,26 +1376,17 @@ public class GameReel : MonoBehaviour
 
     private void BounceReel(Vector3 direction, float strength = 100f, float duration = 0.5f, float sharpness = 0f, float peak = 0.4f, Action onComplete = null)
     {
-        try
+        if (nextSymbolsRoot != null)
         {
-            if (nextSymbolsRoot != null)
-            {
-                try { nextSymbolsRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear); } catch (Exception ex) { LogDevException(ex); }
-            }
-            if (symbolRoot != null)
-            {
-                try { symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { onComplete?.Invoke(); }); }
-                catch (Exception ex) { LogDevException(ex); try { onComplete?.Invoke(); } catch (Exception e) { LogDevException(e); } }
-            }
-            else
-            {
-                onComplete?.Invoke();
-            }
+            nextSymbolsRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear);
         }
-        catch (Exception ex)
+        if (symbolRoot != null)
         {
-            LogDevException(ex);
-            try { onComplete?.Invoke(); } catch (Exception e) { LogDevException(e); }
+            symbolRoot.DOPulseUp(direction, strength, duration, sharpness, peak).SetEase(Ease.Linear).OnComplete(() => { onComplete?.Invoke(); });
+        }
+        else
+        {
+            onComplete?.Invoke();
         }
     }
 
@@ -1483,8 +1451,8 @@ public class GameReel : MonoBehaviour
         if (completeOnNextSpin)
         {
             spinning = false;
-            for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch (Exception ex) { LogDevException(ex); }
-            try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch (Exception ex) { LogDevException(ex); }
+            for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { }
+            try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
         }
         else
         {

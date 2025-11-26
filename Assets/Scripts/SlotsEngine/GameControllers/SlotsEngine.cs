@@ -1,24 +1,3 @@
-// NOTE: Exception handling and external dependencies
-//
-// This class uses many "best-effort" empty catch blocks (e.g. `try { ... } catch { }`) in order to avoid
-// breaking gameplay when non-critical subsystems fail (event broadcasts, pool prewarm, or optional singletons).
-// These catches intentionally swallow exceptions; replace them with logging (e.g., `Debug.LogException`) when
-// more visibility is required for debugging.
-//
-// Dependencies (singletons):
-// - `GameSymbolPool.Instance`
-// - `SlotsDataManager.Instance`
-// - `WinEvaluator.Instance`
-// - `GlobalEventManager.Instance`
-// - `GamePlayer.Instance`
-// - `SlotConsoleController.Instance`
-// - `DataPersistenceManager.Instance`
-// Callers should ensure these singletons are initialized when needed.
-//
-// Unity context:
-// - Methods in this class assume they run on the Unity main thread. They create/destroy GameObjects and
-//   start/stop coroutines; invoking them from background threads is unsafe.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -254,13 +233,9 @@ public class SlotsEngine : MonoBehaviour
 		}
 		for (int i = 0; i < reels.Count; i++)
 		{
-			try
-			{
-				// Schedule stop so it will not fire before the reel's own scheduled start.
-				float delay = enginePageActive ? (ensureAllStartedDelay + baseStagger * i) : 0f;
-				reels[i].StopReel(delay);
-			}
-			catch { }
+			// Schedule stop so it will not fire before the reel's own scheduled start.
+			float delay = enginePageActive ? (ensureAllStartedDelay + baseStagger * i) : 0f;
+			reels[i].StopReel(delay);
 		}
 		// Notify listeners that a stop has been requested
 		eventManager.BroadcastEvent(SlotsEvent.StoppingReels);
