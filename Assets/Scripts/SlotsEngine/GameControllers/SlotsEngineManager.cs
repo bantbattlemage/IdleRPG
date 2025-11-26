@@ -175,13 +175,34 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 	public void AdjustSlotCanvas(SlotsEngine slot)
 	{
 		if (slot == null || slotsDisplayPages == null || slotsDisplayPages.Count == 0) return;
-		var page = currentSlotsDisplayPage; if (page == null) return; var grid = page.gridGroup.GetComponent<GridLayoutGroup>(); if (grid == null) return; Canvas.ForceUpdateCanvases(); ApplyCellSizeToSlot(slot, grid.cellSize.x, grid.cellSize.y);
+		// Find the page that contains this slot; fall back to current page
+		var page = FindPageForSlot(slot) ?? currentSlotsDisplayPage;
+		if (page == null) return;
+		var grid = page.gridGroup.GetComponent<GridLayoutGroup>(); if (grid == null) return;
+		Canvas.ForceUpdateCanvases(); LayoutRebuilder.ForceRebuildLayoutImmediate(page.gridGroup);
+		ApplyCellSizeToSlot(slot, grid.cellSize.x, grid.cellSize.y);
 	}
 
 	public void AdjustSlotCanvasForHeightChange(SlotsEngine slot)
 	{
 		if (slot == null || slotsDisplayPages == null || slotsDisplayPages.Count == 0) return;
-		var page = currentSlotsDisplayPage; if (page == null) return; var grid = page.gridGroup.GetComponent<GridLayoutGroup>(); if (grid == null) return; Canvas.ForceUpdateCanvases(); ApplyCellSizeToSlotForHeightChange(slot, grid.cellSize.x, grid.cellSize.y);
+		var page = FindPageForSlot(slot) ?? currentSlotsDisplayPage;
+		if (page == null) return;
+		var grid = page.gridGroup.GetComponent<GridLayoutGroup>(); if (grid == null) return;
+		Canvas.ForceUpdateCanvases(); LayoutRebuilder.ForceRebuildLayoutImmediate(page.gridGroup);
+		ApplyCellSizeToSlotForHeightChange(slot, grid.cellSize.x, grid.cellSize.y);
+	}
+
+	// Helper: locate the display page that contains the provided slot
+	private SlotsDisplayPage FindPageForSlot(SlotsEngine slot)
+	{
+		if (slot == null || slotsDisplayPages == null) return null;
+		for (int i = 0; i < slotsDisplayPages.Count; i++)
+		{
+			var p = slotsDisplayPages[i];
+			if (p != null && p.slotsToDisplay != null && p.slotsToDisplay.Contains(slot)) return p;
+		}
+		return null;
 	}
 
 	private void ApplyCellSizeToSlot(SlotsEngine s, float cellWidth, float cellHeight)
