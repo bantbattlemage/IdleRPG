@@ -118,6 +118,9 @@ public class WinEvaluator : Singleton<WinEvaluator>
                     }
                     catch (Exception ex)
                     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                        Debug.LogException(ex);
+#endif
                         sb.AppendLine($"  [{wi}] {wl.name} - GenerateIndexes threw: {ex.Message}");
                     }
                 }
@@ -142,7 +145,14 @@ public class WinEvaluator : Singleton<WinEvaluator>
 
             // Ensure directory exists
             string dir = Path.Combine(Application.persistentDataPath, "SpinLogs");
-            try { Directory.CreateDirectory(dir); } catch { }
+            try
+            {
+                Directory.CreateDirectory(dir);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"WinEvaluator: Failed to create SpinLogs directory '{dir}': {ex.Message}");
+            }
 
             // Write file (timestamped)
             string fileName = $"spin_{now:yyyyMMdd_HHmmssfff}.log";
@@ -170,7 +180,10 @@ public class WinEvaluator : Singleton<WinEvaluator>
                         int toRemove = ordered.Count - MaxSpinLogs;
                         for (int r = 0; r < toRemove; r++)
                         {
-                            try { ordered[r].Delete(); } catch { }
+                            try { ordered[r].Delete(); } catch (Exception ex)
+                            {
+                                Debug.LogWarning($"WinEvaluator: Failed to delete old spin log '{ordered[r].FullName}': {ex.Message}");
+                            }
                         }
                     }
                 }
@@ -251,9 +264,12 @@ public class WinEvaluator : Singleton<WinEvaluator>
                     multipliers.Add(wl.WinMultiplier);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // If expansion fails for unexpected reason, fall back to original single pattern
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.LogException(ex);
+#endif
+                // Fall back to attempting the basic expansion once; log above if it fails
                 patterns.Add(wl.GenerateIndexes(columns, rowsPerColumn));
                 multipliers.Add(wl.WinMultiplier);
             }

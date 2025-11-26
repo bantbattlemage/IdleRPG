@@ -45,30 +45,28 @@ public class GameReel : MonoBehaviour
     private SymbolData ResolveAndPersistSymbol(SymbolData candidate, List<SymbolData> existingSelections)
     {
         SymbolData result = candidate;
-        try
+
+        if (result != null)
         {
-            if (result != null)
+            if (result.Sprite == null && !string.IsNullOrEmpty(result.Name))
             {
-                if (result.Sprite == null && !string.IsNullOrEmpty(result.Name))
-                {
-                    try { result.Sprite = AssetResolver.ResolveSprite(result.Name); } catch (Exception ex) { LogDevException(ex); }
-                }
-                if (result.Sprite == null)
-                {
-                    // fallback to strip selection
-                    result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : result;
-                }
-                else
-                {
-                    try { if (SymbolDataManager.Instance != null && result.AccessorId == 0) SymbolDataManager.Instance.AddNewData(result); } catch (Exception ex) { LogDevException(ex); }
-                }
+                try { result.Sprite = AssetResolver.ResolveSprite(result.Name); } catch (Exception ex) { LogDevException(ex); }
+            }
+            if (result.Sprite == null)
+            {
+                // fallback to strip selection
+                result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : result;
             }
             else
             {
-                result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : null;
+                try { if (SymbolDataManager.Instance != null && result.AccessorId == 0) SymbolDataManager.Instance.AddNewData(result); } catch (Exception ex) { LogDevException(ex); }
             }
         }
-        catch (Exception ex) { LogDevException(ex); /* swallow - caller expects best-effort resolution */ }
+        else
+        {
+            result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : null;
+        }
+
         return result;
     }
 
