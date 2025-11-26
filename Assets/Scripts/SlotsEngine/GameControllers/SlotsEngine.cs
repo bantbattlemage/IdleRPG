@@ -19,6 +19,11 @@
 // - Methods in this class assume they run on the Unity main thread. They create/destroy GameObjects and
 //   start/stop coroutines; invoking them from background threads is unsafe.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
 public class SlotsEngine : MonoBehaviour
 {
 	[SerializeField] private GameObject reelPrefab;
