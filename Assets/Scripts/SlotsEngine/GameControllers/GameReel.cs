@@ -342,11 +342,35 @@ public class GameReel : MonoBehaviour
 
         ClearPreSpinTweens();
 
-        if (pageActive)
+        if (IsEffectivelyPageActive())
         {
             // normal visual kickup
+            // capture whether a stop was already requested before the kickup began so we can
+            // decide whether to short-circuit on completion. This avoids treating a stop that
+            // occurs after visible kickup as if it happened before the kickup.
+            stopRequestedBeforeKickup = completeOnNextSpin;
             BounceReel(Vector3.up, strength: 50f, peak: 0.8f, duration: KickupDuration, onComplete: () =>
             {
+                // Only treat this as "stop during kickup" when the stop was already requested
+                // before the kickup began. If the stop was requested after kickup completed we
+                // should proceed with the normal fallout flow and let landing logic handle completion.
+                if (stopRequestedBeforeKickup && completeOnNextSpin)
+                {
+                    spinning = false;
+                    // notify landed for visible symbols and mark reel completed so engine can progress
+                    if (eventManager != null)
+                    {
+                        for (int i = 0; i < symbols.Count; i++)
+                        {
+                            try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { }
+                        }
+                        try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
+                    }
+                    stopRequestedBeforeKickup = false;
+                    return;
+                }
+
+                stopRequestedBeforeKickup = false;
                 spinning = true;
                 FallOut(solution, true);
                 eventManager.BroadcastEvent(SlotsEvent.ReelSpinStarted, ID);
@@ -361,9 +385,31 @@ public class GameReel : MonoBehaviour
 
     private IEnumerator SkipKickupDelay(List<SymbolData> solution)
     {
-        yield return new WaitForSeconds(KickupDuration);
+        // If the page is active we preserve the kickup delay so timing matches visible reels; if it's inactive
+        // we skip the visual delay entirely to avoid deferred state transitions that have no visual effect.
+        if (IsEffectivelyPageActive())
+        {
+            yield return new WaitForSeconds(KickupDuration);
+        }
+
+        // If a stop was requested before the kickup finished, complete immediately (no visual bounce) so
+        // the engine doesn't wait on a reel that will never visibly animate.
+        if (completeOnNextSpin)
+        {
+            spinning = false;
+            if (eventManager != null)
+            {
+                for (int i = 0; i < symbols.Count; i++)
+                {
+                    try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { }
+                }
+                try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
+            }
+            yield break;
+        }
+
         spinning = true;
-        if (!pageActive)
+        if (!IsEffectivelyPageActive())
         {
             pendingLandingSolution = solution; // store intended first solution
             suspendedAwaitingResume = true;
@@ -380,7 +426,7 @@ public class GameReel : MonoBehaviour
     private IEnumerator WaitForInitialPageActivation()
     {
         // Wait until page becomes active OR a stop is requested before first FallOut
-        while (!pageActive && !completeOnNextSpin)
+        while (!IsEffectivelyPageActive() && !completeOnNextSpin)
         {
             yield return null;
         }
@@ -432,6 +478,24 @@ public class GameReel : MonoBehaviour
 
     public void StopReel(float delay = 0f)
     {
+        // If this reel is not effectively active (page hidden), perform a very lightweight stop
+        // so the engine can remain in-sync without doing heavy visual work. Otherwise fall back
+        // to the existing delayed stop behavior which accelerates visual motion.
+        if (!IsEffectivelyPageActive())
+        {
+            // Cancel any existing stop coroutine
+            if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; }
+            if (delay > 0f)
+            {
+                stopReelCoroutine = StartCoroutine(DelayedLightStop(delay));
+            }
+            else
+            {
+                LightStopImmediate();
+            }
+            return;
+        }
+
         EnsureUnpausedForStop();
         // Cancel any existing stop coroutine and schedule a lightweight delayed stop to avoid DOTween.Sequence allocations
         if (stopReelCoroutine != null) StopCoroutine(stopReelCoroutine);
@@ -441,10 +505,104 @@ public class GameReel : MonoBehaviour
     private IEnumerator DelayedStopReel(float delay)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
+        // mark requested stop (fallout will complete the reel)
         completeOnNextSpin = true;
         // accelerate coroutine-based spin movement
         spinSpeedMultiplier = 4f;
         stopReelCoroutine = null;
+    }
+
+    private IEnumerator DelayedLightStop(float delay)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        LightStopImmediate();
+        stopReelCoroutine = null;
+    }
+
+    // Lightweight immediate stop used for reels that are off-page. Avoids heavy tweens/coroutines;
+    // broadcasts landed/completed so engine state remains consistent.
+    private void LightStopImmediate()
+    {
+        // Cancel spin/landing coroutines
+        try { if (beginSpinCoroutine != null) { StopCoroutine(beginSpinCoroutine); beginSpinCoroutine = null; } } catch { beginSpinCoroutine = null; }
+        try { if (stopReelCoroutine != null) { StopCoroutine(stopReelCoroutine); stopReelCoroutine = null; } } catch { stopReelCoroutine = null; }
+        try { if (activeSpinCoroutines[0] != null) { StopCoroutine(activeSpinCoroutines[0]); activeSpinCoroutines[0] = null; } } catch { activeSpinCoroutines[0] = null; }
+        try { if (activeSpinCoroutines[1] != null) { StopCoroutine(activeSpinCoroutines[1]); activeSpinCoroutines[1] = null; } } catch { activeSpinCoroutines[1] = null; }
+
+        // Capture pending landing solution and clear transient state
+        var sol = pendingLandingSolution;
+        pendingLandingSolution = null;
+        suspendedAwaitingResume = false;
+        landingPendingCount = 0;
+
+        // Mark reel as completing and stop further spin progression
+        completeOnNextSpin = true;
+        spinSpeedMultiplier = 4f;
+        spinning = false;
+
+        // Determine whether a buffered 'next' strip exists (was prepared by FallOut/SpawnNextReel).
+        bool hasBuffer = (bufferSymbols != null && bufferSymbols.Count > 0) ||
+                         (bufferTopDummySymbols != null && bufferTopDummySymbols.Count > 0) ||
+                         (bufferBottomDummySymbols != null && bufferBottomDummySymbols.Count > 0) ||
+                         (nextSymbolsRoot != null && nextSymbolsRoot.childCount > 0);
+
+        // Ensure any DOTween tweens affecting the roots are killed so they can't later override our forced positions
+        try { DG.Tweening.DOTween.Kill(symbolRoot, false); } catch { }
+        try { DG.Tweening.DOTween.Kill(nextSymbolsRoot, false); } catch { }
+
+        // If coroutines were paused while the page was inactive the roots may be at intermediate positions.
+        // Force the roots to the final landed positions so visuals are correct when the page is later shown.
+        try
+        {
+            if (symbolRoot != null && nextSymbolsRoot != null)
+            {
+                if (hasBuffer)
+                {
+                    // When a buffer exists the final targeted positions during fallout are:
+                    // symbolRoot -> fallDistance (which equals -nextSymbolsRoot.localPosition.y)
+                    // nextSymbolsRoot -> 0
+                    float desiredSymbolY = -nextSymbolsRoot.localPosition.y;
+                    var sLp = symbolRoot.localPosition; sLp.y = desiredSymbolY; symbolRoot.localPosition = sLp;
+                    var nLp = nextSymbolsRoot.localPosition; nLp.y = 0f; nextSymbolsRoot.localPosition = nLp;
+                }
+                else
+                {
+                    // No buffer: ensure active root is reset to origin so visible symbols are aligned
+                    var sLp = symbolRoot.localPosition; sLp.y = 0f; symbolRoot.localPosition = sLp;
+                }
+            }
+        }
+        catch { }
+
+        if (hasBuffer)
+        {
+            // Safe to finalize using the full completion path which swaps roots and adopts the buffer.
+            try
+            {
+                CompleteReelSpin(sol);
+            }
+            catch
+            {
+                // Fallback: broadcast minimal events so engine isn't left waiting
+                if (eventManager != null)
+                {
+                    for (int i = 0; i < symbols.Count; i++) { try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { } }
+                    try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
+                }
+            }
+        }
+        else
+        {
+            // No prepared buffer: avoid swapping roots. Simply mark visible symbols landed and complete.
+            if (eventManager != null)
+            {
+                for (int i = 0; i < symbols.Count; i++)
+                {
+                    try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { }
+                }
+                try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { }
+            }
+        }
     }
 
     private void SpawnNextReel(List<SymbolData> solution = null)
@@ -684,7 +842,7 @@ public class GameReel : MonoBehaviour
             while (elapsed < duration)
             {
                 // NEW: pause progress while page inactive (coroutine keeps yielding but elapsed doesn't advance)
-                if (!pageActive)
+                if (!IsEffectivelyPageActive())
                 {
                     yield return null;
                     continue;
@@ -709,8 +867,14 @@ public class GameReel : MonoBehaviour
 
     // --- New: page visibility suspension support ---
     private bool pageActive = true; // new: whether this reel's page is currently visible
+    // Consider engine-level page active as well to avoid race conditions where reel-local flag
+    // differs from the containing engine's known visibility. A reel is effectively active only
+    // when both its local flag and the owner's IsPageActive are true.
+    private bool IsEffectivelyPageActive() => pageActive && (ownerEngine == null || ownerEngine.IsPageActive);
     private bool suspendedAwaitingResume = false; // new: indicates post-landing or pre-first-fallout suspension between spins
     private Coroutine waitForPageResumeCoroutine; // new: coroutine waiting for page to become active
+    // Tracks whether a Stop was already requested before the kickup animation began.
+    private bool stopRequestedBeforeKickup = false;
 
     public void SetPageActive(bool active)
     {
@@ -738,6 +902,17 @@ public class GameReel : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns true when the reel has no outstanding motion or pending resume work and can be
+    /// considered fully settled for spin-completion purposes.
+    /// </summary>
+    public bool IsMotionComplete()
+    {
+        // not spinning, not suspended waiting for page resume, and no active spin coroutines
+        bool coroutinesIdle = (activeSpinCoroutines[0] == null) && (activeSpinCoroutines[1] == null);
+        return !spinning && !suspendedAwaitingResume && coroutinesIdle;
+    }
+
     // Called when Stop is requested; ensure we unpause if hidden so stop can complete promptly
     private void EnsureUnpausedForStop()
     {
@@ -755,19 +930,21 @@ public class GameReel : MonoBehaviour
 
         if (completeOnNextSpin)
         {
-            if (pageActive)
+            if (IsEffectivelyPageActive())
             {
+                // Play landing bounce when visible
                 BounceReel(Vector3.down, peak: 0.25f, duration: KickupDuration, onComplete: () => CompleteReelSpin(sol));
             }
             else
             {
-                // skip landing bounce visuals but preserve timing
-                StartCoroutine(SkipLandingBounceDelay(sol));
+                // When not visible, skip any bounce/delay and complete immediately to avoid deferred state
+                // transitions that would otherwise leave the engine waiting for non-existent visuals.
+                CompleteReelSpin(sol);
             }
         }
         else
         {
-            if (!pageActive)
+            if (!IsEffectivelyPageActive())
             {
                 suspendedAwaitingResume = true;
                 if (waitForPageResumeCoroutine != null) StopCoroutine(waitForPageResumeCoroutine);
@@ -922,26 +1099,10 @@ public class GameReel : MonoBehaviour
         if (allocatedPooledSet.Contains(symbol)) allocatedPooledSet.Remove(symbol);
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-// Validation helper to detect if the same GameSymbol instance exists in both roots (debugging only)
-private void ValidateNoSharedInstances()
-{
-    if (symbolRoot == null || nextSymbolsRoot == null) return;
-
-    var currentSet = new HashSet<GameSymbol>(symbols.Where(s => s != null));
-    var bufferSet = new HashSet<GameSymbol>(bufferSymbols.Where(s => s != null));
-
-    foreach (var shared in currentSet.Intersect(bufferSet))
-    {
-        Debug.LogWarning($"GameReel {ID}: GameSymbol instance present in both symbolRoot and nextSymbolsRoot: {shared.name}");
-    }
-}
-#endif
-
     public void SetSymbolCount(int newCount, bool incremental = true)
     {
         if (newCount < 1) newCount = 1;
-        if (spinning) { Debug.LogWarning("Cannot change symbol count while reel is spinning."); return; }
+        if (spinning) { return; }
         int oldCount = currentReelData.SymbolCount;
         if (newCount == oldCount) return;
 
@@ -1011,12 +1172,17 @@ private void ValidateNoSharedInstances()
         }
 
         // If this reel was the tallest and is getting shorter, other reels might need fewer dummies
-        if (thisReelWasTallest && newHeight < oldHeight) return true;
+        if (thisReelWasTallest && isGettingShorter(oldHeight, newHeight)) return true;
 
         // If this reel is becoming taller than the current max, other reels need more dummies
         if (newHeight > currentMaxHeight) return true;
 
         return false;
+    }
+
+    private bool isGettingShorter(float oldHeight, float newHeight)
+    {
+        return newHeight < oldHeight;
     }
 
     // --- Per-reel pooled symbol helpers (covers visible symbols, buffer symbols and dummies) ---
@@ -1252,7 +1418,7 @@ private void ValidateNoSharedInstances()
     // Ensure WaitForPageResume is declared before usage in LandingTweenCompleted
     private IEnumerator WaitForPageResume(List<SymbolData> solution)
     {
-        while (!pageActive && !completeOnNextSpin) yield return null;
+        while (!IsEffectivelyPageActive() && !completeOnNextSpin) yield return null;
         suspendedAwaitingResume = false; waitForPageResumeCoroutine = null;
         if (completeOnNextSpin)
         {

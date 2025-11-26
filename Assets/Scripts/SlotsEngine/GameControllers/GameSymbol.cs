@@ -41,7 +41,6 @@ public class GameSymbol : MonoBehaviour
 		eventManager = slotsEventManager;
 
 		// register to slot events
-		eventManager.RegisterEvent(SlotsEvent.SymbolWin, OnSymbolWin);
 		eventManager.RegisterEvent(State.Idle, "Exit", OnIdleExit);
 
 		ApplySymbol(symbol);
@@ -84,65 +83,29 @@ public class GameSymbol : MonoBehaviour
 		transform.localRotation = originalLocalRotation;
 	}
 
-	private void OnSymbolWin(object obj)
+	/// <summary>
+	/// Highlight this symbol for a win: set color immediately and optionally play a shake tween.
+	/// This is the preferred API for presentation controllers to call directly instead of broadcasting
+	/// individual SymbolWin events to every symbol.
+	/// </summary>
+	public void HighlightForWin(Color highlight, bool doShake)
 	{
-		GameSymbol symbol = (GameSymbol)obj;
-
-		if (symbol != this)
-		{
-			return;
-		}
-
-		// Always ensure cachedImage is available
 		var img = CachedImage;
-
-		// Choose highlight color based on this symbol's win mode.
-		Color highlight = Color.green; // default for line wins
-		if (currentSymbolData != null)
-		{
-			switch (currentSymbolData.WinMode)
-			{
-				case EvaluatorCore.SymbolWinMode.LineMatch:
-					highlight = Color.green;
-					break;
-				case EvaluatorCore.SymbolWinMode.SingleOnReel:
-					highlight = Color.yellow;
-					break;
-				case EvaluatorCore.SymbolWinMode.TotalCount:
-					highlight = Color.red;
-					break;
-				default:
-					highlight = Color.green;
-					break;
-			}
-		}
-
-		// Apply color immediately so it's visible even if a tween is restarted
 		if (img != null) img.color = highlight;
 
-		// Ensure transform rotation is reset before starting a new tween
+		// restore original rotation before any animation
 		transform.localRotation = originalLocalRotation;
 
-		// If an existing tweener is active, kill it so we reliably restart the animation and avoid stale state
+		// stop any existing tweens
 		if (activeTweener != null)
 		{
 			try { activeTweener.Kill(); } catch { }
 			activeTweener = null;
 		}
 
-		// Use cached OwnerReel instead of GetComponentInParent to avoid expensive calls
-		var parentReel = OwnerReel;
-		if (parentReel != null)
-		{
-			var engine = parentReel.OwnerEngine;
-			if (engine != null && !engine.IsPageActive)
-			{
-				// Do not start DOTween shake when page is hidden
-				return;
-			}
-		}
+		if (!doShake) return;
 
-		// Start a shake rotation tween and ensure rotation is restored when tween ends or is killed
+		// Start shake tween
 		activeTweener = transform.DOShakeRotation(1f, strength: 25f);
 		if (activeTweener != null)
 		{
@@ -160,7 +123,7 @@ public class GameSymbol : MonoBehaviour
 	{
 		if (eventManager == null) return;
 
-		eventManager.UnregisterEvent(SlotsEvent.SymbolWin, OnSymbolWin);
+		// Only unregister Idle handler (SymbolWin no longer used)
 		eventManager.UnregisterEvent(State.Idle, "Exit", OnIdleExit);
 
 		eventManager = null;

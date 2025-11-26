@@ -11,9 +11,10 @@ public enum SlotsEvent
 	// presentation
 	BeginSlotPresentation,
 	PresentationComplete,
+	// group-level presentation finished across all participating slots
+	PresentationCompleteGroup,
 
 	// symbol events
-	SymbolWin,
 	SymbolLanded,
 
 	// global UI/input
@@ -26,5 +27,8 @@ public enum SlotsEvent
 	PlayerInputPressed,
 
 	// slot management
-	AllSlotsRemoved
+	AllSlotsRemoved,
+
+	// Engine-level: all reels have signalled that their spin started
+	ReelsAllStarted
 }

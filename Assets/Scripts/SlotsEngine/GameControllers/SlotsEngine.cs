@@ -59,6 +59,9 @@ public class SlotsEngine : MonoBehaviour
 		eventManager.RegisterEvent(SlotsEvent.ReelCompleted, OnReelCompleted);
 		eventManager.RegisterEvent(State.Presentation, "Enter", OnPresentationEnter);
 		eventManager.RegisterEvent(SlotsEvent.PresentationComplete, OnPresentationComplete);
+
+		// Listen for group-level presentation completion so engines can transition to Idle together
+		try { GlobalEventManager.Instance?.RegisterEvent(SlotsEvent.PresentationCompleteGroup, OnPresentationCompleteGroup); } catch { }
 		reelsRootTransform = canvasTransform;
 		SpawnReels(reelsRootTransform);
 	}
@@ -75,12 +78,24 @@ public class SlotsEngine : MonoBehaviour
 	public void SpinOrStopReels(bool spin)
 	{
 		if (!spinInProgress && spin) SpinAllReels();
-		else if (spinInProgress && !spin && stateMachine.CurrentState == State.Spinning) StopAllReels();
+		// Always attempt to stop when a spin is in progress. Do not gate on per-reel Spinning flags or
+		// strict stateMachine state here — a single Stop request should stop all reels (including
+		// those suspended due to being off-page). Individual reels will unpause as needed to finish.
+		else if (spinInProgress && !spin) StopAllReels();
 		else if (GamePlayer.Instance.CurrentCredits < GamePlayer.Instance.CurrentBet.CreditCost) SlotConsoleController.Instance.SetConsoleMessage("Not enough credits! Switch to a lower bet or add credits.");
 	}
 
 	// Coroutine handle used to stagger starting reels from a single scheduler rather than per-reel sequences
 	private Coroutine staggerSpinCoroutine;
+	// Counter used to detect when all reels have signalled that their spin started
+	private int reelsStartedCount = 0;
+	// Tracks whether a stop has already been requested for the current spin
+	private bool stopRequested = false;
+	// If an external caller requests a stop before all reels have started, defer until ready
+	private bool deferredStopRequested = false;
+
+	// Safety margin to wait for per-reel kickup to complete before allowing stops to take effect
+	private const float KickupSafetyMargin = 0.25f;
 
 	/// <summary>
 	/// Randomizes each reel's visible symbols based on its strip and begins the spin with a slight stagger.
@@ -88,6 +103,8 @@ public class SlotsEngine : MonoBehaviour
 	/// </summary>
 	private void SpinAllReels()
 	{
+		// Clear any previous stop request when starting a new spin
+		stopRequested = false;
 		if (spinInProgress) throw new InvalidOperationException("Spin already in progress!");
 		try { if (WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) WinEvaluator.Instance.NotifySpinStarted(); } catch { }
 
@@ -102,6 +119,11 @@ public class SlotsEngine : MonoBehaviour
 			reels[i].CurrentReelData.SetCurrentSymbolData(testSolution);
 			perReelSolutions.Add(testSolution);
 		}
+
+		// Reset started counter and use a single coroutine to stagger BeginSpinImmediate calls to avoid per-reel scheduling allocations.
+		reelsStartedCount = 0;
+		// If there are zero reels, nothing to do
+		if (reels.Count == 0) return;
 
 		// Use a single coroutine to stagger BeginSpinImmediate calls to avoid per-reel scheduling allocations.
 		float falloutStep = 0.025f;
@@ -130,20 +152,84 @@ public class SlotsEngine : MonoBehaviour
 
 	private void OnReelSpinStarted(object obj)
 	{
+		// Called each time a reel broadcasts that it has started spinning.
+		// Mark engine as spinning on the first notification and track how many reels have started.
 		if (!spinInProgress)
 		{
 			spinInProgress = true; stateMachine.SetState(State.Spinning);
+		}
+		try
+		{
+			reelsStartedCount++;
+			// When every reel has started, notify listeners (e.g., UI) that the Stop button may be enabled.
+			if (reelsStartedCount >= reels.Count)
+			{
+				reelsStartedCount = reels.Count; // clamp
+				try { eventManager.BroadcastEvent(SlotsEvent.ReelsAllStarted); } catch { }
+				// If a deferred stop was requested earlier, execute it now
+				if (deferredStopRequested)
+				{
+					deferredStopRequested = false;
+					StopAllReels();
+				}
+			}
+		}
+		catch { }
+	}
+
+	/// <summary>
+	/// Request that this engine stop when it is ready (i.e., after all reels have started kickup).
+	/// If the engine is already ready, the stop will be applied immediately.
+	/// Subsequent requests during the same spin are ignored.
+	/// </summary>
+	public void RequestStopWhenReady()
+	{
+		if (!spinInProgress) return; // nothing to stop
+		if (stopRequested) return; // already requested
+		if (reelsStartedCount >= reels.Count)
+		{
+			StopAllReels();
+		}
+		else
+		{
+			deferredStopRequested = true;
 		}
 	}
 
 	/// <summary>
 	/// Requests all reels to stop with a staggered delay and broadcasts a StoppingReels event.
-	/// No-op if any reel is already not spinning (prevents mid-spin interruptions).
+	/// This will request each reel to stop regardless of its current spinning flag. Reels that are
+	/// suspended because their page is inactive will be unpaused briefly so they can complete stop
+	/// logic; OnReelCompleted will handle updating engine state when all reels have finished.
 	/// </summary>
 	private void StopAllReels()
 	{
-		if (!reels.TrueForAll(x => x.Spinning)) return;
-		float stagger = 0.025f; for (int i = 0; i < reels.Count; i++) { reels[i].StopReel(stagger); stagger += 0.025f; }
+		if (!spinInProgress) return; // nothing to stop
+		// If a stop has already been requested for this spin, ignore subsequent requests
+		if (stopRequested) return;
+		stopRequested = true;
+		float baseStagger = 0.025f;
+		// If this engine/page is inactive, request immediate stops (no stagger) so reels don't wait
+		bool enginePageActive = IsPageActive;
+		// When active, ensure stop requests don't occur before the last reel's kickup begins.
+		// Compute a conservative minimum delay that guarantees all per-reel BeginSpin(startDelay) calls
+		// have started and their kickup period elapsed. Use a safety margin equal to expected kickup duration.
+		float ensureAllStartedDelay = 0f;
+		if (enginePageActive)
+		{
+			ensureAllStartedDelay = baseStagger * reels.Count + KickupSafetyMargin;
+		}
+		for (int i = 0; i < reels.Count; i++)
+		{
+			try
+			{
+				// Schedule stop so it will not fire before the reel's own scheduled start.
+				float delay = enginePageActive ? (ensureAllStartedDelay + baseStagger * i) : 0f;
+				reels[i].StopReel(delay);
+			}
+			catch { }
+		}
+		// Notify listeners that a stop has been requested
 		eventManager.BroadcastEvent(SlotsEvent.StoppingReels);
 	}
 
@@ -348,7 +434,23 @@ public class SlotsEngine : MonoBehaviour
 	
 	void OnReelCompleted(object obj)
 	{
-		if (reels.TrueForAll(x => !x.Spinning)) { spinInProgress = false; eventManager.BroadcastEvent(SlotsEvent.SpinCompleted); }
+		try
+		{
+			// Consider a reel complete only when its motion is fully settled. This avoids reporting spin
+			// completion while some reels are still running landing coroutines or suspended awaiting resume,
+			// which could lead to presentation/state desync and visual offsets.
+			bool allDone = reels != null && reels.Count > 0 && reels.All(r => r != null && r.IsMotionComplete());
+			if (allDone && spinInProgress)
+			{
+				spinInProgress = false;
+				// Reset started counter for next spin
+				reelsStartedCount = 0;
+				// Clear stop guard for next spin
+				stopRequested = false;
+				eventManager.BroadcastEvent(SlotsEvent.SpinCompleted);
+			}
+		}
+		catch { }
 	}
 
 	/// <summary>
@@ -373,6 +475,19 @@ public class SlotsEngine : MonoBehaviour
 	}
 	private void OnPresentationComplete(object obj) => stateMachine.SetState(State.Idle);
 
+	// Global group-level presentation finished: transition to Idle if this engine is currently presenting
+	private void OnPresentationCompleteGroup(object obj)
+	{
+		try
+		{
+			if (stateMachine != null && stateMachine.CurrentState == State.Presentation)
+			{
+				stateMachine.SetState(State.Idle);
+			}
+		}
+		catch { }
+	}
+
 	/// <summary>
 	/// Returns a row-major flattened grid of the current visible `GameSymbol`s across all reels.
 	/// </summary>
@@ -384,6 +499,39 @@ public class SlotsEngine : MonoBehaviour
 	/// Broadcasts a slot-scoped event to listeners registered on this engine's `EventManager` instance.
 	/// </summary>
 	public void BroadcastSlotsEvent(SlotsEvent eventName, object value = null) => eventManager.BroadcastEvent(eventName, value);
+	/// <summary>
+	/// Let the engine highlight winning symbols. SlotsEngine controls symbol animations directly
+	/// so we avoid broadcasting per-symbol events.
+	/// </summary>
+	public void HighlightWinningSymbols(GameSymbol[] grid, List<WinData> winData)
+	{
+		if (grid == null || winData == null) return;
+		int gridLen = grid.Length;
+		foreach (var w in winData)
+		{
+			if (w?.WinningSymbolIndexes == null) continue;
+			foreach (int idx in w.WinningSymbolIndexes)
+			{
+				if (idx < 0 || idx >= gridLen) continue;
+				var gs = grid[idx];
+				if (gs == null) continue;
+				Color hi = Color.green;
+				if (gs.CurrentSymbolData != null)
+				{
+					switch (gs.CurrentSymbolData.WinMode)
+					{
+						case EvaluatorCore.SymbolWinMode.LineMatch: hi = Color.green; break;
+						case EvaluatorCore.SymbolWinMode.SingleOnReel: hi = Color.yellow; break;
+						case EvaluatorCore.SymbolWinMode.TotalCount: hi = Color.red; break;
+					}
+				}
+				bool doShake = true;
+				try { doShake = gs.OwnerReel != null ? gs.OwnerReel.OwnerEngine.IsPageActive : true; } catch { }
+				try { gs.HighlightForWin(hi, doShake); } catch { }
+			}
+		}
+	}
+
 	/// <summary>
 	/// Saves the current `SlotsData` through the persistence layer.
 	/// </summary>
@@ -408,5 +556,8 @@ public class SlotsEngine : MonoBehaviour
 	{
 		// ensure any stagger coroutine is stopped
 		if (staggerSpinCoroutine != null) StopCoroutine(staggerSpinCoroutine);
+
+		// Unregister global handlers
+		try { GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.PresentationCompleteGroup, OnPresentationCompleteGroup); } catch { }
 	}
 }

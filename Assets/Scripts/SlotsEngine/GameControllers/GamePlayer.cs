@@ -63,18 +63,19 @@ public class GamePlayer : Singleton<GamePlayer>
 		if (Input.GetKeyDown(KeyCode.Space))
 		{
 			GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.PlayerInputPressed);
+			return;
 		}
 
 #if UNITY_EDITOR
 		// Debug/testing inputs (editor only)
 		// Testing add slots
-		if (Input.GetKeyDown(KeyCode.S))
+		if (Input.GetKeyDown(KeyCode.S) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
 			SpawnSlots(null, true);
 		}
 
 		// Testing add reels
-		if (Input.GetKeyDown(KeyCode.R))
+		if (Input.GetKeyDown(KeyCode.R) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
 			var slots = playerSlots.GetRandom();
 			if (slots == null)
@@ -88,7 +89,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 
 		// Testing add symbols
-		if (Input.GetKeyDown(KeyCode.A))
+		if (Input.GetKeyDown(KeyCode.A) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
 			var slots = playerSlots.GetRandom();
 			if (slots == null)
@@ -108,7 +109,7 @@ public class GamePlayer : Singleton<GamePlayer>
 				}
 			}
 		}
-		if (Input.GetKeyDown(KeyCode.Z))
+		if (Input.GetKeyDown(KeyCode.Z) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
 			var slots = playerSlots.GetRandom();
 			if (slots == null)
@@ -130,7 +131,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 
 		// Testing kill slots
-		if (Input.GetKeyDown(KeyCode.X))
+		if (Input.GetKeyDown(KeyCode.X) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
 			if (playerSlots.Count > 0)
 			{
@@ -280,7 +281,15 @@ public class GamePlayer : Singleton<GamePlayer>
 		// iterate over copy to avoid modification during iteration
 		foreach (var slots in playerSlots.ToArray())
 		{
-			slots.SpinOrStopReels(spinPurchase);
+			if (spinPurchase)
+			{
+				slots.SpinOrStopReels(true);
+			}
+			else
+			{
+				// Request stop at engine level; engines will defer or ignore repeated requests.
+				try { slots.RequestStopWhenReady(); } catch { /* defensive */ }
+			}
 		}
 	}
 

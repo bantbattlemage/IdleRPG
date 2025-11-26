@@ -62,6 +62,8 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 		slotsEventManager.RegisterEvent(State.Spinning, "Enter", OnSpinningEnter);
 		slotsEventManager.RegisterEvent(State.Spinning, "Exit", OnSpinningExit);
 		slotsEventManager.RegisterEvent(SlotsEvent.StoppingReels, OnStoppingReels);
+		// Enable Stop only after the engine notifies that all reels have started their kickup
+		slotsEventManager.RegisterEvent(SlotsEvent.ReelsAllStarted, OnReelsAllStarted);
 	}
 
 	private void OnCreditsChanged(object obj)
@@ -347,7 +349,8 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 	{
 		StopButton.GetComponentInChildren<TextMeshProUGUI>().text = "STOP";
 		StopButton.gameObject.SetActive(true);
-		StopButton.interactable = true;
+		// Keep stop disabled until engine confirms all reels have started
+		StopButton.interactable = false;
 
 		SpinButton.gameObject.SetActive(false);
 
@@ -364,11 +367,21 @@ public class SlotConsoleController : Singleton<SlotConsoleController>
 
 	void OnSpinPressed()
 	{
+		// Broadcast spin-specific event for listeners that need to know a spin was explicitly requested
 		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.SpinButtonPressed);
+		// Unified input pathway: also broadcast PlayerInputPressed so all input methods follow the same handler
+		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.PlayerInputPressed);
 	}
 
 	void OnStopPressed()
 	{
-		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.StopButtonPressed);
+		// Unified input pathway: route Stop button presses through PlayerInputPressed so handling is identical
+		cachedGlobalEventManager?.BroadcastEvent(SlotsEvent.PlayerInputPressed);
+	}
+
+	private void OnReelsAllStarted(object obj)
+	{
+		// Engine reports all reels have entered their visible kickup; enable the Stop button now
+		try { StopButton.interactable = true; } catch { }
 	}
 }
