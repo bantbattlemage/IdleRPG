@@ -88,8 +88,9 @@ public class ReelStripData : Data
 
     /// <summary>
     /// Core selection overload with ability to skip consuming reserved counts (used for dummy symbols).
+    /// Added optional parameter `useSeededRng` to allow callers to bypass the project's seeded RNG.
     /// </summary>
-    public SymbolData GetWeightedSymbol(List<SymbolData> existingSelections, bool consumeReserved)
+    public SymbolData GetWeightedSymbol(List<SymbolData> existingSelections, bool consumeReserved, bool useSeededRng = true)
     {
         EnsureResolved();
         if (symbolDefinitions == null || symbolDefinitions.Length == 0) return null;
@@ -190,9 +191,41 @@ public class ReelStripData : Data
             if (candidates.Count == 0) return null;
         }
 
+        // Build simple picker list
         var picker = new List<(SymbolDefinition, float)>(candidates.Count);
         for (int i = 0; i < candidates.Count; i++) picker.Add((candidates[i].def, candidates[i].weight));
-        var pickedDef = WeightedRandom.Pick(picker) ?? symbolDefinitions.FirstOrDefault(d => d != null);
+
+        SymbolDefinition pickedDef = null;
+        if (useSeededRng)
+        {
+            // Use existing centralized RNG via WeightedRandom (which calls RNGManager)
+            pickedDef = WeightedRandom.Pick(picker) ?? symbolDefinitions.FirstOrDefault(d => d != null);
+        }
+        else
+        {
+            // Use UnityEngine.Random (non-seeded by RNGManager) for dummy/non-deterministic picks
+            float total = 0f;
+            for (int i = 0; i < picker.Count; i++) total += picker[i].Item2;
+            if (total <= 0f)
+            {
+                pickedDef = picker.Count > 0 ? picker[0].Item1 : symbolDefinitions.FirstOrDefault(d => d != null);
+            }
+            else
+            {
+                float r = UnityEngine.Random.value * total;
+                for (int i = 0; i < picker.Count; i++)
+                {
+                    r -= picker[i].Item2;
+                    if (r <= 0f)
+                    {
+                        pickedDef = picker[i].Item1;
+                        break;
+                    }
+                }
+                if (pickedDef == null) pickedDef = picker[picker.Count - 1].Item1;
+            }
+        }
+
         if (pickedDef == null) return null;
 
         // Consume only if depletable and requested.

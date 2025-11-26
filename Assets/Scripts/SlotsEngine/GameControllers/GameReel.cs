@@ -42,7 +42,7 @@ public class GameReel : MonoBehaviour
     // Helper to resolve persisted SymbolData candidate, attempt to recover missing sprite by name,
     // and persist into SymbolDataManager when possible. Falls back to reelStrip selection when
     // candidate is null or sprite could not be resolved.
-    private SymbolData ResolveAndPersistSymbol(SymbolData candidate, List<SymbolData> existingSelections)
+    private SymbolData ResolveAndPersistSymbol(SymbolData candidate, List<SymbolData> existingSelections, bool useSeededRng = true)
     {
         SymbolData result = candidate;
 
@@ -56,7 +56,7 @@ public class GameReel : MonoBehaviour
             if (result.Sprite == null)
             {
                 // fallback to strip selection
-                result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : result;
+                result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections, true, useSeededRng) : result;
             }
             else
             {
@@ -66,7 +66,7 @@ public class GameReel : MonoBehaviour
         }
         else
         {
-            result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections) : null;
+            result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections, true, useSeededRng) : null;
         }
 
         return result;
@@ -275,14 +275,16 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 sym?.SetOwnerReel(this);
-                SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
+                // Use non-seeded RNG for dummy initialization
+                SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = ResolveAndPersistSymbol(null, existingSelections);
+            // Use non-seeded RNG for dummy selection
+            SymbolData def = ResolveAndPersistSymbol(null, existingSelections, useSeededRng: false);
             sym.ApplySymbol(def);
             sym.transform.SetParent(symbolRoot, false);
             float y = -step * (i + 1);
@@ -302,13 +304,15 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 sym?.SetOwnerReel(this);
-                SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections);
+                // Use non-seeded RNG for dummy initialization
+                SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = ResolveAndPersistSymbol(null, existingSelections);
+            // Use non-seeded RNG for dummy selection
+            SymbolData def = ResolveAndPersistSymbol(null, existingSelections, useSeededRng: false);
             sym.ApplySymbol(def);
             sym.transform.SetParent(symbolRoot, false);
             float y = step * (activeCount + i);
@@ -703,13 +707,15 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 sym?.SetOwnerReel(this);
-                SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
+                // Use non-seeded RNG for dummy init
+                SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
+            // Use non-seeded RNG for dummy selection
+            SymbolData def = ResolveAndPersistSymbol(null, tmpCombinedForBuffer, useSeededRng: false);
             sym.ApplySymbol(def);
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = -step * (i + 1);
@@ -729,13 +735,15 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 sym?.SetOwnerReel(this);
-                SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
+                // Use non-seeded RNG for dummy init
+                SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = ResolveAndPersistSymbol(null, tmpCombinedForBuffer);
+            // Use non-seeded RNG for dummy selection
+            SymbolData def = ResolveAndPersistSymbol(null, tmpCombinedForBuffer, useSeededRng: false);
             sym.ApplySymbol(def);
             sym.transform.SetParent(nextSymbolsRoot, false);
             float y = step * (currentReelData.SymbolCount + i);
@@ -802,13 +810,15 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(root) : GameSymbolPool.Instance?.Get(root);
                 sym?.SetOwnerReel(this);
-                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume);
+                // Use non-seeded RNG for dummy symbols
+                SymbolData initDef = reelStrip.GetWeightedSymbol(existingSelections, consume, false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
                 allPooledSymbols.Add(sym); allPooledSet.Add(sym);
                 allocatedPooledSet.Add(sym);
             }
-            SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, consume);
+            // Use non-seeded RNG for dummy selection
+            SymbolData def = reelStrip.GetWeightedSymbol(existingSelections, consume, false);
             sym.ApplySymbol(def);
             float y = (step * (i + startIndex)) * flip;
             sym.SetSizeAndLocalY(currentReelData.SymbolSize, y);
@@ -1047,7 +1057,7 @@ public class GameReel : MonoBehaviour
         if (!spinning) DimDummySymbols();
     }
 
-    // Public API: update visual sizes/positions without regenerenerating or reassigning symbols/dummies
+    // Public API: update visual sizes/positions without regenerening or reassigning symbols/dummies
     public void ResizeVisuals(float newSymbolSize, float newSpacing)
     {
         if (currentReelData == null) return;
@@ -1233,10 +1243,10 @@ public class GameReel : MonoBehaviour
         {
             var sym = CreateSymbolInstance(dummyContainer);
             // initialize with a harmless non-consuming pick so the symbol has a sprite and registers events
-            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
+            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false, false) : null;
             if (sym != null)
             {
-                if (def != null) sym.InitializeSymbol(def, eventManager); else sym.InitializeSymbol(reelStrip?.GetWeightedSymbol(null), eventManager);
+                if (def != null) sym.InitializeSymbol(def, eventManager); else sym.InitializeSymbol(reelStrip?.GetWeightedSymbol(null, false, false), eventManager);
                 sym.SetSizeAndLocalY(currentReelData != null ? currentReelData.SymbolSize : 100, 0);
                 // keep pool symbols inactive until allocated
                 if (sym.gameObject.activeSelf) sym.gameObject.SetActive(false);
@@ -1290,8 +1300,8 @@ public class GameReel : MonoBehaviour
             // NEW: assign owner before initialization so symbol can reference it immediately
             newSym.SetOwnerReel(this);
 
-            // initialize with non-consuming pick to get a sprite
-            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false) : null;
+            // initialize with non-consuming pick to get a sprite - use non-seeded RNG for pooled symbols (dummies)
+            SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false, false) : null;
             if (def != null) newSym.InitializeSymbol(def, eventManager);
             if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
             allPooledSymbols.Add(newSym); allPooledSet.Add(newSym);

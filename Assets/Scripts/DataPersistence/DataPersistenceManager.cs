@@ -126,6 +126,22 @@ public class DataPersistenceManager : MonoBehaviour
 		selectedProfileId = SanitizeProfileId(name);
 		gameData = new GameData();
 
+		// If dev saved a seed in PlayerPrefs, apply it so initial randomness is deterministic for the new profile
+		try
+		{
+			const string devSeedKey = "Dev_RNGSeed";
+			if (PlayerPrefs.HasKey(devSeedKey))
+			{
+				int s = PlayerPrefs.GetInt(devSeedKey);
+				RNGManager.SetSeed(s);
+				Debug.Log($"Applied dev RNG seed {s} for New Game.");
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"Failed to apply saved dev seed: {ex.Message}");
+		}
+
 		// perform immediate save for new game
 		SaveGame();
 	}
