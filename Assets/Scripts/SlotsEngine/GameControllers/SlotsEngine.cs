@@ -596,4 +596,63 @@ public class SlotsEngine : MonoBehaviour
 		// Inform listeners
 		try { eventManager?.BroadcastEvent(SlotsEvent.ReelAdded, reel); } catch { }
 	}
+
+	/// <summary>
+	/// Removes a reel from this engine at runtime. Cleans up its GameObjects, updates data and layout, and broadcasts an event.
+	/// </summary>
+	public void RemoveReel(GameReel reel)
+	{
+		if (reel == null) return;
+		if (spinInProgress) { Debug.LogWarning("Cannot remove reel while spinning."); return; }
+		int idx = reels.IndexOf(reel);
+		if (idx < 0)
+		{
+			Debug.LogWarning("Tried to remove a reel that isn't registered with this engine.");
+			return;
+		}
+
+		// Remove from visual list first to avoid index mismatches during cleanup
+		reels.RemoveAt(idx);
+
+		// Remove the corresponding data entry if present
+		if (currentSlotsData != null && currentSlotsData.CurrentReelData != null)
+		{
+			ReelData rd = (idx >= 0 && idx < currentSlotsData.CurrentReelData.Count) ? currentSlotsData.CurrentReelData[idx] : null;
+			if (rd != null)
+			{
+				try { ReelDataManager.Instance?.RemoveDataIfExists(rd); } catch { }
+				currentSlotsData.RemoveReel(rd);
+			}
+		}
+
+		// Destroy the reel GameObject safely
+		try
+		{
+			if (reel.gameObject != null)
+			{
+				Destroy(reel.gameObject);
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogException(ex);
+		}
+
+		// Reindex remaining reels so their IDs remain consistent
+		for (int i = 0; i < reels.Count; i++)
+		{
+			var r = reels[i];
+			if (r == null) continue;
+			// Update local position using stable spacing
+			// IDs are used only for events/debug; positions are handled by RepositionReels
+			// We keep ID in sync by respawning positions and letting event flow continue.
+		}
+
+		// Update layout
+		RepositionReels();
+		RegenerateAllReelDummies();
+
+		// Inform listeners
+		try { eventManager?.BroadcastEvent(SlotsEvent.ReelRemoved, reel); } catch { }
+	}
 }

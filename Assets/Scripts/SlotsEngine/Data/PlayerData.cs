@@ -18,12 +18,17 @@ public class PlayerData : Data
 	[SerializeField] private List<SlotsData> currentSlots;
 	public List<SlotsData> CurrentSlots => currentSlots;
 
+	// --- New: Player inventory scaffolding ---
+	[SerializeField] private PlayerInventory inventory;
+	public PlayerInventory Inventory => inventory;
+
 	public PlayerData(int c = 0, BetLevelDefinition bet = null)
 	{
 		credits = c;
 		currentBet = bet;
 		currentBetKey = bet != null ? bet.name : null;
 		currentSlots = new List<SlotsData>();
+		inventory = new PlayerInventory(); // initialize empty inventory
 	}
 
 	private void EnsureResolved()
@@ -58,5 +63,22 @@ public class PlayerData : Data
 	public void SetCurrentCredits(int c)
 	{
 		credits = c;
+	}
+
+	// --- Inventory operations convenience wrappers ---
+	public void AddInventoryItem(InventoryItemData item)
+	{
+		if (inventory == null) inventory = new PlayerInventory();
+		inventory.AddItem(item);
+	}
+	public bool RemoveInventoryItem(InventoryItemData item)
+	{
+		if (inventory == null) return false;
+		return inventory.RemoveItem(item);
+	}
+	public List<InventoryItemData> GetItemsOfType(InventoryItemType type)
+	{
+		if (inventory == null) return new List<InventoryItemData>();
+		return inventory.GetItemsOfType(type);
 	}
 }

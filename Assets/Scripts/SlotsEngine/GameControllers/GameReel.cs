@@ -280,7 +280,8 @@ public class GameReel : MonoBehaviour
                 sym.InitializeSymbol(initDef, eventManager);
                 // Ensure it's hidden until allocated properly
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
+                // Only add to per-reel pooled lists if not already present (avoid duplicates)
+                if (sym != null && !allPooledSet.Contains(sym)) { allPooledSymbols.Add(sym); allPooledSet.Add(sym); }
                 allocatedPooledSet.Add(sym);
             }
             // Use non-seeded RNG for dummy selection
@@ -308,7 +309,8 @@ public class GameReel : MonoBehaviour
                 SymbolData initDef = ResolveAndPersistSymbol(null, existingSelections, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
+                // Only add to per-reel pooled lists if not already present (avoid duplicates)
+                if (sym != null && !allPooledSet.Contains(sym)) { allPooledSymbols.Add(sym); allPooledSet.Add(sym); }
                 allocatedPooledSet.Add(sym);
             }
             // Use non-seeded RNG for dummy selection
@@ -707,11 +709,13 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 sym?.SetOwnerReel(this);
-                // Use non-seeded RNG for dummy init
+                // Use non-seeded RNG for dummy initialization
                 SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
+                // Ensure it's hidden until allocated properly
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
+                // Only add to per-reel pooled lists if not already present (avoid duplicates)
+                if (sym != null && !allPooledSet.Contains(sym)) { allPooledSymbols.Add(sym); allPooledSet.Add(sym); }
                 allocatedPooledSet.Add(sym);
             }
             // Use non-seeded RNG for dummy selection
@@ -735,11 +739,12 @@ public class GameReel : MonoBehaviour
             {
                 sym = cachedSymbolPool != null ? cachedSymbolPool.Get(dummyContainer) : GameSymbolPool.Instance?.Get(dummyContainer);
                 sym?.SetOwnerReel(this);
-                // Use non-seeded RNG for dummy init
+                // Use non-seeded RNG for dummy initialization
                 SymbolData initDef = ResolveAndPersistSymbol(null, tmpCombinedForBuffer, useSeededRng: false);
                 sym.InitializeSymbol(initDef, eventManager);
                 sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
+                // Only add to per-reel pooled lists if not already present (avoid duplicates)
+                if (sym != null && !allPooledSet.Contains(sym)) { allPooledSymbols.Add(sym); allPooledSet.Add(sym); }
                 allocatedPooledSet.Add(sym);
             }
             // Use non-seeded RNG for dummy selection
@@ -1250,7 +1255,8 @@ public class GameReel : MonoBehaviour
                 sym.SetSizeAndLocalY(currentReelData != null ? currentReelData.SymbolSize : 100, 0);
                 // keep pool symbols inactive until allocated
                 if (sym.gameObject.activeSelf) sym.gameObject.SetActive(false);
-                allPooledSymbols.Add(sym); allPooledSet.Add(sym);
+                // Only add to per-reel pooled lists if not already present (avoid duplicates)
+                if (!allPooledSet.Contains(sym)) { allPooledSymbols.Add(sym); allPooledSet.Add(sym); }
                 // newly created symbol is free until allocated
                 if (allocatedPooledSet.Contains(sym)) allocatedPooledSet.Remove(sym);
                 freePooledStack.Push(sym);
@@ -1304,7 +1310,8 @@ public class GameReel : MonoBehaviour
             SymbolData def = reelStrip != null ? reelStrip.GetWeightedSymbol(s_emptySelection, false, false) : null;
             if (def != null) newSym.InitializeSymbol(def, eventManager);
             if (!newSym.gameObject.activeSelf) newSym.gameObject.SetActive(true);
-            allPooledSymbols.Add(newSym); allPooledSet.Add(newSym);
+            // Only add to per-reel pooled lists if not already present (avoid duplicates)
+            if (!allPooledSet.Contains(newSym)) { allPooledSymbols.Add(newSym); allPooledSet.Add(newSym); }
             allocatedPooledSet.Add(newSym);
 
             // newly created symbol should start clean

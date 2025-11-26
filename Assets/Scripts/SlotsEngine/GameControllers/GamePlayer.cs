@@ -39,6 +39,12 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
 
+		// Initialize inventory if missing (legacy saved data support)
+		if (playerData.Inventory == null)
+		{
+			playerData.AddInventoryItem(new InventoryItemData("Starter Reel Strip", InventoryItemType.ReelStrip, null));
+		}
+
 		if (playerData.CurrentSlots == null || playerData.CurrentSlots.Count == 0)
 		{
 			SpawnSlots();
@@ -66,75 +72,38 @@ public class GamePlayer : Singleton<GamePlayer>
 			return;
 		}
 
+
+		// Testing remove slots
+		if((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && Input.GetKeyDown(KeyCode.S))
+		{
+			RemoveTestSlot();
+		}
 		// Testing add slots
-		if (Input.GetKeyDown(KeyCode.S) && playerSlots.All(x => x.CurrentState == State.Idle))
+		else if (Input.GetKeyDown(KeyCode.S) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
-			SpawnSlots(null, true);
+			AddTestSlot();
 		}
 
+		// Testing remove reels (Shift+R)
+		if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && Input.GetKeyDown(KeyCode.R) && playerSlots.All(x => x.CurrentState == State.Idle))
+		{
+			RemoveTestReel();
+		}
 		// Testing add reels
-		if (Input.GetKeyDown(KeyCode.R) && playerSlots.All(x => x.CurrentState == State.Idle))
+		else if (Input.GetKeyDown(KeyCode.R) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
-			var slots = playerSlots.GetRandom();
-			if (slots == null)
-			{
-				Debug.LogWarning("No slots available to add a reel.");
-			}
-			else
-			{
-				slots.AddReel();
-			}
+			AddTestReel();
 		}
 
+		// Testing remove symbols
+		if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && Input.GetKeyDown(KeyCode.A) && playerSlots.All(x => x.CurrentState == State.Idle))
+		{
+			RemoveTestSymbol();
+		}
 		// Testing add symbols
-		if (Input.GetKeyDown(KeyCode.A) && playerSlots.All(x => x.CurrentState == State.Idle))
+		else if (Input.GetKeyDown(KeyCode.A) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
-			var slots = playerSlots.GetRandom();
-			if (slots == null)
-			{
-				Debug.LogWarning("No slots available to add a symbol.");
-			}
-			else
-			{
-				var reel = slots.CurrentReels.GetRandom();
-				if (reel == null)
-				{
-					Debug.LogWarning("Selected slot has no reels to add a symbol to.");
-				}
-				else
-				{
-					reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
-				}
-			}
-		}
-		if (Input.GetKeyDown(KeyCode.Z) && playerSlots.All(x => x.CurrentState == State.Idle))
-		{
-			var slots = playerSlots.GetRandom();
-			if (slots == null)
-			{
-				Debug.LogWarning("No slots available to remove a symbol.");
-			}
-			else
-			{
-				var reel = slots.CurrentReels.GetRandom();
-				if (reel == null)
-				{
-					Debug.LogWarning("Selected slot has no reels to remove a symbol from.");
-				}
-				else
-				{
-					reel.SetSymbolCount(reel.CurrentReelData.SymbolCount - 1);
-				}
-			}
-		}
-
-		// Testing kill slots
-		if (Input.GetKeyDown(KeyCode.X) && playerSlots.All(x => x.CurrentState == State.Idle))
-		{
-			if (playerSlots.Count > 0)
-			{
-				RemoveSlots(playerSlots.Last());
-			}
+			AddTestSymbol();
 		}
 
 		// Testing add credits
@@ -155,6 +124,94 @@ public class GamePlayer : Singleton<GamePlayer>
 			Time.timeScale = Mathf.Clamp(Time.timeScale + 0.1f, 0.1f, 10f);
 			Debug.LogWarning(Time.timeScale);
 		}
+	}
+
+	// ---------------- Test item helpers ----------------
+	private SlotsEngine GetRandomIdleSlot()
+	{
+		var candidates = playerSlots.Where(s => s != null && s.CurrentState == State.Idle).ToList();
+		return candidates.Count == 0 ? null : candidates.GetRandom();
+	}
+
+	public void AddTestSlot()
+	{
+		SpawnSlots(null, true);
+	}
+
+	public void RemoveTestSlot()
+	{
+		var slot = GetRandomIdleSlot();
+		if (slot == null)
+		{
+			Debug.LogWarning("No idle slot available to remove.");
+			return;
+		}
+		RemoveSlots(slot);
+	}
+
+	public void AddTestReel()
+	{
+		var slot = GetRandomIdleSlot();
+		if (slot == null)
+		{
+			Debug.LogWarning("No slot available to add a reel.");
+			return;
+		}
+		slot.AddReel();
+		playerData.AddInventoryItem(new InventoryItemData("Reel", InventoryItemType.Reel, null));
+	}
+
+	public void RemoveTestReel()
+	{
+		var slot = GetRandomIdleSlot();
+		if (slot == null)
+		{
+			Debug.LogWarning("No slot available to remove a reel.");
+			return;
+		}
+		var reel = slot.CurrentReels.GetRandom();
+		if (reel == null)
+		{
+			Debug.LogWarning("Selected slot has no reels to remove.");
+			return;
+		}
+		// Use engine API to remove the entire reel now that it's implemented
+		slot.RemoveReel(reel);
+	}
+
+	public void AddTestSymbol()
+	{
+		var slot = GetRandomIdleSlot();
+		if (slot == null)
+		{
+			Debug.LogWarning("No slot available to add a symbol.");
+			return;
+		}
+		var reel = slot.CurrentReels.GetRandom();
+		if (reel == null)
+		{
+			Debug.LogWarning("Selected slot has no reels to add a symbol to.");
+			return;
+		}
+		reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
+		playerData.AddInventoryItem(new InventoryItemData("Symbol" + reel.CurrentReelData.SymbolCount, InventoryItemType.Symbol, reel.CurrentReelData.CurrentReelStrip?.Definition?.name));
+	}
+
+	public void RemoveTestSymbol()
+	{
+		var slot = GetRandomIdleSlot();
+		if (slot == null)
+		{
+			Debug.LogWarning("No slot available to remove a symbol.");
+			return;
+		}
+		var reel = slot.CurrentReels.GetRandom();
+		if (reel == null)
+		{
+			Debug.LogWarning("Selected slot has no reels to remove a symbol from.");
+			return;
+		}
+		reel.SetSymbolCount(Mathf.Max(1, reel.CurrentReelData.SymbolCount - 1));
 	}
 
 	public void BeginGame()
@@ -181,6 +238,8 @@ public class GamePlayer : Singleton<GamePlayer>
 		if (existingData == null)
 		{
 			playerData.AddSlots(newSlots.CurrentSlotsData);
+			// Inventory registration for tracking
+			playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, null));
 		}
 
 		playerSlots.Add(newSlots);
