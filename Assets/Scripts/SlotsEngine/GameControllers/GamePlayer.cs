@@ -66,8 +66,6 @@ public class GamePlayer : Singleton<GamePlayer>
 			return;
 		}
 
-#if UNITY_EDITOR
-		// Debug/testing inputs (editor only)
 		// Testing add slots
 		if (Input.GetKeyDown(KeyCode.S) && playerSlots.All(x => x.CurrentState == State.Idle))
 		{
@@ -157,7 +155,6 @@ public class GamePlayer : Singleton<GamePlayer>
 			Time.timeScale = Mathf.Clamp(Time.timeScale + 0.1f, 0.1f, 10f);
 			Debug.LogWarning(Time.timeScale);
 		}
-#endif
 	}
 
 	public void BeginGame()

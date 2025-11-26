@@ -990,11 +990,13 @@ public class GameReel : MonoBehaviour
         if (!completeOnNextSpin) { FallOut(solution); }
         else { spinning = false; if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); }
 
+#if UNITY_EDITOR
         // Run pool integrity diagnostics in editor/dev to help catch reuse or corruption issues
         if ((Application.isEditor || Debug.isDebugBuild))
         {
             ValidatePoolIntegrity("CompleteReelSpin_end");
         }
+#endif
     }
 
     public void DimDummySymbols() { Color dim = new Color(0.5f, 0.5f, 0.5f); foreach (GameSymbol g in topDummySymbols) { var img = g.CachedImage; if (img != null) img.color = dim; } foreach (GameSymbol g in bottomDummySymbols) { var img = g.CachedImage; if (img != null) img.color = dim; } }
