@@ -21,16 +21,18 @@ public class ReelDetailItem : MonoBehaviour
 
 		if (data == null) return;
 
-		var symbols = data.CurrentSymbolData;
-		if (symbols == null) return;
+		// Display the reel's strip definitions when available
+		var strip = data.CurrentReelStrip;
+		if (strip == null || strip.SymbolDefinitions == null) return;
 
-		for (int i = 0; i < symbols.Count; i++)
+		var defs = strip.SymbolDefinitions;
+		for (int i = 0; i < defs.Length; i++)
 		{
-			var s = symbols[i];
+			var d = defs[i];
 			if (ReelSymbolDetailItemPrefab != null && SymbolDetailsRoot != null)
 			{
 				var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
-				itm.Setup(s, i);
+				itm.Setup(d, i);
 			}
 		}
 	}

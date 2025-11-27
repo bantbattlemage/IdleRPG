@@ -21,4 +21,20 @@ public class ReelSymbolDetailItem : MonoBehaviour
 			metaText.text = m;
 		}
 	}
+
+	public void Setup(SymbolDefinition def, int index)
+	{
+		if (nameText != null) nameText.text = (def != null ? def.SymbolName : "(null)") + $" [{index}]";
+		if (metaText != null)
+		{
+			string m = string.Empty;
+			if (def != null)
+			{
+				m += $"Value:{def.BaseValue} ";
+				m += $"MinDepth:{def.MinWinDepth} ";
+				m += $"MatchGroup:{def.MatchGroupId} ";
+			}
+			metaText.text = m;
+		}
+	}
 }
