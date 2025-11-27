@@ -166,6 +166,7 @@ public class PresentationController : Singleton<PresentationController>
         {
             presentationSessionActive = false;
             SlotConsoleController.Instance?.EndPresentationSession();
+            try { WinEvaluator.Instance?.ClearCurrentSpinWinData(); } catch { }
             return;
         }
 
@@ -181,6 +182,9 @@ public class PresentationController : Singleton<PresentationController>
                 p.SetReadyToPresent(false);
                 p.ClearCurrentGrid();
             }
+
+            // Clear stored win data now that the presentation session has fully completed so it won't be reused later
+            try { WinEvaluator.Instance?.ClearCurrentSpinWinData(); } catch { }
         }
     }
 

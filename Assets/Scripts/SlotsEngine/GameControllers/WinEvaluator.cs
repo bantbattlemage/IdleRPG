@@ -17,7 +17,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
     // Public toggle kept for editor convenience but logging implementation removed per instructions
     public bool LoggingEnabled = false;
 
-    // Scene-configurable cap for how many spin log files are retained in the SpinLogs folder.
+    // Scene-configurable cap for how many spin log files to retain in the SpinLogs folder.
     // A value <= 0 means no pruning (retain all logs).
     [Tooltip("Maximum number of spin log files to retain. Set to 0 or negative for no limit.")]
     public int MaxSpinLogs = 100;
@@ -25,6 +25,15 @@ public class WinEvaluator : Singleton<WinEvaluator>
     private List<WinData> currentSpinWinData;
 
     public List<WinData> CurrentSpinWinData => currentSpinWinData ?? (currentSpinWinData = new List<WinData>());
+
+    /// <summary>
+    /// Clears stored win data from the last evaluated spin. Presentation should call this
+    /// when the spin's presentation session completes so stale win data is not reused.
+    /// </summary>
+    public void ClearCurrentSpinWinData()
+    {
+        try { currentSpinWinData = null; } catch { currentSpinWinData = new List<WinData>(); }
+    }
 
     // No-op spin notification kept for backwards compatibility with callers (previous logging behavior removed)
     public void NotifySpinStarted()
@@ -39,7 +48,7 @@ public class WinEvaluator : Singleton<WinEvaluator>
         if (!LoggingEnabled) return;
         try
         {
-            var sb = new StringBuilder();
+            var sb = new System.Text.StringBuilder();
             var now = DateTime.UtcNow;
             sb.AppendLine($"=== Spin Log {now:yyyy-MM-dd HH:mm:ss.fff} UTC ===");
 
