@@ -9,6 +9,7 @@ public class SlotDetailInterface : MonoBehaviour
 	public RectTransform ReelDetailsRoot;
 	public ReelDetailItem ReelDetailItemPrefab;
 	public Button CloseButton;
+	public Button AddReelButton;
 
 	private SlotsData current;
 
@@ -20,7 +21,24 @@ public class SlotDetailInterface : MonoBehaviour
 		if (ReelDetailsRoot != null)
 		{
 			// ensure it's empty initially
-			for (int i = ReelDetailsRoot.childCount - 1; i >= 0; i--) Destroy(ReelDetailsRoot.GetChild(i).gameObject);
+			for (int i = ReelDetailsRoot.childCount - 1; i >= 0; i--) 
+			{
+				var child = ReelDetailsRoot.GetChild(i);
+				// Preserve AddReelButton (or its parent container) if it's under ReelDetailsRoot
+				if (AddReelButton != null)
+				{
+					if (child == AddReelButton.transform || AddReelButton.transform.IsChildOf(child))
+						continue;
+				}
+
+				Destroy(child.gameObject);
+			}
+
+			// Ensure AddReelButton (if present under ReelDetailsRoot) is last sibling
+			if (AddReelButton != null && AddReelButton.transform.parent == ReelDetailsRoot)
+			{
+				AddReelButton.transform.SetAsLastSibling();
+			}
 		}
 	}
 
@@ -52,7 +70,15 @@ public class SlotDetailInterface : MonoBehaviour
 		// clear existing children
 		for (int i = ReelDetailsRoot.childCount - 1; i >= 0; i--)
 		{
-			Destroy(ReelDetailsRoot.GetChild(i).gameObject);
+			var child = ReelDetailsRoot.GetChild(i);
+			// Preserve AddReelButton (or its parent container) if it's under ReelDetailsRoot
+			if (AddReelButton != null)
+			{
+				if (child == AddReelButton.transform || AddReelButton.transform.IsChildOf(child))
+					continue;
+			}
+
+			Destroy(child.gameObject);
 		}
 
 		if (current == null || current.CurrentReelData == null) return;
@@ -63,6 +89,12 @@ public class SlotDetailInterface : MonoBehaviour
 			var rd = list[i];
 			var item = Instantiate(ReelDetailItemPrefab, ReelDetailsRoot);
 			item.Setup(rd, i);
+		}
+
+		// Ensure AddReelButton remains the last child in its parent (typically ReelDetailsRoot)
+		if (AddReelButton != null && AddReelButton.transform.parent == ReelDetailsRoot)
+		{
+			AddReelButton.transform.SetAsLastSibling();
 		}
 	}
 

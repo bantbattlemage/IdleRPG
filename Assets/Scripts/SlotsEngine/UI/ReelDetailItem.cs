@@ -26,13 +26,19 @@ public class ReelDetailItem : MonoBehaviour
 		if (strip == null || strip.SymbolDefinitions == null) return;
 
 		var defs = strip.SymbolDefinitions;
-		for (int i = 0; i < defs.Length; i++)
+		int target = Mathf.Max(strip.StripSize, defs.Length);
+		for (int i = 0; i < target; i++)
 		{
-			var d = defs[i];
-			if (ReelSymbolDetailItemPrefab != null && SymbolDetailsRoot != null)
+			if (ReelSymbolDetailItemPrefab == null || SymbolDetailsRoot == null) break;
+			var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
+			if (i < defs.Length)
 			{
-				var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
-				itm.Setup(d, i);
+				itm.Setup(defs[i], i);
+			}
+			else
+			{
+				// spawn placeholder for missing symbols (pass null so the item renders as empty)
+				itm.Setup((SymbolDefinition)null, i);
 			}
 		}
 	}

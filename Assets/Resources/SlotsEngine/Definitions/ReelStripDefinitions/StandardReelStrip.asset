@@ -12,15 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c30da326e217b94cb97ba0c2543bf6d, type: 3}
   m_Name: StandardReelStrip
   m_EditorClassIdentifier: Assembly-CSharp::ReelStripDefinition
-  stripSize: 12
-  symbols:
-  - {fileID: 11400000, guid: 89533e4d39e492e4d912a48b82224fd3, type: 2}
-  - {fileID: 11400000, guid: ad323b424767ab64aaae7fd5f5eebd13, type: 2}
-  - {fileID: 11400000, guid: 6ec0b555e556e9945b7c76cc1b30e5a3, type: 2}
-  - {fileID: 11400000, guid: 247fcc994cb4eca4cbab152a881b44bf, type: 2}
-  - {fileID: 11400000, guid: 3872bd2477dcc014bbb749bc78f076f8, type: 2}
-  - {fileID: 11400000, guid: 0a9874b8b0b093f47b97606196c26fea, type: 2}
-  - {fileID: 11400000, guid: 76e79b251aac2ab489216f800f3ec4a0, type: 2}
-  - {fileID: 11400000, guid: 55ab9603c371fc7419a874c070d3c9c4, type: 2}
-  symbolCounts: 0000000000000000000000000000000000000000000000000000000000000000
-  symbolCountsDepletable: 0101010101010101
+  stripSize: 4
+  symbols: []
+  symbolCounts: 
+  symbolCountsDepletable: 
