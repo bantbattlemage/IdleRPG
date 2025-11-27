@@ -1160,7 +1160,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7029150567142101467}
-  - component: {fileID: 6895430562703516502}
   - component: {fileID: 8753436388269392313}
   - component: {fileID: 780136107885776411}
   - component: {fileID: 615942105122330613}
@@ -1195,25 +1194,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1600, y: 1000}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &6895430562703516502
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3279344386031351089}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2f550c659d2d2e743922c2cc9bf1ee08, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InventoryInterface
-  ItemPanelPrefab: {fileID: 3434640521913402571, guid: f6392da55dd1e874da128df371e0fc50, type: 3}
-  CloseButton: {fileID: 8817329040090120153}
-  ItemPrefabContentRoot: {fileID: 2969937216307640310}
-  ItemDetailsGroup: {fileID: 1168467134376466553}
-  ItemDetailsNameText: {fileID: 1525108849334738784}
-  ItemDetailsDescriptionText: {fileID: 2005471563940995766}
-  ItemDetailsBackButton: {fileID: 3297373125618537799}
 --- !u!114 &8753436388269392313
 MonoBehaviour:
   m_ObjectHideFlags: 0

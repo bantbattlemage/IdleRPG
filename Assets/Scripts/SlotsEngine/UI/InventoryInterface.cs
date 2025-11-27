@@ -5,6 +5,8 @@ using TMPro;
 
 public class InventoryInterface : MonoBehaviour
 {
+	public RectTransform InventoryRoot;
+
 	public InventoryInterfaceItem ItemPanelPrefab;
 	public Button CloseButton;
 	public RectTransform ItemPrefabContentRoot;
@@ -13,6 +15,8 @@ public class InventoryInterface : MonoBehaviour
 	public TMP_Text ItemDetailsNameText;
 	public TMP_Text ItemDetailsDescriptionText;
 	public Button ItemDetailsBackButton;
+
+	public SlotDetailInterface SlotDetailsInterface; // show slot-specific details
 
 	private void Start()
 	{
@@ -30,10 +34,39 @@ public class InventoryInterface : MonoBehaviour
 		{
 			ItemDetailsGroup.gameObject.SetActive(false);
 		}
+
+		// Ensure slot details are hidden initially and hook close to restore list
+		if (SlotDetailsInterface != null)
+		{
+			if (SlotDetailsInterface.CloseButton != null)
+			{
+				// ensure no duplicate listener
+				SlotDetailsInterface.CloseButton.onClick.RemoveListener(OnSlotDetailsClosed);
+				SlotDetailsInterface.CloseButton.onClick.AddListener(OnSlotDetailsClosed);
+			}
+
+			// If the slot details interface exposes a root, hide it initially so it behaves like a panel
+			if (SlotDetailsInterface.SlotDetailsRoot != null)
+			{
+				SlotDetailsInterface.SlotDetailsRoot.gameObject.SetActive(false);
+			}
+		}
 	}
 
-	private void OnEnable()
+	// Removed OnEnable dependency: InventoryInterface may no longer be toggled directly.
+	// Call OpenInventory() to show the inventory and refresh its contents.
+	public void OpenInventory()
 	{
+		if (InventoryRoot != null)
+		{
+			InventoryRoot.gameObject.SetActive(true);
+		}
+		else
+		{
+			// fallback for older setups where this component lived on the UI root
+			gameObject.SetActive(true);
+		}
+
 		Refresh();
 	}
 
@@ -68,6 +101,33 @@ public class InventoryInterface : MonoBehaviour
 			}, () =>
 			{
 				// Select / show details
+				if (itemData != null && itemData.ItemType == InventoryItemType.SlotEngine && SlotDetailsInterface != null)
+				{
+					// Try to find matching SlotsData by display name (best-effort)
+					var pd2 = GamePlayer.Instance?.PlayerData;
+					SlotsData foundSlot = null;
+					if (pd2?.CurrentSlots != null)
+					{
+						string display = itemData.DisplayName;
+						foreach (var s in pd2.CurrentSlots)
+						{
+							if (s == null) continue;
+							if (("Slot " + s.Index) == display || s.Index.ToString() == display)
+							{
+								foundSlot = s;
+								break;
+							}
+						}
+					}
+
+					if (foundSlot != null)
+					{
+						ShowSlotDetails(foundSlot);
+						return;
+					}
+				}
+
+				// fallback to generic item details
 				ShowItemDetails(itemData);
 			});
 		}
@@ -75,7 +135,15 @@ public class InventoryInterface : MonoBehaviour
 
 	void OnCloseButtonClicked()
 	{
-		gameObject.SetActive(false);
+		if (InventoryRoot != null)
+		{
+			InventoryRoot.gameObject.SetActive(false);
+		}
+		else
+		{
+			// fallback for older setups
+			gameObject.SetActive(false);
+		}
 	}
 
 	private void OnItemDetailsBack()
@@ -112,5 +180,26 @@ public class InventoryInterface : MonoBehaviour
 		{
 			ItemPrefabContentRoot.gameObject.SetActive(!visible);
 		}
+	}
+
+	private void ShowSlotDetails(SlotsData slot)
+	{
+		if (SlotDetailsInterface == null || slot == null)
+		{
+			// fallback to generic
+			ShowItemDetails(new InventoryItemData($"Slot {slot?.Index}", InventoryItemType.SlotEngine, slot?.BaseDefinition?.name));
+			return;
+		}
+
+		SlotDetailsInterface.ShowSlot(slot);
+		// hide list and generic details while slot details panel is visible
+		if (ItemPrefabContentRoot != null) ItemPrefabContentRoot.gameObject.SetActive(false);
+		if (ItemDetailsGroup != null) ItemDetailsGroup.gameObject.SetActive(false);
+	}
+
+	private void OnSlotDetailsClosed()
+	{
+		// restore list visibility when slot details closed
+		if (ItemPrefabContentRoot != null) ItemPrefabContentRoot.gameObject.SetActive(true);
 	}
 }

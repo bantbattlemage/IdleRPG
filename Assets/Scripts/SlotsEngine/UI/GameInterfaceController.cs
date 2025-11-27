@@ -16,7 +16,7 @@ public class GameInterfaceController : Singleton<GameInterfaceController>
 	{
 		if (Input.GetKeyDown(KeyCode.I))
 		{
-			inventoryInterface.gameObject.SetActive(!inventoryInterface.gameObject.activeSelf);
+			inventoryInterface.OpenInventory();
 		}
 	}
 
