@@ -10,11 +10,13 @@ public class GameInterfaceController : Singleton<GameInterfaceController>
 
 	[SerializeField] private GameObject overlayMessagePrefab;
 
+	[SerializeField] private InventoryInterface inventoryInterface;
+
 	void Update()
 	{
-		if (Input.GetKeyDown(KeyCode.T))
+		if (Input.GetKeyDown(KeyCode.I))
 		{
-			CreateOverlayMessage();
+			inventoryInterface.gameObject.SetActive(!inventoryInterface.gameObject.activeSelf);
 		}
 	}
 

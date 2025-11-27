@@ -177,6 +177,25 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 		// Use engine API to remove the entire reel now that it's implemented
 		slot.RemoveReel(reel);
+
+		// Remove a matching InventoryItem (best-effort): prefer the most recently added Reel item
+		try
+		{
+			if (playerData != null)
+			{
+				var reels = playerData.GetItemsOfType(InventoryItemType.Reel);
+				if (reels != null && reels.Count > 0)
+				{
+					// remove the last added reel item
+					var toRemove = reels[reels.Count - 1];
+					playerData.RemoveInventoryItem(toRemove);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"RemoveTestReel: failed to remove inventory item: {ex.Message}");
+		}
 	}
 
 	public void AddTestSymbol()
@@ -212,6 +231,24 @@ public class GamePlayer : Singleton<GamePlayer>
 			return;
 		}
 		reel.SetSymbolCount(Mathf.Max(1, reel.CurrentReelData.SymbolCount - 1));
+
+		// Best-effort: remove one Symbol inventory item (most recently added)
+		try
+		{
+			if (playerData != null)
+			{
+				var syms = playerData.GetItemsOfType(InventoryItemType.Symbol);
+				if (syms != null && syms.Count > 0)
+				{
+					var toRemove = syms[syms.Count - 1];
+					playerData.RemoveInventoryItem(toRemove);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"RemoveTestSymbol: failed to remove inventory item: {ex.Message}");
+		}
 	}
 
 	public void BeginGame()
@@ -255,6 +292,25 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		// Remove player data entry if present
 		if (slotsToRemove.CurrentSlotsData != null) playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
+
+		// Also remove matching inventory item for this slot (best-effort match by display name)
+		try
+		{
+			if (playerData != null && slotsToRemove.CurrentSlotsData != null)
+			{
+				var display = "Slot " + slotsToRemove.CurrentSlotsData.Index;
+				var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
+				if (slotItems != null)
+				{
+					var found = slotItems.Find(i => i.DisplayName == display);
+					if (found != null) playerData.RemoveInventoryItem(found);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"RemoveSlots: failed to remove inventory item: {ex.Message}");
+		}
 
 		// Remove from list first
 		playerSlots.Remove(slotsToRemove);
