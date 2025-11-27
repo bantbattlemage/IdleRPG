@@ -194,7 +194,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InventoryInterfaceItem
   nameText: {fileID: 5483718995744698832}
   typeText: {fileID: 0}
-  idText: {fileID: 0}
+  idText: {fileID: 4820134694359387142}
   removeButton: {fileID: 0}
   selectButton: {fileID: 4982086777539559252}
 --- !u!114 &1324488092848694651
