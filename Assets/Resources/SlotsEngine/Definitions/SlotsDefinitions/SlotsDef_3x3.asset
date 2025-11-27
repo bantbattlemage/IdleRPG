@@ -22,6 +22,3 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d35c3fee3e9cd0f43b6aab1a08a1b03c, type: 2}
   betLevelDefinitions:
   - {fileID: 11400000, guid: 96bf0fc9e9c987b4ba91c2ebace1020d, type: 2}
-  - {fileID: 11400000, guid: fafe5611c7f04494caa24ba0e909b721, type: 2}
-  - {fileID: 11400000, guid: 7478cfc5d2311ce4ca22a9b4cd374c2b, type: 2}
-  - {fileID: 11400000, guid: 45d953bc559c52a4c8353ab303571a49, type: 2}
