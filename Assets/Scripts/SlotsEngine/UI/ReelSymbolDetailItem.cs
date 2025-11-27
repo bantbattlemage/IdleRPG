@@ -1,10 +1,16 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 public class ReelSymbolDetailItem : MonoBehaviour
 {
 	[SerializeField] private TMP_Text nameText;
 	[SerializeField] private TMP_Text metaText;
+	[SerializeField] private Button MenuButton;
+
+	private ReelStripData cachedStrip;
+	private SlotsData cachedSlot;
+	private System.Action<ReelStripData, SlotsData> openMenuCallback;
 
 	public void Setup(SymbolData data, int index)
 	{
@@ -35,6 +41,22 @@ public class ReelSymbolDetailItem : MonoBehaviour
 				m += $"MatchGroup:{def.MatchGroupId} ";
 			}
 			metaText.text = m;
+		}
+	}
+
+	/// <summary>
+	/// Configure the optional menu button so clicking it will request the AddRemoveSymbolsMenu
+	/// be shown with the provided reel-strip and slot context.
+	/// </summary>
+	public void ConfigureMenu(ReelStripData strip, SlotsData slot, System.Action<ReelStripData, SlotsData> onOpen)
+	{
+		cachedStrip = strip;
+		cachedSlot = slot;
+		openMenuCallback = onOpen;
+		if (MenuButton != null)
+		{
+			MenuButton.onClick.RemoveAllListeners();
+			MenuButton.onClick.AddListener(() => { openMenuCallback?.Invoke(cachedStrip, cachedSlot); });
 		}
 	}
 }

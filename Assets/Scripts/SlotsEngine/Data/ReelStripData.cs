@@ -2,12 +2,14 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using WeightedRandomNamespace;
+using System;
 
 public class ReelStripData : Data
 {
     [SerializeField] private int stripSize;
     [SerializeField] private string[] symbolDefinitionKeys;
     [SerializeField] private string definitionKey;
+    [SerializeField] private string instanceKey; // unique per runtime instance (used for per-strip associations)
 
     [System.NonSerialized] private SymbolDefinition[] symbolDefinitions;
     [System.NonSerialized] private ReelStripDefinition definition;
@@ -20,12 +22,14 @@ public class ReelStripData : Data
     public int StripSize => stripSize;
     public SymbolDefinition[] SymbolDefinitions { get { EnsureResolved(); return symbolDefinitions; } }
     public ReelStripDefinition Definition { get { EnsureResolved(); return definition; } }
+    public string InstanceKey => instanceKey;
 
     public ReelStripData(ReelStripDefinition def, int size, SymbolDefinition[] syms, int[] counts = null, bool[] depletable = null)
     {
         stripSize = size;
         definition = def;
-        symbolDefinitions = syms;
+        // clone the incoming array so each runtime instance has its own mutable copy
+        symbolDefinitions = syms != null ? (SymbolDefinition[])syms.Clone() : null;
         fixedCounts = counts != null && syms != null && counts.Length == syms.Length ? (int[])counts.Clone() : null;
         countDepletable = depletable != null && syms != null && depletable.Length == syms.Length ? (bool[])depletable.Clone() : null;
         if (fixedCounts != null && countDepletable == null)
@@ -36,10 +40,12 @@ public class ReelStripData : Data
         remainingCounts = fixedCounts != null ? (int[])fixedCounts.Clone() : null;
         internalPicksSoFar = 0;
         definitionKey = def != null ? def.name : null;
-        if (syms != null)
+        // create a GUID per runtime instance so inventory associations can be made per-strip
+        instanceKey = Guid.NewGuid().ToString();
+        if (symbolDefinitions != null)
         {
-            symbolDefinitionKeys = new string[syms.Length];
-            for (int i = 0; i < syms.Length; i++) symbolDefinitionKeys[i] = syms[i].name;
+            symbolDefinitionKeys = new string[symbolDefinitions.Length];
+            for (int i = 0; i < symbolDefinitions.Length; i++) symbolDefinitionKeys[i] = symbolDefinitions[i] != null ? symbolDefinitions[i].name : null;
         }
     }
 

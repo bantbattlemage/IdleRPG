@@ -11,6 +11,9 @@ public class SlotDetailInterface : MonoBehaviour
 	public Button CloseButton;
 	public Button AddReelButton;
 
+	// AddRemoveSymbolsMenu reference (prefab or scene instance)
+	public AddRemoveSymbolsMenu AddRemoveSymbolsMenuInstance;
+
 	private SlotsData current;
 
 	private void Start()
@@ -89,6 +92,9 @@ public class SlotDetailInterface : MonoBehaviour
 			var rd = list[i];
 			var item = Instantiate(ReelDetailItemPrefab, ReelDetailsRoot);
 			item.Setup(rd, i);
+
+			// wire up each reel's symbol menu buttons to open our AddRemoveSymbolsMenu
+			item.ConfigureSymbolMenu(current, OpenAddRemoveSymbolsMenu);
 		}
 
 		// Ensure AddReelButton remains the last child in its parent (typically ReelDetailsRoot)
@@ -96,6 +102,20 @@ public class SlotDetailInterface : MonoBehaviour
 		{
 			AddReelButton.transform.SetAsLastSibling();
 		}
+	}
+
+	private void OpenAddRemoveSymbolsMenu(ReelStripData strip, SlotsData slot)
+	{
+		if (AddRemoveSymbolsMenuInstance == null)
+		{
+			Debug.LogWarning("AddRemoveSymbolsMenuInstance is not assigned on SlotDetailInterface.");
+			return;
+		}
+
+		// Optionally pass context to the menu. Currently the menu reads PlayerData inventory; this
+		// provides a hook if you want the menu to pre-select symbols from the provided strip or slot.
+		AddRemoveSymbolsMenuInstance.Show();
+		// future: AddRemoveSymbolsMenuInstance.SetContext(strip, slot);
 	}
 
 	private void OnCloseButtonClicked()
