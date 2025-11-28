@@ -15,7 +15,7 @@ public class SymbolDetailsItem : MonoBehaviour
 	private System.Action<InventoryItemData> onAddCallback;
 	private System.Action<InventoryItemData> onTransferCallback;
 
-	public void Setup(InventoryItemData item, System.Action<InventoryItemData> onAdd, System.Action<InventoryItemData> onRemove, bool allowAdd, bool allowRemove, System.Action<InventoryItemData> onTransfer = null, bool allowTransfer = false)
+	public void Setup(InventoryItemData item, System.Action<InventoryItemData> onAdd, System.Action<InventoryItemData> onRemove, bool allowAdd, bool allowRemove, System.Action<InventoryItemData> onTransfer = null, bool allowTransfer = false, ReelStripData targetStrip = null)
 	{
 		boundItem = item;
 		onAddCallback = onAdd;
@@ -25,11 +25,27 @@ public class SymbolDetailsItem : MonoBehaviour
 		if (NameText != null) NameText.text = item != null ? item.DisplayName : "(null)";
 		if (MetaText != null) MetaText.text = item != null ? item.ItemType.ToString() : "";
 
+		// Determine whether add/transfer should be enabled based on target strip capacity
+		bool canAdd = allowAdd;
+		bool canTransfer = allowTransfer;
+		if (targetStrip != null)
+		{
+			var list = targetStrip.RuntimeSymbols;
+			int currentCount = list != null ? list.Count : 0;
+			int limit = targetStrip.StripSize;
+			if (limit > 0 && currentCount >= limit)
+			{
+				canAdd = false;
+				canTransfer = false;
+			}
+		}
+
 		if (AddButton != null)
 		{
 			AddButton.onClick.RemoveAllListeners();
 			AddButton.onClick.AddListener(OnAddClicked);
 			AddButton.gameObject.SetActive(allowAdd);
+			AddButton.interactable = canAdd;
 		}
 
 		if (RemoveButton != null)
@@ -44,6 +60,7 @@ public class SymbolDetailsItem : MonoBehaviour
 			TransferButton.onClick.RemoveAllListeners();
 			TransferButton.onClick.AddListener(OnTransferClicked);
 			TransferButton.gameObject.SetActive(allowTransfer);
+			TransferButton.interactable = canTransfer;
 		}
 
 		// when all actions are disabled, visually dim and disable interaction

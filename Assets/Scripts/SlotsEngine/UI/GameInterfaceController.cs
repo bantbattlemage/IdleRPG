@@ -10,7 +10,7 @@ public class GameInterfaceController : Singleton<GameInterfaceController>
 
 	[SerializeField] private GameObject overlayMessagePrefab;
 
-	[SerializeField] private InventoryInterface inventoryInterface;
+	[SerializeField] private SlotInventoryInterface inventoryInterface;
 
 	void Update()
 	{

@@ -10,7 +10,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 	public RectTransform SymbolListRoot;
 	public SymbolDetailsItem SymbolDetailsItemPrefab;
 	public Button CloseButton;
-	public Button AddSymbolButton;
 
 	private ReelStripData currentStrip;
 	private SlotsData currentSlot;
@@ -18,18 +17,14 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 	private void Start()
 	{
 		if (CloseButton != null) CloseButton.onClick.AddListener(OnCloseClicked);
-		if (AddSymbolButton != null) AddSymbolButton.onClick.AddListener(OnQuickAddTestSymbol);
 
 		if (SymbolListRoot != null)
 		{
 			for (int i = SymbolListRoot.childCount - 1; i >= 0; i--)
 			{
 				var child = SymbolListRoot.GetChild(i);
-				if (AddSymbolButton != null && (child == AddSymbolButton.transform || AddSymbolButton.transform.IsChildOf(child))) continue;
 				Destroy(child.gameObject);
 			}
-			if (AddSymbolButton != null && AddSymbolButton.transform.parent == SymbolListRoot)
-				AddSymbolButton.transform.SetAsLastSibling();
 		}
 
 		// Listen for external updates to reel strips so the menu can refresh if the current strip was changed elsewhere
@@ -114,7 +109,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		for (int i = SymbolListRoot.childCount - 1; i >= 0; i--)
 		{
 			var child = SymbolListRoot.GetChild(i);
-			if (AddSymbolButton != null && (child == AddSymbolButton.transform || AddSymbolButton.transform.IsChildOf(child))) continue;
 			Destroy(child.gameObject);
 		}
 
@@ -156,58 +150,25 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		for (int i = 0; i < associatedThis.Count; i++)
 		{
 			var itm = Instantiate(SymbolDetailsItemPrefab, SymbolListRoot);
-			itm.Setup(associatedThis[i], OnAddInventoryItem, OnRemoveInventoryItem, allowAdd: false, allowRemove: true);
+			itm.Setup(associatedThis[i], OnAddInventoryItem, OnRemoveInventoryItem, allowAdd: false, allowRemove: true, onTransfer: null, allowTransfer: false, targetStrip: currentStrip);
 		}
 		for (int i = 0; i < unassociated.Count; i++)
 		{
 			var itm = Instantiate(SymbolDetailsItemPrefab, SymbolListRoot);
-			itm.Setup(unassociated[i], OnAddInventoryItem, OnRemoveInventoryItem, allowAdd: true, allowRemove: false);
+			itm.Setup(unassociated[i], OnAddInventoryItem, OnRemoveInventoryItem, allowAdd: true, allowRemove: false, onTransfer: null, allowTransfer: false, targetStrip: currentStrip);
 		}
 		for (int i = 0; i < associatedOther.Count; i++)
 		{
 			var itm = Instantiate(SymbolDetailsItemPrefab, SymbolListRoot);
 			// Allow transfer: enable Add when symbol belongs to another strip
 			// Previous behavior wired transfer handler into the "add" slot; now provide it as explicit onTransfer and enable transfer button.
-			itm.Setup(associatedOther[i], onAdd: null, onRemove: OnRemoveInventoryItem, allowAdd: false, allowRemove: false, onTransfer: OnTransferInventoryItem, allowTransfer: true);
+			itm.Setup(associatedOther[i], onAdd: null, onRemove: OnRemoveInventoryItem, allowAdd: false, allowRemove: false, onTransfer: OnTransferInventoryItem, allowTransfer: true, targetStrip: currentStrip);
 		}
-
-		if (AddSymbolButton != null && AddSymbolButton.transform.parent == SymbolListRoot)
-			AddSymbolButton.transform.SetAsLastSibling();
 	}
 
 	private void OnCloseClicked()
 	{
 		if (MenuRoot != null) MenuRoot.gameObject.SetActive(false); else gameObject.SetActive(false);
-	}
-
-	private void OnQuickAddTestSymbol()
-	{
-		var pd = GamePlayer.Instance?.PlayerData; if (pd == null) return;
-		string newName = "Symbol" + (pd.Inventory?.Items.Count + 1);
-		// Prefer to pick a sprite from the centralized SymbolDefinitionManager when available
-		Sprite chosen = null;
-		if (SymbolDefinitionManager.Instance != null)
-		{
-			var defs = SymbolDefinitionManager.Instance.GetAllDefinitions();
-			if (defs != null && defs.Count > 0)
-			{
-				for (int i = 0; i < defs.Count; i++)
-				{
-					var d = defs[i]; if (d == null) continue;
-					if (d.SymbolSprite != null) { chosen = d.SymbolSprite; break; }
-				}
-			}
-		}
-
-		if (chosen != null)
-		{
-			pd.AddInventoryItem(new InventoryItemData(newName, InventoryItemType.Symbol, null, chosen.name));
-		}
-		else
-		{
-			pd.AddInventoryItem(new InventoryItemData(newName, InventoryItemType.Symbol, null));
-		}
-		Refresh();
 	}
 
 	private void LogRuntimeSymbols(string prefix)

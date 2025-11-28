@@ -249,6 +249,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a15f6ac82b8fc54a9799615f03a6526, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GlobalEventManager
+--- !u!114 &514405309 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5126740189436733746, guid: 5d205dd4508c5c44782c3c6b5f867746, type: 3}
+  m_PrefabInstance: {fileID: 1089095915548011405}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -629,7 +640,9 @@ MonoBehaviour:
   InventoryRoot: {fileID: 904790266}
   ItemPanelPrefab: {fileID: 3434640521913402571, guid: f6392da55dd1e874da128df371e0fc50, type: 3}
   CloseButton: {fileID: 1079568383}
+  ToggleButton: {fileID: 514405309}
   ItemPrefabContentRoot: {fileID: 695384756}
+  ItemFilter: 3
   ItemDetailsGroup: {fileID: 783084321}
   ItemDetailsNameText: {fileID: 1022920315}
   ItemDetailsDescriptionText: {fileID: 472633717}
