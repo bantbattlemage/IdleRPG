@@ -118,6 +118,16 @@ public class InventoryItemData
 		symbolAccessorId = accessorId;
 		DataPersistenceManager.Instance?.RequestSave();
 	}
+
+	/// <summary>
+	/// Allows updating the display name of this inventory item (used to mark items unassociated when their
+	/// referenced slot/strip is removed).
+	/// </summary>
+	public void SetDisplayName(string newDisplayName)
+	{
+		displayName = newDisplayName;
+		DataPersistenceManager.Instance?.RequestSave();
+	}
 }
 
 [Serializable]

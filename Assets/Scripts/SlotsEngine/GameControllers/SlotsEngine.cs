@@ -649,6 +649,13 @@ public class SlotsEngine : MonoBehaviour
 		if (idx < 0) return;
 		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) throw new InvalidOperationException("Cannot remove reel while spinning.");
 
+		// Preserve any persisted symbol <-> reel-strip associations.
+		// Removing a visual/data-only Reel should NOT remove persisted ReelStripData or SymbolData entries
+		// because players may own symbols tied to those strips. Any manager-level cleanup that would
+		// disassociate symbols must be performed explicitly elsewhere (e.g., when an entire slot is
+		// intentionally deleted). Therefore do not call ReelDataManager.RemoveDataIfExists or
+		// ReelStripDataManager.RemoveDataIfExists here.
+
 		// Remove data model entry if present
 		try
 		{
@@ -656,6 +663,7 @@ public class SlotsEngine : MonoBehaviour
 			{
 				var rd = currentSlotsData.CurrentReelData[idx];
 				currentSlotsData.RemoveReel(rd);
+				// NOTE: Intentionally do not remove rd from ReelDataManager or its symbols/strips here.
 			}
 		}
 		catch (Exception ex) { Debug.LogWarning($"SlotsEngine.RemoveReel: data removal failed: {ex.Message}"); }

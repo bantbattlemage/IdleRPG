@@ -18,13 +18,8 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 	{
 		base.AddNewData(newData);
 
-		// Ensure the SlotsData.Index reflects the assigned AccessorId for display and ordering
-		try
-		{
-			newData.Index = newData.AccessorId;
-		}
-		catch { }
-
+		// Do not override display Index with persistence AccessorId; keep Index decoupled.
+		// Ensure contained reels are registered.
 		for (int i = 0; i < newData.CurrentReelData.Count; i++)
 		{
 			ReelDataManager.Instance.AddNewData(newData.CurrentReelData[i]);
@@ -59,8 +54,7 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 				}
 			}
 
-			// Ensure index matches accessor id for consistent display
-			try { slotsData.Index = slotsData.AccessorId; } catch { }
+			// Do not force Index to match AccessorId; maintain existing Index.
 
 			// Replace stored reference
 			LocalData[slotsData.AccessorId] = slotsData;
@@ -127,11 +121,14 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 
 		if (LocalData.ContainsKey(data.AccessorId))
 		{
-			// Remove contained reel & symbol data to prevent orphaned entries
-			foreach (var reel in data.CurrentReelData.ToList())
-			{
-				if (reel != null) ReelDataManager.Instance.RemoveDataIfExists(reel);
-			}
+			// Do NOT remove contained reel & symbol data here. Keeping ReelData and SymbolData
+			// allows previously created runtime reels/strips to remain available in the AddReel UI
+			// so players can re-use them across slots.
+			//
+			// Previous behavior removed each contained ReelData via ReelDataManager.Instance.RemoveDataIfExists(reel);
+			// That caused runtime reels to disappear from the ReelDataManager and made them unavailable
+			// for reattachment to new slots. To preserve player-owned runtime data, we only remove
+			// the SlotsData entry itself.
 
 			LocalData.Remove(data.AccessorId);
 			// Debounced save

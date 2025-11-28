@@ -333,26 +333,90 @@ public class GamePlayer : Singleton<GamePlayer>
 		if (!playerSlots.Contains(slotsToRemove)) throw new Exception("Tried to remove slots that player doesn't have!");
 		if (slotsToRemove.CurrentState == State.Spinning) { Debug.LogWarning("Cannot remove slots while spinning."); return; }
 
-		// Remove player data entry if present
-		if (slotsToRemove.CurrentSlotsData != null) playerData.RemoveSlots(slotsToRemove.CurrentSlotsData);
-
-		// Also remove matching inventory item for this slot (best-effort match by display name)
+		// Disassociate inventory items from this slot's reel strips before removal
 		try
 		{
-			if (playerData != null && slotsToRemove.CurrentSlotsData != null)
+			if (slotsToRemove.CurrentSlotsData?.CurrentReelData != null && playerData != null)
 			{
-				var display = "Slot " + slotsToRemove.CurrentSlotsData.Index;
-				var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
-				if (slotItems != null)
+				foreach (var reel in slotsToRemove.CurrentSlotsData.CurrentReelData)
 				{
-					var found = slotItems.Find(i => i.DisplayName == display);
-					if (found != null) playerData.RemoveInventoryItem(found);
+					if (reel == null) continue;
+					var strip = reel.CurrentReelStrip;
+					if (strip == null || string.IsNullOrEmpty(strip.InstanceKey)) continue;
+
+					// Clear DefinitionKey for ReelStrip inventory items matching this strip
+					var reelStripItems = playerData.GetItemsOfType(InventoryItemType.ReelStrip);
+					if (reelStripItems != null)
+					{
+						foreach (var item in reelStripItems)
+						{
+							if (item != null && item.DefinitionKey == strip.InstanceKey)
+							{
+								item.SetDefinitionKey(null);
+							}
+						}
+					}
+
+					// NOTE: do NOT clear symbol inventory items here. Symbols should remain associated with their
+					// ReelStrip instances even if the slot using the strip is removed. This preserves player-owned
+					// symbol associations and allows reusing strips/symbols across slots.
+
+				}
+
+				// Additionally, mark any SlotEngine inventory item that references this slot's display as unassociated
+				try
+				{
+					var slotDisplay = "Slot " + slotsToRemove.CurrentSlotsData.Index;
+					var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
+					if (slotItems != null)
+					{
+						foreach (var sItem in slotItems)
+						{
+							if (sItem == null) continue;
+							if (sItem.DisplayName == slotDisplay)
+							{
+								sItem.SetDisplayName(slotDisplay + " (unassociated)");
+								sItem.SetDefinitionKey(null);
+							}
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					Debug.LogWarning($"RemoveSlots: failed to mark SlotEngine inventory items unassociated: {ex.Message}");
 				}
 			}
 		}
 		catch (Exception ex)
 		{
-			Debug.LogWarning($"RemoveSlots: failed to remove inventory item: {ex.Message}");
+			Debug.LogWarning($"RemoveSlots: failed to disassociate inventory items: {ex.Message}");
+		}
+
+		// Remove player data entry if present
+		try
+		{
+			if (slotsToRemove.CurrentSlotsData != null)
+			{
+				// Try direct removal first
+				try { playerData.RemoveSlots(slotsToRemove.CurrentSlotsData); }
+				catch (Exception)
+				{
+					// Fallback: remove any SlotsData with matching AccessorId to avoid stale references
+					if (playerData.CurrentSlots != null && slotsToRemove.CurrentSlotsData.AccessorId > 0)
+					{
+						playerData.CurrentSlots.RemoveAll(s => s != null && s.AccessorId == slotsToRemove.CurrentSlotsData.AccessorId);
+					}
+					else if (playerData.CurrentSlots != null)
+					{
+						// Last resort: remove by reference match
+						playerData.CurrentSlots.RemoveAll(s => ReferenceEquals(s, slotsToRemove.CurrentSlotsData));
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"RemoveSlots: failed to remove SlotsData from PlayerData: {ex.Message}");
 		}
 
 		// Remove from list first
