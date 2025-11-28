@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using System.Linq;
 
 public class ReelStripDefinition : BaseDefinition<ReelStripData>
 {
@@ -19,6 +20,11 @@ public class ReelStripDefinition : BaseDefinition<ReelStripData>
 
     public override ReelStripData CreateInstance()
     {
+        // Always create a fresh runtime instance for consumers of this definition.
+        // Persisted runtime strips are restored by managers (e.g., ReelData.EnsureResolved)
+        // when a specific persisted accessor id is referenced; creating from a definition
+        // should not return a shared persisted instance because that would cause edits
+        // on one reel's strip to affect all reels using the same definition.
         int[] counts = (symbolCounts != null && symbols != null && symbolCounts.Length == symbols.Length) ? symbolCounts : null;
         bool[] flags = (symbolCountsDepletable != null && symbols != null && symbolCountsDepletable.Length == symbols.Length) ? symbolCountsDepletable : null;
         return new ReelStripData(this, stripSize, symbols, counts, flags);

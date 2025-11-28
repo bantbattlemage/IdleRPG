@@ -146,7 +146,8 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		{
 			var itm = Instantiate(SymbolDetailsItemPrefab, SymbolListRoot);
 			// Allow transfer: enable Add when symbol belongs to another strip
-			itm.Setup(associatedOther[i], OnTransferInventoryItem, OnRemoveInventoryItem, allowAdd: true, allowRemove: false);
+			// Previous behavior wired transfer handler into the "add" slot; now provide it as explicit onTransfer and enable transfer button.
+			itm.Setup(associatedOther[i], onAdd: null, onRemove: OnRemoveInventoryItem, allowAdd: false, allowRemove: false, onTransfer: OnTransferInventoryItem, allowTransfer: true);
 		}
 
 		if (AddSymbolButton != null && AddSymbolButton.transform.parent == SymbolListRoot)

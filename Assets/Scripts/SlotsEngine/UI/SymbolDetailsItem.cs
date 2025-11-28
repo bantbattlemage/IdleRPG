@@ -8,16 +8,20 @@ public class SymbolDetailsItem : MonoBehaviour
 	public TMP_Text MetaText;
 	public Button AddButton;
 	public Button RemoveButton;
+	public Button TransferButton;
 
 	private InventoryItemData boundItem;
 	private System.Action<InventoryItemData> onRemoveCallback;
 	private System.Action<InventoryItemData> onAddCallback;
+	private System.Action<InventoryItemData> onTransferCallback;
 
-	public void Setup(InventoryItemData item, System.Action<InventoryItemData> onAdd, System.Action<InventoryItemData> onRemove, bool allowAdd, bool allowRemove)
+	public void Setup(InventoryItemData item, System.Action<InventoryItemData> onAdd, System.Action<InventoryItemData> onRemove, bool allowAdd, bool allowRemove, System.Action<InventoryItemData> onTransfer = null, bool allowTransfer = false)
 	{
 		boundItem = item;
 		onAddCallback = onAdd;
 		onRemoveCallback = onRemove;
+		onTransferCallback = onTransfer;
+
 		if (NameText != null) NameText.text = item != null ? item.DisplayName : "(null)";
 		if (MetaText != null) MetaText.text = item != null ? item.ItemType.ToString() : "";
 
@@ -35,16 +39,23 @@ public class SymbolDetailsItem : MonoBehaviour
 			RemoveButton.gameObject.SetActive(allowRemove);
 		}
 
-		// when both actions are disabled, visually dim and disable interaction
-		var bothDisabled = !allowAdd && !allowRemove;
+		if (TransferButton != null)
+		{
+			TransferButton.onClick.RemoveAllListeners();
+			TransferButton.onClick.AddListener(OnTransferClicked);
+			TransferButton.gameObject.SetActive(allowTransfer);
+		}
+
+		// when all actions are disabled, visually dim and disable interaction
+		var noneEnabled = !allowAdd && !allowRemove && !allowTransfer;
 		var cg = GetComponent<CanvasGroup>();
-		if (cg == null && bothDisabled)
+		if (cg == null && noneEnabled)
 		{
 			cg = gameObject.AddComponent<CanvasGroup>();
 		}
 		if (cg != null)
 		{
-			if (bothDisabled)
+			if (noneEnabled)
 			{
 				cg.interactable = false;
 				cg.blocksRaycasts = false;
@@ -67,5 +78,10 @@ public class SymbolDetailsItem : MonoBehaviour
 	private void OnAddClicked()
 	{
 		onAddCallback?.Invoke(boundItem);
+	}
+
+	private void OnTransferClicked()
+	{
+		onTransferCallback?.Invoke(boundItem);
 	}
 }
