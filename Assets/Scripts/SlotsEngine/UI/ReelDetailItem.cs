@@ -63,6 +63,9 @@ public class ReelDetailItem : MonoBehaviour
 		if (strip != null && strip.StripSize > 0) target = strip.StripSize;
 		else if (data != null && data.SymbolCount > 0) target = data.SymbolCount;
 
+		// If the runtime list contains more symbols than the defined strip size, expand to show them as well
+		if (runtimeLen > target) target = runtimeLen;
+
 		if (ReelSymbolDetailItemPrefab == null)
 		{
 			Debug.LogWarning($"ReelDetailItem: ReelSymbolDetailItemPrefab is not assigned on {name}. Cannot instantiate symbol items.");
