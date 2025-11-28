@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using EvaluatorCore;
 
@@ -84,6 +85,12 @@ public class SymbolDefinition : BaseDefinition<SymbolData>
 	/// </summary>
 	public override SymbolData CreateInstance()
 	{
+		// Enforce invariant: symbolSprite must be present so runtime SymbolData can be constructed
+		if (symbolSprite == null)
+		{
+			throw new InvalidOperationException($"SymbolDefinition.CreateInstance: definition asset '{name}' (SymbolName='{symbolName}') does not have a SymbolSprite assigned. Symbols must include a Sprite asset to create runtime SymbolData.");
+		}
+
 		// pass match group id and definition asset name into runtime SymbolData
 		return new SymbolData(symbolName, symbolSprite, BaseValue, MinWinDepth, weight, payScaling, isWild, allowWildMatch, winMode, totalCountTrigger, maxPerReel, MatchGroupId)
 		{

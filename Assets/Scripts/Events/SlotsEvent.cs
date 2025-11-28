@@ -8,6 +8,9 @@ public enum SlotsEvent
 	ReelAdded,
 	ReelRemoved,
 
+	// reel-strip updates
+	ReelStripUpdated,
+
 	// presentation
 	BeginSlotPresentation,
 	PresentationComplete,

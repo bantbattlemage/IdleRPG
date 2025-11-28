@@ -7,6 +7,7 @@ public class ReelSymbolDetailItem : MonoBehaviour
 	[SerializeField] private TMP_Text nameText;
 	[SerializeField] private TMP_Text metaText;
 	[SerializeField] private Button MenuButton;
+	[SerializeField] private Image symbolImage;
 
 	private ReelStripData cachedStrip;
 	private SlotsData cachedSlot;
@@ -14,7 +15,46 @@ public class ReelSymbolDetailItem : MonoBehaviour
 
 	public void Setup(SymbolData data, int index)
 	{
-		if (nameText != null) nameText.text = (data != null ? data.Name : "(null)") + $" [{index}]";
+		// Diagnostic: report incoming data
+		Debug.Log($"ReelSymbolDetailItem.Setup(SymbolData) index={index} name={(data != null ? data.Name : "<null>")} hasSprite={(data != null && data.Sprite != null)}");
+
+		Sprite sprite = null;
+		if (data != null)
+		{
+			// Only use the explicit runtime sprite (resolved via spriteKey) — do not attempt to resolve by name
+			sprite = data.Sprite; // getter resolves from spriteKey if present
+		}
+
+		// If we have symbol data and a sprite, show the sprite and hide the text.
+		if (data != null && symbolImage != null && sprite != null)
+		{
+			symbolImage.enabled = true;
+			symbolImage.sprite = sprite;
+			// when displaying a sprite we want neutral tint so sprite colors are correct
+			symbolImage.color = Color.white;
+			if (nameText != null)
+			{
+				nameText.enabled = false;
+				nameText.text = string.Empty; // clear residual name
+			}
+		}
+		else
+		{
+			// No associated symbol data sprite: show the "Random" text (or name if available) and keep the image's color as a placeholder.
+			if (nameText != null)
+			{
+				nameText.enabled = true;
+				nameText.text = (data != null && !string.IsNullOrEmpty(data.Name) ? data.Name : "Random") + $" [{index}]";
+			}
+			if (symbolImage != null)
+			{
+				// Keep the image visible so its configured color acts as the placeholder background; clear any sprite used for symbol display.
+				symbolImage.enabled = true;
+				symbolImage.sprite = null;
+				// preserve symbolImage.color so authoring color remains for the placeholder
+			}
+		}
+
 		if (metaText != null)
 		{
 			string m = string.Empty;
@@ -30,7 +70,44 @@ public class ReelSymbolDetailItem : MonoBehaviour
 
 	public void Setup(SymbolDefinition def, int index)
 	{
-		if (nameText != null) nameText.text = (def != null ? def.SymbolName : "(null)") + $" [{index}]";
+		// Diagnostic
+		Debug.Log($"ReelSymbolDetailItem.Setup(SymbolDefinition) index={index} name={(def != null ? def.SymbolName : "<null>")} hasSprite={(def != null && def.SymbolSprite != null)}");
+
+		Sprite sprite = null;
+		if (def != null)
+		{
+			// Only use the explicit authoring sprite if present. Do not resolve by definition name.
+			sprite = def.SymbolSprite;
+		}
+
+		if (def != null && symbolImage != null && sprite != null)
+		{
+			symbolImage.enabled = true;
+			symbolImage.sprite = sprite;
+			// when displaying a sprite we want neutral tint so sprite colors are correct
+			symbolImage.color = Color.white;
+			if (nameText != null)
+			{
+				nameText.enabled = false;
+				nameText.text = string.Empty; // clear residual name
+			}
+		}
+		else
+		{
+			// No associated definition: show the "Random" text (or symbol name if available) and keep image color as placeholder.
+			if (nameText != null)
+			{
+				nameText.enabled = true;
+				nameText.text = (def != null && !string.IsNullOrEmpty(def.SymbolName) ? def.SymbolName : "Random") + $" [{index}]";
+			}
+			if (symbolImage != null)
+			{
+				symbolImage.enabled = true;
+				symbolImage.sprite = null;
+				// preserve symbolImage.color so authoring color remains for the placeholder
+			}
+		}
+
 		if (metaText != null)
 		{
 			string m = string.Empty;

@@ -43,6 +43,15 @@ public class SlotDetailInterface : MonoBehaviour
 				AddReelButton.transform.SetAsLastSibling();
 			}
 		}
+
+		// Subscribe to global reel-strip updates so UI can refresh when strips change elsewhere
+		GlobalEventManager.Instance?.RegisterEvent(SlotsEvent.ReelStripUpdated, OnReelStripUpdated);
+	}
+
+	private void OnDestroy()
+	{
+		// Unregister to avoid dangling references
+		GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.ReelStripUpdated, OnReelStripUpdated);
 	}
 
 	public void ShowSlot(SlotsData slots)
@@ -93,7 +102,7 @@ public class SlotDetailInterface : MonoBehaviour
 			var item = Instantiate(ReelDetailItemPrefab, ReelDetailsRoot);
 			item.Setup(rd, i);
 
-			// wire up each reel's symbol menu buttons to open our AddRemoveSymbolsMenu
+			// wire up each reel's symbol menu to open our AddRemoveSymbolsMenu
 			item.ConfigureSymbolMenu(current, OpenAddRemoveSymbolsMenu);
 		}
 
@@ -114,7 +123,7 @@ public class SlotDetailInterface : MonoBehaviour
 
 		// Optionally pass context to the menu. Currently the menu reads PlayerData inventory; this
 		// provides a hook if you want the menu to pre-select symbols from the provided strip or slot.
-		AddRemoveSymbolsMenuInstance.Show();
+		AddRemoveSymbolsMenuInstance.Show(strip, slot);
 		// future: AddRemoveSymbolsMenuInstance.SetContext(strip, slot);
 	}
 
@@ -129,6 +138,31 @@ public class SlotDetailInterface : MonoBehaviour
 			SlotDetailsRoot?.gameObject.SetActive(false); // no-op if null, kept for clarity
 			// fallback: hide component GameObject if no separate root
 			gameObject.SetActive(false);
+		}
+	}
+
+	public void OnDataReloaded()
+	{
+		if (current != null) Refresh();
+	}
+
+	private void OnReelStripUpdated(object obj)
+	{
+		var updated = obj as ReelStripData;
+		if (updated == null) return;
+		if (current == null || current.CurrentReelData == null) return;
+
+		// If any reel in the current slot references this strip, refresh the UI
+		foreach (var rd in current.CurrentReelData)
+		{
+			if (rd == null) continue;
+			var strip = rd.CurrentReelStrip;
+			if (strip == null) continue;
+			if (strip.AccessorId == updated.AccessorId || (!string.IsNullOrEmpty(strip.InstanceKey) && strip.InstanceKey == updated.InstanceKey))
+			{
+				Refresh();
+				break;
+			}
 		}
 	}
 }

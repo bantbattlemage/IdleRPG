@@ -259,9 +259,56 @@ public class PlayerInventoryDebugUI : MonoBehaviour
         var types = Enum.GetValues(typeof(InventoryItemType));
         var t = (InventoryItemType)types.GetValue(UnityEngine.Random.Range(0, types.Length));
         var name = "Item " + UnityEngine.Random.Range(1000, 9999);
-        var item = new InventoryItemData(name, t, null);
+
+        // Try to find a real sprite key from available reel strips or runtime symbols so the new inventory item stores an explicit spriteKey
+        string spriteKey = FindAnyAvailableSymbolSpriteKey();
+
+        InventoryItemData item;
+        if (!string.IsNullOrEmpty(spriteKey)) item = new InventoryItemData(name, t, null, spriteKey);
+        else item = new InventoryItemData(name, t, null);
+
         pd.AddInventoryItem(item);
         RefreshList();
+    }
+
+    // Search managed reel strips for any available authoring sprite or runtime sprite key to use as a sample spriteKey
+    private string FindAnyAvailableSymbolSpriteKey()
+    {
+        // Prefer explicit runtime sprite keys on runtime symbols, then authoring symbol definition sprites
+        var mgr = ReelStripDataManager.Instance;
+        if (mgr != null && mgr.ReadOnlyLocalData != null)
+        {
+            foreach (var kv in mgr.ReadOnlyLocalData)
+            {
+                var strip = kv.Value; if (strip == null) continue;
+
+                // Check runtime symbols first
+                var runtimes = strip.RuntimeSymbols;
+                if (runtimes != null)
+                {
+                    for (int i = 0; i < runtimes.Count; i++)
+                    {
+                        var s = runtimes[i];
+                        if (s == null) continue;
+                        if (!string.IsNullOrEmpty(s.SpriteKey)) return s.SpriteKey;
+                        if (s.Sprite != null) return s.Sprite.name;
+                    }
+                }
+
+                // Fall back to authoring symbol definitions
+                var defs = strip.SymbolDefinitions;
+                if (defs != null)
+                {
+                    for (int i = 0; i < defs.Length; i++)
+                    {
+                        var d = defs[i]; if (d == null) continue;
+                        if (d.SymbolSprite != null) return d.SymbolSprite.name;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     private void OnRemoveItem(string id)

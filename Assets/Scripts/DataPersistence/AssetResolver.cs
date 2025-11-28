@@ -38,6 +38,12 @@ public static class AssetResolver
 			if (all[i].name == key) return all[i];
 		}
 
+		// Diagnostic: in editor/dev builds, log missing keys to help authors fix asset keys
+		if (Application.isEditor || Debug.isDebugBuild)
+		{
+			Debug.Log($"AssetResolver: failed to resolve Sprite for key='{key}'");
+		}
+
 		return null;
 	}
 }

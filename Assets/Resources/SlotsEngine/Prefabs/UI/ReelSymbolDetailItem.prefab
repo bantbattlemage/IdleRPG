@@ -54,9 +54,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ff125e62032d9e4db078d2523f90a4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ReelSymbolDetailItem
-  nameText: {fileID: 0}
+  nameText: {fileID: 4308772645404102266}
   metaText: {fileID: 0}
   MenuButton: {fileID: 9037560915516775351}
+  symbolImage: {fileID: 5883292973090144383}
 --- !u!114 &5883292973090144383
 MonoBehaviour:
   m_ObjectHideFlags: 0

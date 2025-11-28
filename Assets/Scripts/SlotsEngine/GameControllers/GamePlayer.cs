@@ -206,14 +206,47 @@ public class GamePlayer : Singleton<GamePlayer>
 			Debug.LogWarning("No slot available to add a symbol.");
 			return;
 		}
-		var reel = slot.CurrentReels.GetRandom();
-		if (reel == null)
+
+		// Previously this modified a reel. New behavior: only add an inventory item using SymbolDefinitionManager
+		var pd = playerData;
+		if (pd == null)
 		{
-			Debug.LogWarning("Selected slot has no reels to add a symbol to.");
+			Debug.LogWarning("PlayerData missing; cannot add test symbol.");
 			return;
 		}
-		reel.SetSymbolCount(reel.CurrentReelData.SymbolCount + 1);
-		playerData.AddInventoryItem(new InventoryItemData("Symbol" + reel.CurrentReelData.SymbolCount, InventoryItemType.Symbol, reel.CurrentReelData.CurrentReelStrip?.Definition?.name));
+
+		string newName = "Symbol" + (pd.Inventory?.Items.Count + 1);
+		Sprite chosen = null;
+		if (SymbolDefinitionManager.Instance != null)
+		{
+			var defs = SymbolDefinitionManager.Instance.GetAllDefinitions();
+			if (defs != null && defs.Count > 0)
+			{
+				for (int i = 0; i < defs.Count; i++)
+				{
+					var d = defs[i]; if (d == null) continue;
+					if (d.SymbolSprite != null) { chosen = d.SymbolSprite; break; }
+				}
+			}
+		}
+		// Legacy fallback
+		if (chosen == null)
+		{
+			var all = Resources.FindObjectsOfTypeAll<SymbolDefinition>();
+			if (all != null && all.Length > 0)
+			{
+				for (int i = 0; i < all.Length; i++) { var d = all[i]; if (d == null) continue; if (d.SymbolSprite != null) { chosen = d.SymbolSprite; break; } }
+			}
+		}
+
+		if (chosen != null)
+		{
+			pd.AddInventoryItem(new InventoryItemData(newName, InventoryItemType.Symbol, null, chosen.name));
+		}
+		else
+		{
+			pd.AddInventoryItem(new InventoryItemData(newName, InventoryItemType.Symbol, null));
+		}
 	}
 
 	public void RemoveTestSymbol()

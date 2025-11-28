@@ -39,37 +39,37 @@ public class GameReel : MonoBehaviour
     // Cached singleton references to avoid repeated Instance lookups
     private GameSymbolPool cachedSymbolPool;
 
-    // Helper to resolve persisted SymbolData candidate, attempt to recover missing sprite by name,
+    // Helper to resolve persisted SymbolData candidate, attempt to recover missing sprite by spriteKey,
     // and persist into SymbolDataManager when possible. Falls back to reelStrip selection when
     // candidate is null or sprite could not be resolved.
     private SymbolData ResolveAndPersistSymbol(SymbolData candidate, List<SymbolData> existingSelections, bool useSeededRng = true)
     {
-        SymbolData result = candidate;
-
-        if (result != null)
+        // Prefer provided candidate (already a runtime instance)
+        if (candidate != null)
         {
-            if (result.Sprite == null && !string.IsNullOrEmpty(result.Name))
+            // Only attempt resolution via explicit SpriteKey; do not use Name as a key
+            if (candidate.Sprite == null && !string.IsNullOrEmpty(candidate.SpriteKey))
             {
-                // Let failures surface; do not swallow exceptions here so callers can detect issues
-                result.Sprite = AssetResolver.ResolveSprite(result.Name);
+                candidate.Sprite = AssetResolver.ResolveSprite(candidate.SpriteKey);
             }
-            if (result.Sprite == null)
+            if (SymbolDataManager.Instance != null && candidate.AccessorId == 0)
             {
-                // fallback to strip selection
-                result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections, true, useSeededRng) : result;
+                SymbolDataManager.Instance.AddNewData(candidate);
             }
-            else
-            {
-                if (SymbolDataManager.Instance != null && result.AccessorId == 0)
-                    SymbolDataManager.Instance.AddNewData(result);
-            }
-        }
-        else
-        {
-            result = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections, true, useSeededRng) : null;
+            return candidate;
         }
 
-        return result;
+        // Use the strip's weighted selection over runtime symbols
+        SymbolData selected = reelStrip != null ? reelStrip.GetWeightedSymbol(existingSelections, true, useSeededRng) : null;
+        if (selected != null && selected.Sprite == null && !string.IsNullOrEmpty(selected.SpriteKey))
+        {
+            selected.Sprite = AssetResolver.ResolveSprite(selected.SpriteKey);
+        }
+        if (selected != null && SymbolDataManager.Instance != null && selected.AccessorId == 0)
+        {
+            SymbolDataManager.Instance.AddNewData(selected);
+        }
+        return selected;
     }
 
     // Coroutine handles for delayed operations to avoid DOTween.Sequence allocations
@@ -167,6 +167,10 @@ public class GameReel : MonoBehaviour
 
             // If this symbol was freshly created it has been initialized. Apply the new data for reuse.
             if (sym != null) sym.ApplySymbol(newSymbol);
+            if (sym != null && newSymbol != null && newSymbol.Sprite != null && sym.CachedImage != null)
+            {
+                sym.CachedImage.sprite = newSymbol.Sprite;
+            }
             // Ensure visible symbols are shown with full color (not dimmed)
             var visImg = sym?.CachedImage; if (visImg != null) visImg.color = Color.white;
             if (sym != null) sym.SetSizeAndLocalY(currentReelData.SymbolSize, step * i);
@@ -365,6 +369,9 @@ public class GameReel : MonoBehaviour
     // Public method to immediately begin spin without scheduling a coroutine (used by SlotsEngine single-coroutine stagger)
     public void BeginSpinImmediate(List<SymbolData> solution = null)
     {
+        // Lock strip edits while spinning
+        reelStrip?.SetEditLock(true);
+
         // Reset per-reel state that would normally be set in BeginSpin
         // Ensure per-reel pool is large enough before spin starts to prevent transient gaps
         int est = EstimateNeededPooledCapacity();
@@ -583,6 +590,7 @@ public class GameReel : MonoBehaviour
         completeOnNextSpin = true;
         spinSpeedMultiplier = 4f;
         spinning = false;
+        reelStrip?.SetEditLock(false); // unlock edits for off-page completion
 
         // Determine whether a buffered 'next' strip exists (was prepared by FallOut/SpawnNextReel).
         bool hasBuffer = (bufferSymbols != null && bufferSymbols.Count > 0) ||
@@ -1037,7 +1045,8 @@ public class GameReel : MonoBehaviour
             lastBottomDummyCount = bottomDummySymbols.Count;
         }
         if (!completeOnNextSpin) { FallOut(solution); }
-        else { spinning = false; if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { } try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { } }
+        else { spinning = false; reelStrip?.SetEditLock(false); // unlock edits
+ if ((Application.isEditor || Debug.isDebugBuild) && WinEvaluator.Instance != null && WinEvaluator.Instance.LoggingEnabled) { var names = symbols.Select(s => s?.CurrentSymbolData != null ? s.CurrentSymbolData.Name : "(null)").ToArray(); Debug.Log($"Reel {ID} landed symbols (bottom->top): [{string.Join(",", names)}]"); } for (int i = 0; i < symbols.Count; i++) try { eventManager.BroadcastEvent(SlotsEvent.SymbolLanded, symbols[i]); } catch { } try { eventManager.BroadcastEvent(SlotsEvent.ReelCompleted, ID); } catch { } }
 
 #if UNITY_EDITOR
         // Run pool integrity diagnostics in editor/dev to help catch reuse or corruption issues
@@ -1476,5 +1485,13 @@ public class GameReel : MonoBehaviour
             float delay = ID * ResumeStaggerStep;
             StartCoroutine(ResumeFallOutAfterDelay(solution, delay, false));
         }
+    }
+
+    public bool IsEditLocked => spinning;
+
+    public bool TryBeginStripEdit()
+    {
+        if (spinning) return false;
+        return true;
     }
 }

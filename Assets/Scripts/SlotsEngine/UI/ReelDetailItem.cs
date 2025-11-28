@@ -24,25 +24,65 @@ public class ReelDetailItem : MonoBehaviour
 
 		if (data == null) return;
 
-		// Display the reel's strip definitions when available
+		// Try to use current reel strip; may be null for legacy/empty setups
 		var strip = data.CurrentReelStrip;
 		lastStrip = strip; // cache for later menu wiring
-		if (strip == null || strip.SymbolDefinitions == null) return;
 
-		var defs = strip.SymbolDefinitions;
-		int target = Mathf.Max(strip.StripSize, defs.Length);
+		var defs = strip != null ? strip.SymbolDefinitions : null;
+		var runtime = strip != null ? strip.RuntimeSymbols : null;
+
+		int defsLen = defs != null ? defs.Length : 0;
+		int runtimeLen = runtime != null ? runtime.Count : 0;
+
+		// Target number of symbol slots: prefer strip.StripSize if available, otherwise fall back to ReelData.SymbolCount
+		int target = 1;
+		if (strip != null && strip.StripSize > 0) target = strip.StripSize;
+		else if (data != null && data.SymbolCount > 0) target = data.SymbolCount;
+
+		if (ReelSymbolDetailItemPrefab == null)
+		{
+			Debug.LogWarning($"ReelDetailItem: ReelSymbolDetailItemPrefab is not assigned on {name}. Cannot instantiate symbol items.");
+			return;
+		}
+		if (SymbolDetailsRoot == null)
+		{
+			Debug.LogWarning($"ReelDetailItem: SymbolDetailsRoot is not assigned on {name}. Cannot parent instantiated items.");
+			return;
+		}
+
+		// First: instantiate items for indices that have runtime data (non-null)
 		for (int i = 0; i < target; i++)
 		{
-			if (ReelSymbolDetailItemPrefab == null || SymbolDetailsRoot == null) break;
-			var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
-			if (i < defs.Length)
+			if (runtime != null && i < runtimeLen && runtime[i] != null)
 			{
-				itm.Setup(defs[i], i);
+				var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
+				if (itm != null)
+				{
+					itm.gameObject.SetActive(true);
+					itm.Setup(runtime[i], i);
+				}
 			}
-			else
+		}
+
+		// Second: instantiate remaining slots (definitions or empty placeholders) up to target
+		for (int i = 0; i < target; i++)
+		{
+			bool hasRuntime = runtime != null && i < runtimeLen && runtime[i] != null;
+			if (hasRuntime) continue;
+
+			var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
+			if (itm != null)
 			{
-				// spawn placeholder for missing symbols (pass null so the item renders as empty)
-				itm.Setup((SymbolDefinition)null, i);
+				itm.gameObject.SetActive(true);
+				if (i < defsLen)
+				{
+					itm.Setup(defs[i], i);
+				}
+				else
+				{
+					// spawn placeholder for missing symbols (pass null so the item renders as Random)
+					itm.Setup((SymbolDefinition)null, i);
+				}
 			}
 		}
 	}

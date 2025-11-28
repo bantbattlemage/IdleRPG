@@ -44,9 +44,18 @@ public class SymbolDetailsItem : MonoBehaviour
 		}
 		if (cg != null)
 		{
-			cg.interactable = !bothDisabled;
-			cg.blocksRaycasts = !bothDisabled;
-			cg.alpha = bothDisabled ? 0.6f : 1f;
+			if (bothDisabled)
+			{
+				cg.interactable = false;
+				cg.blocksRaycasts = false;
+				cg.alpha = 0.6f;
+			}
+			else
+			{
+				cg.interactable = true;
+				cg.blocksRaycasts = true;
+				cg.alpha = 1f;
+			}
 		}
 	}
 
