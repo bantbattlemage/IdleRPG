@@ -153,14 +153,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 	private bool IsSlotInventoryBacked(SlotsEngine slot)
 	{
-		if (slot == null) return false;
-		// Prefer explicit runtime flag when present to avoid relying on mutable inventory state
-		try
-		{
-			if (slot.InventoryBacked) return true;
-		}
-		catch { }
-		if (playerData == null) return false;
+		if (slot == null || playerData == null) return false;
 		try
 		{
 			var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
@@ -169,8 +162,13 @@ public class GamePlayer : Singleton<GamePlayer>
 				foreach (var s in slotItems)
 				{
 					if (s == null) continue;
-					// Only consider a slot inventory-backed when the inventory item explicitly references the slot via DefinitionKey (AccessorId)
+					// Prefer explicit DefinitionKey (accessor) match
 					if (!string.IsNullOrEmpty(s.DefinitionKey) && int.TryParse(s.DefinitionKey, out var accessor) && accessor > 0 && accessor == slot.CurrentSlotsData?.AccessorId)
+					{
+						return true;
+					}
+					// Legacy fallback: display-name match for items that don't reference an accessor
+					if (string.IsNullOrEmpty(s.DefinitionKey) && s.DisplayName == ("Slot " + slot.CurrentSlotsData?.Index))
 					{
 						return true;
 					}
@@ -429,9 +427,6 @@ public class GamePlayer : Singleton<GamePlayer>
 		{
 			newSlots.BeginSlots();
 		}
-
-		// Set runtime InventoryBacked flag on the engine for deterministic checks later
-		try { newSlots.InventoryBacked = createInventoryItems; } catch { }
 
 		// If this is a brand-new slot (existingData == null) we need to register it with PlayerData so it becomes
 		// part of the player's CurrentSlots collection. Optionally, we also create Inventory entries for the slot

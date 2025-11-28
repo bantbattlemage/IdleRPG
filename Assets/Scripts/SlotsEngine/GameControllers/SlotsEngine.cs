@@ -35,10 +35,6 @@ public class SlotsEngine : MonoBehaviour
 	/// </summary>
 	public bool IsPageActive => pageActive;
 
-	// NEW: whether this slot instance is backed by an Inventory SlotEngine item
-	[System.NonSerialized]
-	public bool InventoryBacked = false;
-
 	/// <summary>
 	/// Creates a fresh `SlotsData` instance from the provided definition and initializes the engine.
 	/// </summary>
