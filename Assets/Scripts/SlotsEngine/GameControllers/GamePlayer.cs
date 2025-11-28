@@ -310,6 +310,57 @@ public class GamePlayer : Singleton<GamePlayer>
 			playerData.AddSlots(newSlots.CurrentSlotsData);
 			// Inventory registration for tracking
 			playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, null));
+
+			// NEW: Register runtime reel strips used by this slot and add associated symbol inventory items
+			try
+			{
+				if (newSlots?.CurrentSlotsData?.CurrentReelData != null)
+				{
+					for (int i = 0; i < newSlots.CurrentSlotsData.CurrentReelData.Count; i++)
+					{
+						var rd = newSlots.CurrentSlotsData.CurrentReelData[i];
+						if (rd == null) continue;
+						var strip = rd.CurrentReelStrip;
+						if (strip == null) continue;
+
+						// Create an inventory item representing this runtime strip. Use the strip.InstanceKey so it can be identified later.
+						string stripDisplay = $"ReelStrip {newSlots.CurrentSlotsData.Index}-{i}";
+						var stripItem = new InventoryItemData(stripDisplay, InventoryItemType.ReelStrip, strip.InstanceKey);
+						playerData.AddInventoryItem(stripItem);
+
+						// For each authoring symbol definition on the strip, create runtime SymbolData and corresponding inventory item
+						var defs = strip.SymbolDefinitions;
+						if (defs != null)
+						{
+							foreach (var sdef in defs)
+							{
+								if (sdef == null) continue;
+								SymbolData sym = null;
+								try
+								{
+									sym = sdef.CreateInstance();
+									if (SymbolDataManager.Instance != null) SymbolDataManager.Instance.AddNewData(sym);
+								}
+								catch { sym = null; }
+
+								string name = !string.IsNullOrEmpty(sdef.SymbolName) ? sdef.SymbolName : sdef.name;
+								// Associate symbol inventory items to the strip by using the strip's InstanceKey (GUID) not the inventory item's Id
+								var symItem = new InventoryItemData(name, InventoryItemType.Symbol, strip.InstanceKey);
+								if (sym != null)
+								{
+									if (!string.IsNullOrEmpty(sym.SpriteKey)) symItem.SetSpriteKey(sym.SpriteKey);
+									symItem.SetSymbolAccessorId(sym.AccessorId);
+								}
+								playerData.AddInventoryItem(symItem);
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning($"SpawnSlots: failed to register runtime reelstrip inventory for new slot: {ex.Message}");
+			}
 		}
 
 		playerSlots.Add(newSlots);

@@ -72,6 +72,22 @@ public class ReelData : Data
 				ReelStripDataManager.Instance.AddNewData(reelStrip);
 			}
 			currentReelStripAccessorId = reelStrip.AccessorId;
+
+			// Sync currentSymbolData from the strip's runtime symbols so the reel reflects runtime edits immediately
+			if (reelStrip.RuntimeSymbols != null)
+			{
+				if (currentSymbolData == null) currentSymbolData = new List<SymbolData>();
+				currentSymbolData.Clear();
+				int countToCopy = Math.Min(symbolCount, reelStrip.RuntimeSymbols.Count);
+				for (int i = 0; i < countToCopy; i++)
+				{
+					var s = reelStrip.RuntimeSymbols[i];
+					if (s != null) RegisterSymbolForPersistence(s);
+					currentSymbolData.Add(s);
+				}
+				// Ensure persistence arrays updated
+				SyncSymbolPersistenceArrays();
+			}
 		}
 	}
 

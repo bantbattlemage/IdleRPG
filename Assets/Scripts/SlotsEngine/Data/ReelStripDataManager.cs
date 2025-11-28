@@ -98,6 +98,30 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 			Debug.Log($"ReelStripDataManager: Updated stripAccessorId={strip.AccessorId} runtimeSymbols=[{sb}]");
 		}
 		#endif
+
+		// Ensure any ReelData objects referencing this strip adopt the canonical updated instance so UI/engines read updated runtime symbols
+		try
+		{
+			if (ReelDataManager.Instance != null)
+			{
+				var allReels = ReelDataManager.Instance.GetAllData();
+				for (int i = 0; i < allReels.Count; i++)
+				{
+					var rd = allReels[i];
+					if (rd == null) continue;
+					var cur = rd.CurrentReelStrip;
+					if (cur == null) continue;
+					if (cur.AccessorId == strip.AccessorId || (!string.IsNullOrEmpty(cur.InstanceKey) && cur.InstanceKey == strip.InstanceKey))
+					{
+						rd.SetReelStrip(strip);
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"ReelStripDataManager.UpdateRuntimeStrip: failed to canonicalize ReelData references: {ex.Message}");
+		}
 	}
 
 	public void RemoveDataIfExists(ReelStripData strip)

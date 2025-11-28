@@ -166,7 +166,9 @@ public class ReelStripData : Data
         }
 
         // If still empty (new or legacy save), build from definitions
-        if (runtimeSymbols.Count == 0 && symbolDefinitions != null)
+        // Only auto-populate from authoring definitions when there is no persisted runtime symbol arrays
+        // If a persisted runtime list exists (even empty) we must respect it as the authoritative edited state.
+        if (runtimeSymbols.Count == 0 && symbolDefinitions != null && runtimeSymbolAccessorIds == null && runtimeSymbolKeys == null)
         {
             for (int i = 0; i < symbolDefinitions.Length; i++)
             {

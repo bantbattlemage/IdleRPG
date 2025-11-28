@@ -43,6 +43,27 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 	public void Show(ReelStripData strip, SlotsData slot)
 	{
+		// Prefer canonical manager instance if available so UI reflects runtime-managed data.
+		if (strip != null && ReelStripDataManager.Instance != null)
+		{
+			if (strip.AccessorId > 0 && ReelStripDataManager.Instance.TryGetData(strip.AccessorId, out var foundById))
+			{
+				strip = foundById;
+			}
+			else if (!string.IsNullOrEmpty(strip.InstanceKey))
+			{
+				var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
+				if (all != null)
+				{
+					foreach (var kv in all)
+					{
+						var s = kv.Value; if (s == null) continue;
+						if (!string.IsNullOrEmpty(s.InstanceKey) && s.InstanceKey == strip.InstanceKey) { strip = s; break; }
+					}
+				}
+			}
+		}
+
 		currentStrip = strip;
 		currentSlot = slot;
 		MigrateLegacyInventoryKeys();
@@ -237,7 +258,9 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 		// If this inventory item was previously associated with another strip, pre-clear matching runtime symbols
 		// on that strip so transfer will appear as a move rather than duplicate across strips.
-		if (!string.IsNullOrEmpty(previousDefinitionKey) && previousDefinitionKey != currentStrip.InstanceKey && ReelStripDataManager.Instance != null)
+		// Only run transfer removal when the item was actually associated (GUID instance key); do not remove
+		// matching symbols across strips for unassociated inventory items (same sprite may legitimately exist on multiple strips).
+		if (!string.IsNullOrEmpty(previousDefinitionKey) && IsGuid(previousDefinitionKey) && ReelStripDataManager.Instance != null)
 		{
 			var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
 			if (all != null)
@@ -247,7 +270,8 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 				foreach (var other in strips)
 				{
 					if (other == null) continue;
-					if (other.InstanceKey != previousDefinitionKey) continue; // target previous strip only
+					// Only target the strip referenced by the previousDefinitionKey (avoid aggressive cross-strip removals)
+					if (!string.Equals(other.InstanceKey, previousDefinitionKey, StringComparison.OrdinalIgnoreCase)) continue;
 					var list = other.RuntimeSymbols;
 					if (list == null) continue;
 					for (int ri = list.Count - 1; ri >= 0; ri--)
@@ -259,8 +283,9 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 						if (!match && !string.IsNullOrEmpty(item.DisplayName) && string.Equals(rs.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) match = true;
 						if (match)
 						{
-							Debug.Log($"OnAddInventoryItem: removing matching symbol from previous strip (instanceKey={other.InstanceKey}) as part of transfer.");
+							Debug.Log($"OnAddInventoryItem: removing matching symbol from other strip (instanceKey={other.InstanceKey}) as part of transfer.");
 							other.RemoveRuntimeSymbolAt(ri);
+							ReelStripDataManager.Instance.UpdateRuntimeStrip(other);
 						}
 					}
 				}
@@ -281,11 +306,10 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		if (string.IsNullOrEmpty(spriteKey) && currentStrip != null && currentStrip.SymbolDefinitions != null)
 		{
 			var defs = currentStrip.SymbolDefinitions;
-				for (int i = 0; i < defs.Length; i++)
+			for (int i = 0; i < defs.Length; i++)
 			{
 				var def = defs[i]; if (def == null) continue;
 				bool matchesDisplay = false;
-				// match against authoring display name, definition asset name, or sprite asset name (case-insensitive)
 				if (!string.IsNullOrEmpty(def.SymbolName) && string.Equals(def.SymbolName, item.DisplayName, StringComparison.OrdinalIgnoreCase)) matchesDisplay = true;
 				if (!matchesDisplay && string.Equals(def.name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) matchesDisplay = true;
 				if (!matchesDisplay && def.SymbolSprite != null && string.Equals(def.SymbolSprite.name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) matchesDisplay = true;
@@ -323,183 +347,42 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		// Diagnostic: report matched definition and resolved sprite key
 		Debug.Log($"OnAddInventoryItem: matchedDef={(matchedDef!=null?matchedDef.name:"<null>")} matchedDef.SymbolName={(matchedDef!=null?matchedDef.SymbolName:"<null>")} resolvedSpriteKey={spriteKey}");
 
-		// Do NOT attempt to resolve by display name or use fuzzy dynamic loading here. Names are not valid fallbacks.
-		// Enforce: if there is no definition match and the inventory item does not carry an explicit sprite key
-		// or a SymbolAccessorId referencing an existing SymbolData, fail immediately so data can be corrected.
 		if (matchedDef == null && string.IsNullOrEmpty(item.SpriteKey) && (item.SymbolAccessorId <= 0))
 		{
 			throw new InvalidOperationException($"AddRemoveSymbolsMenu: inventory item '{item.DisplayName}' cannot be added because it has no matching SymbolDefinition, no spriteKey, and no SymbolAccessorId. Fix the inventory item or associate it with a definition.");
 		}
 
-		// At this point either matchedDef != null, or an explicit spriteKey (or SymbolAccessorId) exists.
-
-		// Ensure runtime SymbolData always carries a spriteKey when a definition match exists
-		bool alreadyPresent = false;
-		foreach (var rs in currentStrip.RuntimeSymbols)
+		// Create a fresh runtime symbol instance for the target strip
+		SymbolData newRuntime = null;
+		if (matchedDef != null)
 		{
-			// Treat equality by name OR sprite key OR accessor id
-			if (rs == null) continue;
-			if (!string.IsNullOrEmpty(spriteKey) && !string.IsNullOrEmpty(rs.SpriteKey) && string.Equals(rs.SpriteKey, spriteKey, StringComparison.OrdinalIgnoreCase)) { alreadyPresent = true; break; }
-			if (rs.AccessorId > 0 && item.SymbolAccessorId > 0 && rs.AccessorId == item.SymbolAccessorId) { alreadyPresent = true; break; }
-			if (!string.IsNullOrEmpty(rs.Name) && !string.IsNullOrEmpty(item.DisplayName) && string.Equals(rs.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) { alreadyPresent = true; break; }
+			newRuntime = matchedDef.CreateInstance();
+			if (newRuntime.Sprite != null) newRuntime.SetSpriteKey(newRuntime.Sprite.name);
 		}
-		if (!alreadyPresent)
+		else if (item.SymbolAccessorId > 0 && SymbolDataManager.Instance != null && SymbolDataManager.Instance.TryGetData(item.SymbolAccessorId, out var persisted))
 		{
-			// Attempt to reuse an existing SymbolData instance when possible rather than creating a new one.
-			SymbolData existingSymbol = null;
-			// First preference: inventory item may carry a direct reference (accessor id) to a SymbolData registered with the manager
-			if (item != null && item.SymbolAccessorId > 0 && SymbolDataManager.Instance != null)
-			{
-				if (SymbolDataManager.Instance.TryGetData(item.SymbolAccessorId, out var invSym))
-				{
-					existingSymbol = invSym;
-					Debug.Log($"OnAddInventoryItem: found existingSymbol from inventory accessor: Name={invSym.Name} SpriteKey={invSym.SpriteKey} AccessorId={invSym.AccessorId}");
-				}
-			}
-
-			// Prefer symbols already on this strip (same key or name)
-			if (existingSymbol == null && currentStrip != null && currentStrip.RuntimeSymbols != null)
-			{
-				for (int i = 0; i < currentStrip.RuntimeSymbols.Count; i++)
-				{
-					var s = currentStrip.RuntimeSymbols[i];
-					if (s == null) continue;
-					if (!string.IsNullOrEmpty(spriteKey) && !string.IsNullOrEmpty(s.SpriteKey) && string.Equals(s.SpriteKey, spriteKey, StringComparison.OrdinalIgnoreCase)) { existingSymbol = s; Debug.Log($"OnAddInventoryItem: matched existingSymbol on strip by SpriteKey: Name={s.Name} SpriteKey={s.SpriteKey} AccessorId={s.AccessorId}"); break; }
-					if (string.Equals(s.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) { existingSymbol = s; Debug.Log($"OnAddInventoryItem: matched existingSymbol on strip by Name: Name={s.Name} SpriteKey={s.SpriteKey} AccessorId={s.AccessorId}"); break; }
-				}
-			}
-
-			// Next, search the global SymbolDataManager for a matching persisted symbol by spriteKey or name
-			if (existingSymbol == null && SymbolDataManager.Instance != null)
-			{
-				var all = SymbolDataManager.Instance.GetAllData();
-				for (int i = 0; i < all.Count; i++)
-				{
-					var s = all[i]; if (s == null) continue;
-					if (!string.IsNullOrEmpty(spriteKey) && !string.IsNullOrEmpty(s.SpriteKey) && string.Equals(s.SpriteKey, spriteKey, StringComparison.OrdinalIgnoreCase)) { existingSymbol = s; Debug.Log($"OnAddInventoryItem: matched existingSymbol in global manager by SpriteKey: Name={s.Name} SpriteKey={s.SpriteKey} AccessorId={s.AccessorId}"); break; }
-					if (string.Equals(s.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) { existingSymbol = s; Debug.Log($"OnAddInventoryItem: matched existingSymbol in global manager by Name: Name={s.Name} SpriteKey={s.SpriteKey} AccessorId={s.AccessorId}"); break; }
-				}
-			}
-
-			// If we matched a definition (authoring asset) try to find its runtime instance by comparing definition sprite/name
-			if (existingSymbol == null && matchedDef != null)
-			{
-				if (!string.IsNullOrEmpty(matchedDef.SymbolName))
-				{
-					// look on strip first
-					if (currentStrip != null && currentStrip.RuntimeSymbols != null)
-					{
-						for (int i = 0; i < currentStrip.RuntimeSymbols.Count; i++) { var s = currentStrip.RuntimeSymbols[i]; if (s == null) continue; if (string.Equals(s.Name, matchedDef.SymbolName, StringComparison.OrdinalIgnoreCase)) { existingSymbol = s; Debug.Log($"OnAddInventoryItem: matched existingSymbol on strip by matchedDef.SymbolName: Name={s.Name} SpriteKey={s.SpriteKey} AccessorId={s.AccessorId}"); break; } }
-					}
-				}
-				if (existingSymbol == null && matchedDef.SymbolSprite != null)
-				{
-					string defSpriteKey = matchedDef.SymbolSprite.name;
-					if (SymbolDataManager.Instance != null)
-					{
-						var all = SymbolDataManager.Instance.GetAllData();
-						for (int i = 0; i < all.Count; i++) { var s = all[i]; if (s == null) continue; if (!string.IsNullOrEmpty(s.SpriteKey) && string.Equals(s.SpriteKey, defSpriteKey, StringComparison.OrdinalIgnoreCase)) { existingSymbol = s; Debug.Log($"OnAddInventoryItem: matched existingSymbol in global manager by matchedDef.SpriteKey: Name={s.Name} SpriteKey={s.SpriteKey} AccessorId={s.AccessorId}"); break; } }
-					}
-				}
-			}
-
-			// When a definition match exists and the inventory item doesn't explicitly reference a persisted accessor,
-			// prefer creating a fresh runtime instance from the definition instead of reusing a possibly unrelated persisted instance.
-			if (matchedDef != null && existingSymbol != null)
-			{
-				// If the persisted symbol's spriteKey doesn't match the matched definition's sprite, ignore the persisted accessor
-				// and create a fresh runtime instance from the definition so name/sprite align with the definition.
-				string defSpriteKey = matchedDef.SymbolSprite != null ? matchedDef.SymbolSprite.name : null;
-				if (string.IsNullOrEmpty(defSpriteKey) || !string.Equals(existingSymbol.SpriteKey, defSpriteKey, StringComparison.OrdinalIgnoreCase))
-				{
-					Debug.Log($"OnAddInventoryItem: persisted SymbolData (AccessorId={existingSymbol.AccessorId}, SpriteKey={existingSymbol.SpriteKey}) does not match matched definition sprite '{defSpriteKey}'. Ignoring persisted accessor and creating from definition.");
-					existingSymbol = null;
-				}
-				else
-				{
-					Debug.Log($"OnAddInventoryItem: persisted SymbolData matches matched definition sprite; reusing persisted accessor (AccessorId={existingSymbol.AccessorId}).");
-				}
-			}
-
-			if (existingSymbol != null)
-			{
-				// If the symbol instance is already present on this strip, nothing to do.
-				if (currentStrip != null && currentStrip.RuntimeSymbols != null)
-				{
-					bool present = false;
-					for (int pi = 0; pi < currentStrip.RuntimeSymbols.Count; pi++)
-					{
-						if (object.ReferenceEquals(currentStrip.RuntimeSymbols[pi], existingSymbol)) { present = true; break; }
-					}
-					if (present)
-					{
-						Debug.Log($"[Diagnostics] Existing runtimeSymbol already present on strip: Name={existingSymbol.Name} AccessorId={existingSymbol.AccessorId}");
-						return;
-					}
-				}
-
-				// Before reusing the instance on this strip, ensure it's not still attached to another strip (transfer semantics)
-				if (existingSymbol != null && ReelStripDataManager.Instance != null)
-				{
-					var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
-					if (all != null)
-					{
-						foreach (var kv in all)
-						{
-							var other = kv.Value; if (other == null) continue;
-							if (object.ReferenceEquals(other, currentStrip)) continue;
-							// If other strip contains this runtime symbol, remove it so the symbol is moved rather than duplicated in UI
-							var list = other.RuntimeSymbols;
-							if (list != null)
-							{
-								for (int ri = list.Count - 1; ri >= 0; ri--)
-								{
-									var rs = list[ri]; if (rs == null) continue;
-									if (object.ReferenceEquals(rs, existingSymbol))
-									{
-										Debug.Log($"OnAddInventoryItem: removing existingSymbol from other strip (instanceKey={other.InstanceKey}) to perform transfer.");
-										other.RemoveRuntimeSymbolAt(ri);
-										break;
-									}
-								}
-							}
-						}
-					}
-				}
-
-				// Reuse existing instance on this strip
-				Debug.Log($"[Diagnostics] Reusing existing runtimeSymbol: Name={existingSymbol.Name} SpriteKey={existingSymbol.SpriteKey} HasSprite={existingSymbol.Sprite != null} AccessorId={existingSymbol.AccessorId}");
-				currentStrip.AddRuntimeSymbol(existingSymbol);
-				Debug.Log($"[Diagnostics] After AddRuntimeSymbol (reuse): Name={existingSymbol.Name} SpriteKey={existingSymbol.SpriteKey} HasSprite={existingSymbol.Sprite != null} AccessorId={existingSymbol.AccessorId}");
-			}
-			else
-			{
-				// No existing symbol: create new only via definition; ad-hoc creation is disallowed here.
-				if (matchedDef != null)
-				{
-					var runtimeSymbol = matchedDef.CreateInstance();
-					if (runtimeSymbol.Sprite != null)
-					{
-						runtimeSymbol.SetSpriteKey(runtimeSymbol.Sprite.name);
-					}
-
-					Debug.Log($"[Diagnostics] Creating runtimeSymbol from definition: Name={runtimeSymbol.Name} SpriteKey={runtimeSymbol.SpriteKey} HasSprite={runtimeSymbol.Sprite != null}");
-
-					currentStrip.AddRuntimeSymbol(runtimeSymbol);
-
-					Debug.Log($"[Diagnostics] After AddRuntimeSymbol (definition): Name={runtimeSymbol.Name} SpriteKey={runtimeSymbol.SpriteKey} HasSprite={runtimeSymbol.Sprite != null} AccessorId={runtimeSymbol.AccessorId}");
-				}
-				else
-				{
-					// No definition and no existing SymbolData — fail loudly so data can be corrected/migrated.
-					throw new InvalidOperationException($"AddRemoveSymbolsMenu: cannot add inventory item '{item.DisplayName}' to strip — no matching SymbolDefinition and no existing SymbolData found. Inventory items must reference a definition or a SymbolData accessor.");
-				}
-			}
-
-			// After successful add, associate inventory item to new strip
-			item.SetDefinitionKey(currentStrip.InstanceKey);
+			// Clone persisted into a fresh runtime instance to avoid shared references across strips
+			newRuntime = new SymbolData(persisted.Name, persisted.Sprite, persisted.BaseValue, persisted.MinWinDepth, persisted.Weight, persisted.PayScaling, persisted.IsWild, persisted.AllowWildMatch, persisted.WinMode, persisted.TotalCountTrigger, persisted.MaxPerReel, persisted.MatchGroupId);
+			newRuntime.EventTriggerScript = persisted.EventTriggerScript;
+			if (newRuntime.Sprite != null) newRuntime.SetSpriteKey(newRuntime.Sprite.name);
+		}
+		else if (!string.IsNullOrEmpty(spriteKey) && sprite != null)
+		{
+			// Create minimal symbol data from sprite
+			newRuntime = new SymbolData(item.DisplayName ?? spriteKey, sprite, 0, -1, 1f, PayScaling.DepthSquared, false, true);
+			newRuntime.SetSpriteKey(spriteKey);
+		}
+		else
+		{
+			throw new InvalidOperationException($"AddRemoveSymbolsMenu: unable to construct runtime symbol for inventory item '{item.DisplayName}'.");
 		}
 
+		// Add runtime and associate inventory
+		currentStrip.AddRuntimeSymbol(newRuntime);
+		item.SetDefinitionKey(currentStrip.InstanceKey);
+		item.SetSymbolAccessorId(newRuntime.AccessorId);
+
+		// Persist and refresh
 		ReelStripDataManager.Instance.UpdateRuntimeStrip(currentStrip);
 		LogRuntimeSymbols("After Add");
 		Refresh();

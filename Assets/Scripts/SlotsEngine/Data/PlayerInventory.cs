@@ -108,6 +108,16 @@ public class InventoryItemData
 		spriteKey = key;
 		DataPersistenceManager.Instance?.RequestSave();
 	}
+
+	/// <summary>
+	/// Associate this inventory item with an existing persisted SymbolData accessor id.
+	/// Use when the inventory item should reference an already-registered runtime SymbolData.
+	/// </summary>
+	public void SetSymbolAccessorId(int accessorId)
+	{
+		symbolAccessorId = accessorId;
+		DataPersistenceManager.Instance?.RequestSave();
+	}
 }
 
 [Serializable]

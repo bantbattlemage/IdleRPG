@@ -26,6 +26,30 @@ public class ReelDetailItem : MonoBehaviour
 
 		// Try to use current reel strip; may be null for legacy/empty setups
 		var strip = data.CurrentReelStrip;
+
+		// Prefer the canonical manager-registered strip if available to ensure we reflect runtime-managed symbols
+		if (strip != null && ReelStripDataManager.Instance != null)
+		{
+			// First try by accessor id
+			if (strip.AccessorId > 0 && ReelStripDataManager.Instance.TryGetData(strip.AccessorId, out var canonicalById))
+			{
+				strip = canonicalById;
+			}
+			else if (!string.IsNullOrEmpty(strip.InstanceKey))
+			{
+				// fallback: search manager dictionary for matching instance key
+				var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
+				if (all != null)
+				{
+					foreach (var kv in all)
+					{
+						var s = kv.Value; if (s == null) continue;
+						if (!string.IsNullOrEmpty(s.InstanceKey) && s.InstanceKey == strip.InstanceKey) { strip = s; break; }
+					}
+				}
+			}
+		}
+
 		lastStrip = strip; // cache for later menu wiring
 
 		var defs = strip != null ? strip.SymbolDefinitions : null;
@@ -50,29 +74,32 @@ public class ReelDetailItem : MonoBehaviour
 			return;
 		}
 
-		// First: instantiate items for indices that have runtime data (non-null)
-		for (int i = 0; i < target; i++)
+		// If a runtime list exists, always use it (show runtime symbols or placeholders). Do NOT fall back to authoring definitions.
+		if (runtime != null)
 		{
-			if (runtime != null && i < runtimeLen && runtime[i] != null)
+			for (int i = 0; i < target; i++)
 			{
 				var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
-				if (itm != null)
+				if (itm == null) continue;
+				itm.gameObject.SetActive(true);
+				if (i < runtimeLen && runtime[i] != null)
 				{
-					itm.gameObject.SetActive(true);
 					itm.Setup(runtime[i], i);
+				}
+				else
+				{
+					// Explicit placeholder when runtime list has no symbol at this index
+					itm.Setup((SymbolDefinition)null, i);
 				}
 			}
 		}
-
-		// Second: instantiate remaining slots (definitions or empty placeholders) up to target
-		for (int i = 0; i < target; i++)
+		else
 		{
-			bool hasRuntime = runtime != null && i < runtimeLen && runtime[i] != null;
-			if (hasRuntime) continue;
-
-			var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
-			if (itm != null)
+			// No runtime list: fall back to authoring definitions where available
+			for (int i = 0; i < target; i++)
 			{
+				var itm = Instantiate(ReelSymbolDetailItemPrefab, SymbolDetailsRoot);
+				if (itm == null) continue;
 				itm.gameObject.SetActive(true);
 				if (i < defsLen)
 				{
@@ -80,7 +107,6 @@ public class ReelDetailItem : MonoBehaviour
 				}
 				else
 				{
-					// spawn placeholder for missing symbols (pass null so the item renders as Random)
 					itm.Setup((SymbolDefinition)null, i);
 				}
 			}

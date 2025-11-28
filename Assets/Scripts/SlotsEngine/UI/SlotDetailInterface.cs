@@ -73,6 +73,32 @@ public class SlotDetailInterface : MonoBehaviour
 		// Force layout rebuild to ensure first-time visuals are correct
 		Canvas.ForceUpdateCanvases();
 		if (ReelDetailsRoot != null) LayoutRebuilder.ForceRebuildLayoutImmediate(ReelDetailsRoot);
+
+		// Diagnostic dump: log canonical manager strips and mapping for current slot to help debug mismatched instances
+		try
+		{
+			if (ReelStripDataManager.Instance != null)
+			{
+				ReelStripDataManager.Instance.DebugDumpAllRuntimeSymbols();
+			}
+
+			if (current != null && current.CurrentReelData != null)
+			{
+				for (int i = 0; i < current.CurrentReelData.Count; i++)
+				{
+					var rd = current.CurrentReelData[i];
+					if (rd == null) { Debug.Log($"SlotDetailInterface: Reel[{i}] has null ReelData"); continue; }
+					var strip = rd.CurrentReelStrip;
+					if (strip == null) { Debug.Log($"SlotDetailInterface: Reel[{i}] CurrentReelStrip is null"); continue; }
+					int runtimeCount = strip.RuntimeSymbols != null ? strip.RuntimeSymbols.Count : 0;
+					Debug.Log($"SlotDetailInterface: Reel[{i}] -> stripAccessor={strip.AccessorId} instanceKey={strip.InstanceKey} runtimeCount={runtimeCount}");
+				}
+			}
+		}
+		catch (System.Exception ex)
+		{
+			Debug.LogWarning($"SlotDetailInterface: diagnostic dump failed: {ex.Message}");
+		}
 	}
 
 	public void Refresh()
@@ -158,8 +184,15 @@ public class SlotDetailInterface : MonoBehaviour
 			if (rd == null) continue;
 			var strip = rd.CurrentReelStrip;
 			if (strip == null) continue;
+			// Match by accessor or instance key; if matched, adopt the updated strip reference to ensure the reel uses latest runtime data
 			if (strip.AccessorId == updated.AccessorId || (!string.IsNullOrEmpty(strip.InstanceKey) && strip.InstanceKey == updated.InstanceKey))
 			{
+				try
+				{
+					// Force the reel data to adopt the updated strip object so subsequent UI reads reflect runtime changes
+					rd.SetReelStrip(updated);
+				}
+				catch { }
 				Refresh();
 				break;
 			}
