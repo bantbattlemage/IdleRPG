@@ -76,6 +76,9 @@ public class ReelStripData : Data
                 runtimeSymbols.Add(inst); // ADD missing push
             }
         }
+
+        // After registering runtime symbol instances, ensure persistence arrays reflect their accessor ids and keys
+        SyncPersistenceArrays();
     }
 
     private void EnsureResolved()

@@ -125,10 +125,37 @@ public class PlayerData : Data
 					}
 				}
 			}
+
+			// New: special handling for Reel inventory items — create a runtime ReelData from a ReelDefinition
+			if (item.ItemType == InventoryItemType.Reel && !string.IsNullOrEmpty(item.DefinitionKey))
+			{
+				var reelDef = DefinitionResolver.Resolve<ReelDefinition>(item.DefinitionKey);
+				if (reelDef != null)
+				{
+					// Create runtime ReelData using the same path as slot initialization
+					var runtimeReel = reelDef.CreateInstance();
+					if (runtimeReel != null)
+					{
+						// Register reel with manager so it receives an AccessorId and its contained symbols are persisted
+						ReelDataManager.Instance?.AddNewData(runtimeReel);
+
+						// If the reel has an associated runtime strip, ensure it's registered as well
+						if (runtimeReel.CurrentReelStrip != null && ReelStripDataManager.Instance != null)
+						{
+							if (runtimeReel.CurrentReelStrip.AccessorId == 0)
+								ReelStripDataManager.Instance.AddNewData(runtimeReel.CurrentReelStrip);
+						}
+
+						// Associate inventory item to this new runtime reel by storing its accessor id as the definition key
+						// (use string form; callers can parse back if needed)
+						item.SetDefinitionKey(runtimeReel.AccessorId.ToString());
+					}
+				}
+			}
 		}
 		catch (Exception ex)
 		{
-			Debug.LogWarning($"PlayerData.AddInventoryItem: failed to perform reelstrip-symbol association: {ex.Message}");
+			Debug.LogWarning($"PlayerData.AddInventoryItem: failed to perform reelstrip/reel association: {ex.Message}");
 		}
 
 		// finally add the reelstrip (or generic) item to inventory
@@ -143,5 +170,84 @@ public class PlayerData : Data
 	{
 		if (inventory == null) return new List<InventoryItemData>();
 		return inventory.GetItemsOfType(type);
+	}
+
+	/// <summary>
+	/// Register an already-created runtime ReelStripData and its authoring symbols into the player's inventory.
+	/// This is intended for runtime-created strips (not definition-based), and will add a ReelStrip inventory
+	/// item with DefinitionKey set to the strip's InstanceKey, plus Symbol inventory items associated to that key.
+	/// </summary>
+	public void RegisterRuntimeReelStrip(ReelStripData strip, string displayName = null)
+	{
+		if (strip == null) return;
+		if (inventory == null) inventory = new PlayerInventory();
+
+		try
+		{
+			// Ensure the strip is managed/persisted so other systems can find it by AccessorId/InstanceKey
+			if (ReelStripDataManager.Instance != null && (strip.AccessorId == 0 || ReelStripDataManager.Instance.ReadOnlyLocalData == null || !ReelStripDataManager.Instance.ReadOnlyLocalData.ContainsKey(strip.AccessorId)))
+			{
+				ReelStripDataManager.Instance.AddNewData(strip);
+			}
+
+			string stripDisplay = !string.IsNullOrEmpty(displayName) ? displayName : $"ReelStrip {strip.InstanceKey}";
+			var stripItem = new InventoryItemData(stripDisplay, InventoryItemType.ReelStrip, strip.InstanceKey);
+			inventory.AddItem(stripItem);
+
+			// Prefer existing runtime symbol instances on the strip so inventory items reference the canonical persisted SymbolData.
+			var runtimeList = strip.RuntimeSymbols;
+			if (runtimeList != null && runtimeList.Count > 0)
+			{
+				for (int i = 0; i < runtimeList.Count; i++)
+				{
+					var sym = runtimeList[i];
+					if (sym == null) continue;
+
+					// Ensure this runtime symbol is registered with the SymbolDataManager so it has an AccessorId
+					if (SymbolDataManager.Instance != null && sym.AccessorId == 0)
+					{
+						SymbolDataManager.Instance.AddNewData(sym);
+					}
+
+					var name = !string.IsNullOrEmpty(sym.Name) ? sym.Name : (sym.SpriteKey ?? "<unnamed>");
+					var symItem = new InventoryItemData(name, InventoryItemType.Symbol, strip.InstanceKey);
+					if (!string.IsNullOrEmpty(sym.SpriteKey)) symItem.SetSpriteKey(sym.SpriteKey);
+					if (sym.AccessorId > 0) symItem.SetSymbolAccessorId(sym.AccessorId);
+					inventory.AddItem(symItem);
+				}
+			}
+			else
+			{
+				// Fallback: create symbol items from authoring definitions (preserves original behavior)
+				var defs = strip.SymbolDefinitions;
+				if (defs != null)
+				{
+					foreach (var sdef in defs)
+					{
+						if (sdef == null) continue;
+						SymbolData sym = null;
+						try
+						{
+							sym = sdef.CreateInstance();
+							if (SymbolDataManager.Instance != null) SymbolDataManager.Instance.AddNewData(sym);
+						}
+						catch { sym = null; }
+
+						string name = !string.IsNullOrEmpty(sdef.SymbolName) ? sdef.SymbolName : sdef.name;
+						var symItem = new InventoryItemData(name, InventoryItemType.Symbol, strip.InstanceKey);
+						if (sym != null)
+						{
+							if (!string.IsNullOrEmpty(sym.SpriteKey)) symItem.SetSpriteKey(sym.SpriteKey);
+							symItem.SetSymbolAccessorId(sym.AccessorId);
+						}
+						inventory.AddItem(symItem);
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"PlayerData.RegisterRuntimeReelStrip: failed to register runtime reelstrip inventory: {ex.Message}");
+		}
 	}
 }

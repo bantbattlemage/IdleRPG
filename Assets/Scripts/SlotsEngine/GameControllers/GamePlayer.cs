@@ -40,10 +40,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		playerData = PlayerDataManager.Instance.GetPlayerData();
 
 		// Initialize inventory if missing (legacy saved data support)
-		if (playerData.Inventory == null)
-		{
-			playerData.AddInventoryItem(new InventoryItemData("Starter Reel Strip", InventoryItemType.ReelStrip, null));
-		}
+		EnsureInventoryInitialized();
 
 		if (playerData.CurrentSlots == null || playerData.CurrentSlots.Count == 0)
 		{
@@ -158,7 +155,29 @@ public class GamePlayer : Singleton<GamePlayer>
 			return;
 		}
 		slot.AddReel();
-		playerData.AddInventoryItem(new InventoryItemData("Reel", InventoryItemType.Reel, null));
+
+		// Try to locate the newly added reel and register its runtime strip + symbols into inventory
+		try
+		{
+			var addedReel = slot.CurrentReels != null && slot.CurrentReels.Count > 0 ? slot.CurrentReels.Last() : null;
+			var rd = addedReel?.CurrentReelData;
+			var strip = rd?.CurrentReelStrip;
+			if (playerData != null && strip != null)
+			{
+				string display = null;
+				try { display = $"ReelStrip {slot.CurrentSlotsData?.Index ?? 0}-{slot.CurrentReels.IndexOf(addedReel)}"; } catch { display = null; }
+				// Delegate to PlayerData helper
+				playerData.RegisterRuntimeReelStrip(strip, display);
+			}
+			else
+			{
+				Debug.LogWarning("AddTestReel: newly added reel has no runtime strip to register.");
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"AddTestReel: failed to register reel inventory: {ex.Message}");
+		}
 	}
 
 	public void RemoveTestReel()
@@ -181,16 +200,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		// Remove a matching InventoryItem (best-effort): prefer the most recently added Reel item
 		try
 		{
-			if (playerData != null)
-			{
-				var reels = playerData.GetItemsOfType(InventoryItemType.Reel);
-				if (reels != null && reels.Count > 0)
-				{
-					// remove the last added reel item
-					var toRemove = reels[reels.Count - 1];
-					playerData.RemoveInventoryItem(toRemove);
-				}
-			}
+			RemoveMostRecentInventoryItem(InventoryItemType.Reel);
 		}
 		catch (Exception ex)
 		{
@@ -229,24 +239,9 @@ public class GamePlayer : Singleton<GamePlayer>
 				}
 			}
 		}
-		// Legacy fallback
-		if (chosen == null)
-		{
-			var all = Resources.FindObjectsOfTypeAll<SymbolDefinition>();
-			if (all != null && all.Length > 0)
-			{
-				for (int i = 0; i < all.Length; i++) { var d = all[i]; if (d == null) continue; if (d.SymbolSprite != null) { chosen = d.SymbolSprite; break; } }
-			}
-		}
 
-		if (chosen != null)
-		{
-			pd.AddInventoryItem(new InventoryItemData(newName, InventoryItemType.Symbol, null, chosen.name));
-		}
-		else
-		{
-			pd.AddInventoryItem(new InventoryItemData(newName, InventoryItemType.Symbol, null));
-		}
+		// No legacy fallback: if no symbol definitions are available, add symbol without sprite
+		AddSymbolInventory(chosen, newName);
 	}
 
 	public void RemoveTestSymbol()
@@ -268,15 +263,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		// Best-effort: remove one Symbol inventory item (most recently added)
 		try
 		{
-			if (playerData != null)
-			{
-				var syms = playerData.GetItemsOfType(InventoryItemType.Symbol);
-				if (syms != null && syms.Count > 0)
-				{
-					var toRemove = syms[syms.Count - 1];
-					playerData.RemoveInventoryItem(toRemove);
-				}
-			}
+			RemoveMostRecentInventoryItem(InventoryItemType.Symbol);
 		}
 		catch (Exception ex)
 		{
@@ -323,37 +310,9 @@ public class GamePlayer : Singleton<GamePlayer>
 						var strip = rd.CurrentReelStrip;
 						if (strip == null) continue;
 
-						// Create an inventory item representing this runtime strip. Use the strip.InstanceKey so it can be identified later.
+						// Delegate registration to the authoritative PlayerData helper to avoid duplicated logic
 						string stripDisplay = $"ReelStrip {newSlots.CurrentSlotsData.Index}-{i}";
-						var stripItem = new InventoryItemData(stripDisplay, InventoryItemType.ReelStrip, strip.InstanceKey);
-						playerData.AddInventoryItem(stripItem);
-
-						// For each authoring symbol definition on the strip, create runtime SymbolData and corresponding inventory item
-						var defs = strip.SymbolDefinitions;
-						if (defs != null)
-						{
-							foreach (var sdef in defs)
-							{
-								if (sdef == null) continue;
-								SymbolData sym = null;
-								try
-								{
-									sym = sdef.CreateInstance();
-									if (SymbolDataManager.Instance != null) SymbolDataManager.Instance.AddNewData(sym);
-								}
-								catch { sym = null; }
-
-								string name = !string.IsNullOrEmpty(sdef.SymbolName) ? sdef.SymbolName : sdef.name;
-								// Associate symbol inventory items to the strip by using the strip's InstanceKey (GUID) not the inventory item's Id
-								var symItem = new InventoryItemData(name, InventoryItemType.Symbol, strip.InstanceKey);
-								if (sym != null)
-								{
-									if (!string.IsNullOrEmpty(sym.SpriteKey)) symItem.SetSpriteKey(sym.SpriteKey);
-									symItem.SetSymbolAccessorId(sym.AccessorId);
-								}
-								playerData.AddInventoryItem(symItem);
-							}
-						}
+						playerData.RegisterRuntimeReelStrip(strip, stripDisplay);
 					}
 				}
 			}
@@ -509,6 +468,39 @@ public class GamePlayer : Singleton<GamePlayer>
 			{
 				Debug.LogException(ex);
 			}
+		}
+	}
+
+	// --- Centralized inventory helper methods ---
+	private void EnsureInventoryInitialized()
+	{
+		if (playerData == null) return;
+		// Ensure PlayerData's Inventory getter will initialize a PlayerInventory if missing
+		var _ = playerData.Inventory;
+	}
+
+	private void AddSymbolInventory(Sprite sprite, string displayName = null)
+	{
+		if (playerData == null) return;
+		string name = string.IsNullOrEmpty(displayName) ? "Symbol" + (playerData.Inventory?.Items.Count + 1) : displayName;
+		if (sprite != null)
+		{
+			playerData.AddInventoryItem(new InventoryItemData(name, InventoryItemType.Symbol, null, sprite.name));
+		}
+		else
+		{
+			playerData.AddInventoryItem(new InventoryItemData(name, InventoryItemType.Symbol, null));
+		}
+	}
+
+	private void RemoveMostRecentInventoryItem(InventoryItemType type)
+	{
+		if (playerData == null) return;
+		var list = playerData.GetItemsOfType(type);
+		if (list != null && list.Count > 0)
+		{
+			var toRemove = list[list.Count - 1];
+			playerData.RemoveInventoryItem(toRemove);
 		}
 	}
 }

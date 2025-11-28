@@ -554,8 +554,26 @@ public class SlotsEngine : MonoBehaviour
 		ReelData newData;
 		if (template != null)
 		{
-			// Use existing strip data and base definition where available
-			newData = new ReelData(template.ReelSpinDuration, template.SymbolCount, null, template.BaseDefinition, template.CurrentReelStrip);
+			// If the template has a runtime strip, create a fresh runtime strip instance (do NOT share the same instance)
+			if (template.CurrentReelStrip != null)
+			{
+				try
+				{
+					var src = template.CurrentReelStrip;
+					var newStrip = new ReelStripData(src.Definition, src.StripSize, src.SymbolDefinitions, null, null);
+					newData = new ReelData(template.ReelSpinDuration, template.SymbolCount, null, template.BaseDefinition, newStrip);
+				}
+				catch (Exception)
+				{
+					// fallback to conservative clone without explicit strip
+					newData = new ReelData(template.ReelSpinDuration, template.SymbolCount, null, template.BaseDefinition, null);
+				}
+			}
+			else
+			{
+				// No template strip present; create a new ReelData using base definition
+				newData = new ReelData(template.ReelSpinDuration, template.SymbolCount, null, template.BaseDefinition, null);
+			}
 		}
 		else if (currentSlotsData.BaseDefinition != null && currentSlotsData.BaseDefinition.ReelDefinitions != null && currentSlotsData.BaseDefinition.ReelDefinitions.Length > 0)
 		{
@@ -565,6 +583,20 @@ public class SlotsEngine : MonoBehaviour
 		{
 			// Fallback conservative defaults
 			newData = new ReelData(0.5f, 3, null, null, null);
+		}
+
+		// Ensure any runtime ReelStripData that was created/assigned as part of the ReelData is registered
+		try
+		{
+			var stripToRegister = newData.CurrentReelStrip ?? newData.DefaultReelStrip;
+			if (stripToRegister != null && ReelStripDataManager.Instance != null && stripToRegister.AccessorId == 0)
+			{
+				ReelStripDataManager.Instance.AddNewData(stripToRegister);
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"SlotsEngine.AddReel: failed to register new reel strip with manager: {ex.Message}");
 		}
 
 		// Add to data model
@@ -636,16 +668,6 @@ public class SlotsEngine : MonoBehaviour
 		catch (Exception ex)
 		{
 			Debug.LogException(ex);
-		}
-
-		// Reindex remaining reels so their IDs remain consistent
-		for (int i = 0; i < reels.Count; i++)
-		{
-			var r = reels[i];
-			if (r == null) continue;
-			// Update local position using stable spacing
-			// IDs are used only for events/debug; positions are handled by RepositionReels
-			// We keep ID in sync by respawning positions and letting event flow continue.
 		}
 
 		// Update layout

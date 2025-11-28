@@ -390,22 +390,46 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 	private void OnRemoveInventoryItem(InventoryItemData item)
 	{
-		if (item == null || currentStrip == null) return;
+		if (item == null) return;
+		// Determine target strip: prefer the strip referenced by the inventory item (GUID) if present,
+		// otherwise fall back to the currently-open strip shown in the menu.
 		var pd = GamePlayer.Instance?.PlayerData; if (pd == null) return;
-		if (item.DefinitionKey == currentStrip.InstanceKey)
+
+		// By default operate on the strip currently shown in the menu. Only when there is no
+		// currently-open strip do we attempt to locate a target strip by the inventory item's
+		// DefinitionKey. This prevents accidentally removing symbols from other strips when
+		// the user is managing a different strip.
+		ReelStripData targetStrip = currentStrip;
+		if (targetStrip == null && !string.IsNullOrEmpty(item.DefinitionKey) && IsGuid(item.DefinitionKey) && ReelStripDataManager.Instance != null)
 		{
-			item.SetDefinitionKey(null); // disassociate only
+			// try to find the strip that matches the inventory item's DefinitionKey
+			var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
+			if (all != null)
+			{
+				foreach (var kv in all)
+				{
+					var s = kv.Value; if (s == null) continue;
+					if (!string.IsNullOrEmpty(s.InstanceKey) && string.Equals(s.InstanceKey, item.DefinitionKey, StringComparison.OrdinalIgnoreCase)) { targetStrip = s; break; }
+				}
+			}
+		}
+
+		if (targetStrip == null || ReelStripDataManager.Instance == null) return;
+
+		// If removing from the strip the item was associated with, disassociate it.
+		if (!string.IsNullOrEmpty(item.DefinitionKey) && targetStrip.InstanceKey == item.DefinitionKey)
+		{
+			item.SetDefinitionKey(null);
 		}
 
 		LogRuntimeSymbols("Before Remove");
 
-		var list = currentStrip.RuntimeSymbols;
+		var list = targetStrip.RuntimeSymbols;
 		for (int i = list.Count - 1; i >= 0; i--)
 		{
 			var rs = list[i];
 			if (rs == null) continue;
 
-			// Match by strongest identifiers first: persisted accessor id, then spriteKey, then fallback to name equality
 			bool matched = false;
 			if (item.SymbolAccessorId > 0 && rs.AccessorId == item.SymbolAccessorId)
 			{
@@ -425,13 +449,26 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 			if (matched)
 			{
-				currentStrip.RemoveRuntimeSymbolAt(i);
+				targetStrip.RemoveRuntimeSymbolAt(i);
 				break;
 			}
 		}
-		ReelStripDataManager.Instance.UpdateRuntimeStrip(currentStrip);
-		LogRuntimeSymbols("After Remove");
-		Refresh();
+
+		ReelStripDataManager.Instance.UpdateRuntimeStrip(targetStrip);
+
+		// If the menu is currently showing the same strip we removed from, refresh the menu; otherwise
+		// if we removed from a different strip we should still refresh to reflect inventory changes.
+		if (targetStrip == currentStrip)
+		{
+			LogRuntimeSymbols("After Remove");
+			Refresh();
+		}
+		else
+		{
+			// If targetStrip differs from currentStrip, still log for diagnostics and refresh the menu
+			Debug.Log($"OnRemoveInventoryItem: removed symbol from other strip InstanceKey={targetStrip.InstanceKey}");
+			Refresh();
+		}
 	}
 
 	private void OnTransferInventoryItem(InventoryItemData item)
