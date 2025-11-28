@@ -136,4 +136,38 @@ public class ReelSymbolDetailItem : MonoBehaviour
 			MenuButton.onClick.AddListener(() => { openMenuCallback?.Invoke(cachedStrip, cachedSlot); });
 		}
 	}
+
+	public void DisableMenuInteraction()
+	{
+		// Remove callbacks and disable interaction, but preserve full visual appearance (no dimming)
+		if (MenuButton != null)
+		{
+			MenuButton.onClick.RemoveAllListeners();
+
+			// Adjust the ColorBlock so the disabledColor matches the normal color to avoid Unity's dimming.
+			try
+			{
+				var cb = MenuButton.colors;
+				cb.disabledColor = cb.normalColor;
+				cb.colorMultiplier = 1f;
+				MenuButton.colors = cb;
+			}
+			catch { }
+
+			// force non-interactable so clicks do nothing
+			MenuButton.interactable = false;
+		}
+
+		// Ensure the symbol itself is displayed with full brightness
+		if (symbolImage != null)
+		{
+			symbolImage.color = Color.white;
+			symbolImage.enabled = true;
+		}
+		if (nameText != null)
+		{
+			// keep name text enabled/disabled as configured by Setup; do not dim
+			nameText.enabled = nameText.enabled;
+		}
+	}
 }

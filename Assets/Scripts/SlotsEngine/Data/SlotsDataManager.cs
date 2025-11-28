@@ -65,6 +65,9 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		// Debounced save request instead of immediate disk write
 		DataPersistenceManager.Instance?.RequestSave();
 
+		// Broadcast global notification so UI can refresh
+		try { GlobalEventManager.Instance?.BroadcastEvent(SlotsEvent.ReelAdded, slotsData); } catch { }
+
 		// Propagate changes to live SlotsEngine in a safe, surgical manner when possible
 		try
 		{

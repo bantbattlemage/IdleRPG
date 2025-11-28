@@ -9,6 +9,7 @@ public class ReelDetailItem : MonoBehaviour
 	public RectTransform SymbolDetailsRoot;
 	public ReelSymbolDetailItem ReelSymbolDetailItemPrefab;
 	public Button RemoveReelButton; // new: button to remove this reel from its slot
+	public Button AddReelButton; // added: button to add this reel to a slot
 
 	// cached strip used to configure symbol item menu callbacks after Setup
 	private ReelStripData lastStrip;
@@ -214,8 +215,9 @@ public class ReelDetailItem : MonoBehaviour
 				// Fallback: no live engine found - operate on data model directly
 				boundSlot.RemoveReel(boundReel);
 
-				// Remove persisted reel data and any contained symbol data
-				ReelDataManager.Instance?.RemoveDataIfExists(boundReel);
+				// NOTE: Do not remove the underlying ReelData from ReelDataManager here. Removing the
+				// ReelData would prevent it from being available to re-add to other slots via the
+				// AddReelInterface. Only remove reel data when explicitly desired elsewhere.
 
 				// Persist slots update
 				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
@@ -226,6 +228,69 @@ public class ReelDetailItem : MonoBehaviour
 			catch (System.Exception ex)
 			{
 				Debug.LogWarning($"ReelDetailItem: failed to remove reel: {ex.Message}");
+			}
+		});
+	}
+
+	/// <summary>
+	/// Disable symbol menu buttons so symbols are visible but not interactive.
+	/// </summary>
+	public void DisableSymbolMenus()
+	{
+		if (SymbolDetailsRoot == null) return;
+		for (int i = 0; i < SymbolDetailsRoot.childCount; i++)
+		{
+			var child = SymbolDetailsRoot.GetChild(i);
+			if (child == null) continue;
+			var rs = child.GetComponent<ReelSymbolDetailItem>();
+			if (rs != null)
+			{
+				rs.DisableMenuInteraction();
+			}
+		}
+	}
+
+	/// <summary>
+	/// Configure the add-reel button to attach this reel to the provided slot.
+	/// </summary>
+	public void ConfigureAddition(SlotsData slot, System.Action onAdded = null)
+	{
+		boundSlot = slot;
+		if (AddReelButton == null) return;
+
+		AddReelButton.gameObject.SetActive(true);
+		AddReelButton.interactable = true;
+		AddReelButton.onClick.RemoveAllListeners();
+		AddReelButton.onClick.AddListener(() =>
+		{
+			if (boundReel == null || boundSlot == null) return;
+			try
+			{
+				// Try to find live engine to ensure it's safe to add
+				var mgr = SlotsEngineManager.Instance;
+				if (mgr != null)
+				{
+					var engine = mgr.FindEngineForSlotsData(boundSlot);
+					if (engine != null && engine.CurrentState == State.Spinning)
+					{
+						throw new System.InvalidOperationException("Cannot add reel while engine is spinning.");
+					}
+				}
+
+				// Add to data model
+				boundSlot.AddNewReel(boundReel);
+
+				// Ensure reel persisted if not already
+				if (boundReel.AccessorId == 0) ReelDataManager.Instance?.AddNewData(boundReel);
+
+				// Persist slots update which will propagate to any live engine
+				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
+
+				onAdded?.Invoke();
+			}
+			catch (System.Exception ex)
+			{
+				Debug.LogWarning($"ReelDetailItem: failed to add reel: {ex.Message}");
 			}
 		});
 	}

@@ -652,7 +652,10 @@ public class SlotsEngine : MonoBehaviour
 			ReelData rd = (idx >= 0 && idx < currentSlotsData.CurrentReelData.Count) ? currentSlotsData.CurrentReelData[idx] : null;
 			if (rd != null)
 			{
-				try { ReelDataManager.Instance?.RemoveDataIfExists(rd); } catch { }
+				// Do NOT remove the ReelData from ReelDataManager here; removing it would make the reel
+				// unavailable to be re-associated with other slots via the AddReelInterface. Only detach
+				// the reel from the current slot's data list.
+				try { /* previously: ReelDataManager.Instance?.RemoveDataIfExists(rd); */ } catch { }
 				currentSlotsData.RemoveReel(rd);
 			}
 		}

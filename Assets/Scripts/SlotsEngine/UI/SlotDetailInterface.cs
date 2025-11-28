@@ -11,6 +11,9 @@ public class SlotDetailInterface : MonoBehaviour
 	public Button CloseButton;
 	public Button AddReelButton;
 
+	// reference to the AddReelInterface UI
+	public AddReelInterface AddReelInterfaceInstance;
+
 	// AddRemoveSymbolsMenu reference (prefab or scene instance)
 	public AddRemoveSymbolsMenu AddRemoveSymbolsMenuInstance;
 
@@ -20,6 +23,12 @@ public class SlotDetailInterface : MonoBehaviour
 	{
 		if (CloseButton != null)
 			CloseButton.onClick.AddListener(OnCloseButtonClicked);
+
+		if (AddReelButton != null)
+		{
+			AddReelButton.onClick.RemoveAllListeners();
+			AddReelButton.onClick.AddListener(OnAddReelButtonClicked);
+		}
 
 		if (ReelDetailsRoot != null)
 		{
@@ -46,12 +55,16 @@ public class SlotDetailInterface : MonoBehaviour
 
 		// Subscribe to global reel-strip updates so UI can refresh when strips change elsewhere
 		GlobalEventManager.Instance?.RegisterEvent(SlotsEvent.ReelStripUpdated, OnReelStripUpdated);
+
+		// Listen for slot-level updates (reused the ReelAdded global broadcast when SlotsDataManager updates a slot)
+		GlobalEventManager.Instance?.RegisterEvent(SlotsEvent.ReelAdded, OnSlotsDataUpdated);
 	}
 
 	private void OnDestroy()
 	{
 		// Unregister to avoid dangling references
 		GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.ReelStripUpdated, OnReelStripUpdated);
+		GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.ReelAdded, OnSlotsDataUpdated);
 	}
 
 	public void ShowSlot(SlotsData slots)
@@ -176,35 +189,67 @@ public class SlotDetailInterface : MonoBehaviour
 		}
 	}
 
-	public void OnDataReloaded()
-	{
-		if (current != null) Refresh();
-	}
-
-	private void OnReelStripUpdated(object obj)
-	{
-		var updated = obj as ReelStripData;
-		if (updated == null) return;
-		if (current == null || current.CurrentReelData == null) return;
-
-		// If any reel in the current slot references this strip, refresh the UI
-		foreach (var rd in current.CurrentReelData)
+		public void OnDataReloaded()
 		{
-			if (rd == null) continue;
-			var strip = rd.CurrentReelStrip;
-			if (strip == null) continue;
-			// Match by accessor or instance key; if matched, adopt the updated strip reference to ensure the reel uses latest runtime data
-			if (strip.AccessorId == updated.AccessorId || (!string.IsNullOrEmpty(strip.InstanceKey) && strip.InstanceKey == updated.InstanceKey))
+			if (current != null) Refresh();
+		}
+
+		private void OnReelStripUpdated(object obj)
+		{
+			var updated = obj as ReelStripData;
+			if (updated == null) return;
+			if (current == null || current.CurrentReelData == null) return;
+
+			// If any reel in the current slot references this strip, refresh the UI
+			foreach (var rd in current.CurrentReelData)
 			{
-				try
+				if (rd == null) continue;
+				var strip = rd.CurrentReelStrip;
+				if (strip == null) continue;
+				// Match by accessor or instance key; if matched, adopt the updated strip reference to ensure the reel uses latest runtime data
+				if (strip.AccessorId == updated.AccessorId || (!string.IsNullOrEmpty(strip.InstanceKey) && strip.InstanceKey == updated.InstanceKey))
 				{
-					// Force the reel data to adopt the updated strip object so subsequent UI reads reflect runtime changes
-					rd.SetReelStrip(updated);
+					try
+					{
+						// Force the reel data to adopt the updated strip object so subsequent UI reads reflect runtime changes
+						rd.SetReelStrip(updated);
+					}
+					catch { }
+					Refresh();
+					break;
 				}
-				catch { }
-				Refresh();
-				break;
 			}
 		}
-	}
+
+		private void OnAddReelButtonClicked()
+		{
+			if (AddReelInterfaceInstance == null)
+			{
+				Debug.LogWarning("AddReelInterfaceInstance is not assigned on SlotDetailInterface.");
+				return;
+			}
+
+			if (current == null)
+			{
+				Debug.LogWarning("SlotDetailInterface: no current slot selected when invoking AddReel.");
+				return;
+			}
+
+			AddReelInterfaceInstance.ShowSlot(current);
+		}
+
+    private void OnSlotsDataUpdated(object obj)
+    {
+        var updated = obj as SlotsData;
+        if (updated == null) return;
+        if (current == null) return;
+
+        // If this update targets our currently shown slot (by reference or accessor id), refresh
+        if (ReferenceEquals(updated, current) || (updated.AccessorId > 0 && current.AccessorId > 0 && updated.AccessorId == current.AccessorId))
+        {
+            // Update our local reference and refresh UI
+            current = updated;
+            Refresh();
+        }
+    }
 }
