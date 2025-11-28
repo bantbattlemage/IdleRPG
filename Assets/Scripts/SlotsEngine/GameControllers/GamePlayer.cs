@@ -69,16 +69,37 @@ public class GamePlayer : Singleton<GamePlayer>
 			return;
 		}
 
+		bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+		// include common alternative modifier keys (AltGr, Command) so combos are recognized across platforms
+		bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || Input.GetKey(KeyCode.AltGr) || Input.GetKey(KeyCode.LeftCommand) || Input.GetKey(KeyCode.RightCommand);
 
-		// Testing remove slots
-		if((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) && Input.GetKeyDown(KeyCode.S))
+		// Testing slot shortcuts
+		if (Input.GetKeyDown(KeyCode.S))
 		{
-			RemoveTestSlot();
-		}
-		// Testing add slots
-		else if (Input.GetKeyDown(KeyCode.S) && playerSlots.All(x => x.CurrentState == State.Idle))
-		{
-			AddTestSlot();
+			// Alt+Shift+S -> remove non-inventory slot
+			if (alt && shift)
+			{
+				Debug.Log("Shortcut: Alt+Shift+S pressed (remove non-inventory slot)");
+				RemoveTestNonInventorySlot();
+			}
+			// Alt+S -> spawn slot without inventory
+			else if (alt)
+			{
+				Debug.Log("Shortcut: Alt+S pressed (spawn non-inventory slot)");
+				if (playerSlots.All(x => x.CurrentState == State.Idle)) AddTestSlotNoInventory();
+			}
+			// Shift+S -> remove inventory-backed slot
+			else if (shift)
+			{
+				Debug.Log("Shortcut: Shift+S pressed (remove inventory-backed slot)");
+				RemoveTestSlot();
+			}
+			// S -> spawn slot with inventory
+			else
+			{
+				Debug.Log("Shortcut: S pressed (spawn inventory-backed slot)");
+				if (playerSlots.All(x => x.CurrentState == State.Idle)) AddTestSlot();
+			}
 		}
 
 		// Testing remove reels (Shift+R)
@@ -130,22 +151,114 @@ public class GamePlayer : Singleton<GamePlayer>
 		return candidates.Count == 0 ? null : candidates.GetRandom();
 	}
 
+	private bool IsSlotInventoryBacked(SlotsEngine slot)
+	{
+		if (slot == null) return false;
+		// Prefer explicit runtime flag when present to avoid relying on mutable inventory state
+		try
+		{
+			if (slot.InventoryBacked) return true;
+		}
+		catch { }
+		if (playerData == null) return false;
+		try
+		{
+			var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
+			if (slotItems != null)
+			{
+				foreach (var s in slotItems)
+				{
+					if (s == null) continue;
+					// Only consider a slot inventory-backed when the inventory item explicitly references the slot via DefinitionKey (AccessorId)
+					if (!string.IsNullOrEmpty(s.DefinitionKey) && int.TryParse(s.DefinitionKey, out var accessor) && accessor > 0 && accessor == slot.CurrentSlotsData?.AccessorId)
+					{
+						return true;
+					}
+				}
+			}
+		}
+		catch { }
+		return false;
+	}
+
+	private SlotsEngine GetRandomIdleInventoryBackedSlot()
+	{
+		// Prefer most-recently-added idle inventory-backed slot for deterministic behavior
+		for (int i = playerSlots.Count - 1; i >= 0; i--)
+		{
+			var s = playerSlots[i];
+			if (s == null) continue;
+			if (s.CurrentState != State.Idle) continue;
+			if (IsSlotInventoryBacked(s)) return s;
+		}
+		return null;
+	}
+
+	private SlotsEngine GetRandomIdleNonInventorySlot()
+	{
+		// Prefer most-recently-added idle non-inventory slot for deterministic behavior
+		for (int i = playerSlots.Count - 1; i >= 0; i--)
+		{
+			var s = playerSlots[i];
+			if (s == null) continue;
+			if (s.CurrentState != State.Idle) continue;
+			if (!IsSlotInventoryBacked(s)) return s;
+		}
+		return null;
+	}
+
 	public void AddTestSlot()
 	{
-		SpawnSlots(null, true);
+		// Create a test slot that IS represented as an Inventory item
+		SpawnSlots(null, true, true);
+	}
+
+	public void AddTestSlotNoInventory()
+	{
+		// Create a test slot that is NOT represented as an Inventory item (legacy-style slot)
+		SpawnSlots(null, true, false);
 	}
 
 	public void RemoveTestSlot()
 	{
-		var slot = GetRandomIdleSlot();
+		var slot = GetRandomIdleInventoryBackedSlot();
 		if (slot == null)
 		{
-			Debug.LogWarning("No idle slot available to remove.");
+			Debug.LogWarning("No idle inventory-backed slot available to remove.");
 			return;
 		}
 		RemoveSlots(slot);
 	}
 
+	public void RemoveTestNonInventorySlot()
+	{
+		// Diagnostic: log current slots and why none might be considered non-inventory/idle
+		try
+		{
+			Debug.Log($"RemoveTestNonInventorySlot: playerSlots.Count={playerSlots?.Count ?? 0}");
+			for (int i = 0; i < playerSlots.Count; i++)
+			{
+				var s = playerSlots[i];
+				if (s == null) { Debug.Log($" slot[{i}] = null"); continue; }
+				var sd = s.CurrentSlotsData;
+				int accessor = sd != null ? sd.AccessorId : -1;
+				int index = sd != null ? sd.Index : -1;
+				bool inventoryBacked = IsSlotInventoryBacked(s);
+				Debug.Log($" slot[{i}] index={index} accessor={accessor} state={s.CurrentState} inventoryBacked={inventoryBacked}");
+			}
+		}
+		catch (Exception ex) { Debug.LogWarning($"RemoveTestNonInventorySlot: diagnostic logging failed: {ex.Message}"); }
+
+		var slot = GetRandomIdleNonInventorySlot();
+		if (slot == null)
+		{
+			Debug.LogWarning("No idle non-inventory slot available to remove.");
+			return;
+		}
+		RemoveSlots(slot);
+	}
+
+	// --------------------- Reels and Symbols ----------------------
 	public void AddTestReel()
 	{
 		var slot = GetRandomIdleSlot();
@@ -164,10 +277,35 @@ public class GamePlayer : Singleton<GamePlayer>
 			var strip = rd?.CurrentReelStrip;
 			if (playerData != null && strip != null)
 			{
-				string display = null;
-				try { display = $"ReelStrip {slot.CurrentSlotsData?.Index ?? 0}-{slot.CurrentReels.IndexOf(addedReel)}"; } catch { display = null; }
-				// Delegate to PlayerData helper
-				playerData.RegisterRuntimeReelStrip(strip, display);
+				// Only register runtime strips into inventory if this slot is inventory-backed. Avoid creating inventory
+				// entries for legacy/non-inventory slots.
+				bool slotIsInventoryBacked = false;
+				try
+				{
+					var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
+					if (slotItems != null)
+					{
+						foreach (var s in slotItems)
+						{
+							if (s == null) continue;
+							// Prefer DefinitionKey match (stores accessor id) then fall back to display name matching
+							if (!string.IsNullOrEmpty(s.DefinitionKey) && int.TryParse(s.DefinitionKey, out var accessor) && accessor > 0 && accessor == slot.CurrentSlotsData?.AccessorId) { slotIsInventoryBacked = true; break; }
+							if (s.DisplayName == ("Slot " + slot.CurrentSlotsData?.Index)) { slotIsInventoryBacked = true; break; }
+						}
+					}
+				}
+				catch { slotIsInventoryBacked = false; }
+
+				if (slotIsInventoryBacked)
+				{
+					string display = null;
+					try { display = $"ReelStrip {slot.CurrentSlotsData?.Index ?? 0}-{slot.CurrentReels.IndexOf(addedReel)}"; } catch { display = null; }
+					playerData.RegisterRuntimeReelStrip(strip, display);
+				}
+				else
+				{
+					Debug.Log("AddTestReel: slot is not inventory-backed; skipping registering runtime strip to inventory.");
+				}
 			}
 			else
 			{
@@ -283,7 +421,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		GlobalEventManager.Instance.BroadcastEvent(SlotsEvent.CreditsChanged, CurrentCredits);
 	}
 
-	private void SpawnSlots(SlotsData existingData = null, bool beginSlots = false)
+	private void SpawnSlots(SlotsData existingData = null, bool beginSlots = false, bool createInventoryItems = true)
 	{
 		SlotsEngine newSlots = SlotsEngineManager.Instance.CreateSlots(existingData);
 
@@ -292,33 +430,44 @@ public class GamePlayer : Singleton<GamePlayer>
 			newSlots.BeginSlots();
 		}
 
+		// Set runtime InventoryBacked flag on the engine for deterministic checks later
+		try { newSlots.InventoryBacked = createInventoryItems; } catch { }
+
+		// If this is a brand-new slot (existingData == null) we need to register it with PlayerData so it becomes
+		// part of the player's CurrentSlots collection. Optionally, we also create Inventory entries for the slot
+		// and for any runtime reel strips/symbols it created. Passing createInventoryItems=false will skip creating
+		// any InventoryItemData entries so the slot and its strips/symbols will not be exposed or modifiable in the UI.
 		if (existingData == null)
 		{
 			playerData.AddSlots(newSlots.CurrentSlotsData);
-			// Inventory registration for tracking
-			playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, newSlots.CurrentSlotsData.AccessorId.ToString()));
 
-			// NEW: Register runtime reel strips used by this slot and add associated symbol inventory items
-			try
+			if (createInventoryItems)
 			{
-				if (newSlots?.CurrentSlotsData?.CurrentReelData != null)
-				{
-					for (int i = 0; i < newSlots.CurrentSlotsData.CurrentReelData.Count; i++)
-					{
-						var rd = newSlots.CurrentSlotsData.CurrentReelData[i];
-						if (rd == null) continue;
-						var strip = rd.CurrentReelStrip;
-						if (strip == null) continue;
+				// Inventory registration for tracking
+				playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, newSlots.CurrentSlotsData.AccessorId.ToString()));
 
-						// Delegate registration to the authoritative PlayerData helper to avoid duplicated logic
-						string stripDisplay = $"ReelStrip {newSlots.CurrentSlotsData.Index}-{i}";
-						playerData.RegisterRuntimeReelStrip(strip, stripDisplay);
+				// NEW: Register runtime reel strips used by this slot and add associated symbol inventory items
+				try
+				{
+					if (newSlots?.CurrentSlotsData?.CurrentReelData != null)
+					{
+						for (int i = 0; i < newSlots.CurrentSlotsData.CurrentReelData.Count; i++)
+						{
+							var rd = newSlots.CurrentSlotsData.CurrentReelData[i];
+							if (rd == null) continue;
+							var strip = rd.CurrentReelStrip;
+							if (strip == null) continue;
+
+							// Delegate registration to the authoritative PlayerData helper to avoid duplicated logic
+							string stripDisplay = $"ReelStrip {newSlots.CurrentSlotsData.Index}-{i}";
+							playerData.RegisterRuntimeReelStrip(strip, stripDisplay);
+						}
 					}
 				}
-			}
-			catch (Exception ex)
-			{
-				Debug.LogWarning($"SpawnSlots: failed to register runtime reelstrip inventory for new slot: {ex.Message}");
+				catch (Exception ex)
+				{
+					Debug.LogWarning($"SpawnSlots: failed to register runtime reelstrip inventory for new slot: {ex.Message}");
+				}
 			}
 		}
 
@@ -370,13 +519,27 @@ public class GamePlayer : Singleton<GamePlayer>
 					var slotItems = playerData.GetItemsOfType(InventoryItemType.SlotEngine);
 					if (slotItems != null)
 					{
+						int targetAccessor = slotsToRemove.CurrentSlotsData.AccessorId;
 						foreach (var sItem in slotItems)
 						{
 							if (sItem == null) continue;
-							if (sItem.DisplayName == slotDisplay)
+							// If the slot has a persisted accessor, prefer matching by DefinitionKey to avoid ambiguous display-name collisions
+							if (targetAccessor > 0)
 							{
-								sItem.SetDisplayName(slotDisplay + " (unassociated)");
-								sItem.SetDefinitionKey(null);
+								if (!string.IsNullOrEmpty(sItem.DefinitionKey) && sItem.DefinitionKey == targetAccessor.ToString())
+								{
+									sItem.SetDisplayName(slotDisplay + " (unassociated)");
+									sItem.SetDefinitionKey(null);
+								}
+							}
+							else
+							{
+								// Legacy fallback: only match by display name for items that don't already reference an accessor
+								if (string.IsNullOrEmpty(sItem.DefinitionKey) && sItem.DisplayName == slotDisplay)
+								{
+									sItem.SetDisplayName(slotDisplay + " (unassociated)");
+									sItem.SetDefinitionKey(null);
+								}
 							}
 						}
 					}
@@ -404,7 +567,7 @@ public class GamePlayer : Singleton<GamePlayer>
 					// Fallback: remove any SlotsData with matching AccessorId to avoid stale references
 					if (playerData.CurrentSlots != null && slotsToRemove.CurrentSlotsData.AccessorId > 0)
 					{
-						playerData.CurrentSlots.RemoveAll(s => s != null && s.AccessorId == slotsToRemove.CurrentSlotsData.AccessorId);
+					 playerData.CurrentSlots.RemoveAll(s => s != null && s.AccessorId == slotsToRemove.CurrentSlotsData.AccessorId);
 					}
 					else if (playerData.CurrentSlots != null)
 					{
