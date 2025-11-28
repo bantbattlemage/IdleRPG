@@ -599,6 +599,19 @@ public class SlotsEngine : MonoBehaviour
 			Debug.LogWarning($"SlotsEngine.AddReel: failed to register new reel strip with manager: {ex.Message}");
 		}
 
+		// NEW: register the ReelData itself so AddReel UI can list it when unassociated
+		try
+		{
+			if (ReelDataManager.Instance != null && newData.AccessorId == 0)
+			{
+				ReelDataManager.Instance.AddNewData(newData);
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"SlotsEngine.AddReel: failed to register ReelData with manager: {ex.Message}");
+		}
+
 		// Add to data model
 		currentSlotsData.AddNewReel(newData);
 
@@ -629,62 +642,32 @@ public class SlotsEngine : MonoBehaviour
 		try { eventManager?.BroadcastEvent(SlotsEvent.ReelAdded, reel); } catch { }
 	}
 
-	/// <summary>
-	/// Removes a reel from this engine at runtime. Cleans up its GameObjects, updates data and layout, and broadcasts an event.
-	/// </summary>
 	public void RemoveReel(GameReel reel)
 	{
 		if (reel == null) return;
-		if (spinInProgress) { Debug.LogWarning("Cannot remove reel while spinning."); return; }
 		int idx = reels.IndexOf(reel);
-		if (idx < 0)
-		{
-			Debug.LogWarning("Tried to remove a reel that isn't registered with this engine.");
-			return;
-		}
+		if (idx < 0) return;
+		if (stateMachine != null && stateMachine.CurrentState == State.Spinning) throw new InvalidOperationException("Cannot remove reel while spinning.");
 
-		// Remove from visual list first to avoid index mismatches during cleanup
-		reels.RemoveAt(idx);
-
-		// Remove the corresponding data entry if present
-		if (currentSlotsData != null && currentSlotsData.CurrentReelData != null)
+		// Remove data model entry if present
+		try
 		{
-			ReelData rd = (idx >= 0 && idx < currentSlotsData.CurrentReelData.Count) ? currentSlotsData.CurrentReelData[idx] : null;
-			if (rd != null)
+			if (currentSlotsData != null && currentSlotsData.CurrentReelData != null && idx < currentSlotsData.CurrentReelData.Count)
 			{
-				// Do NOT remove the ReelData from ReelDataManager here; removing it would make the reel
-				// unavailable to be re-associated with other slots via the AddReelInterface. Only detach
-				// the reel from the current slot's data list.
-				try { /* previously: ReelDataManager.Instance?.RemoveDataIfExists(rd); */ } catch { }
+				var rd = currentSlotsData.CurrentReelData[idx];
 				currentSlotsData.RemoveReel(rd);
 			}
 		}
+		catch (Exception ex) { Debug.LogWarning($"SlotsEngine.RemoveReel: data removal failed: {ex.Message}"); }
 
-		// Destroy the reel GameObject safely
-		try
-		{
-			if (reel.gameObject != null)
-			{
-				Destroy(reel.gameObject);
-			}
-		}
-		catch (Exception ex)
-		{
-			Debug.LogException(ex);
-		}
-
-		// Update layout
+		// Remove visual
+		reels.RemoveAt(idx);
+		try { Destroy(reel.gameObject); } catch { }
 		RepositionReels();
 		RegenerateAllReelDummies();
-
-		// Inform listeners
 		try { eventManager?.BroadcastEvent(SlotsEvent.ReelRemoved, reel); } catch { }
 	}
 
-	/// <summary>
-	/// Attempt to apply a SlotsData update surgically: update changed reels, add/remove reels as needed.
-	/// Returns true if update applied; throws InvalidOperationException if engine is spinning and update cannot be applied.
-	/// </summary>
 	public bool TryApplySlotsDataUpdate(SlotsData newData)
 	{
 		if (newData == null) return false;
