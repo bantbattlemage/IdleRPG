@@ -19,6 +19,11 @@ public class SlotDetailInterface : MonoBehaviour
 
 	private SlotsData current;
 
+	private int lastShownSlotAccessor = -1;
+	private SlotsData lastShownSlotRef = null;
+	private int lastShownSlotIndex = -1;
+	private bool refreshInProgress = false;
+
 	private void Start()
 	{
 		if (CloseButton != null)
@@ -69,6 +74,21 @@ public class SlotDetailInterface : MonoBehaviour
 
 	public void ShowSlot(SlotsData slots)
 	{
+		// If already showing the same slot and UI is visible, avoid redundant work
+		if (slots != null && SlotDetailsRoot != null && SlotDetailsRoot.gameObject.activeSelf)
+		{
+			// Consider accessor id when available, otherwise fall back to index or reference equality to
+			// distinguish distinct SlotsData instances. Index is used as a stable local identity
+			// that is unique per slot and avoids collisions when AccessorId may be shared/zero.
+			if ((slots.AccessorId > 0 && lastShownSlotAccessor == slots.AccessorId)
+				|| (lastShownSlotIndex >= 0 && slots.Index == lastShownSlotIndex)
+				|| ReferenceEquals(lastShownSlotRef, slots))
+			{
+				// minor optimization: skip duplicate show requests
+				return;
+			}
+		}
+
 		// Activate before populating so instantiated UI receives proper layout and OnEnable events
 		if (SlotDetailsRoot != null)
 		{
@@ -81,6 +101,9 @@ public class SlotDetailInterface : MonoBehaviour
 		}
 
 		current = slots;
+		lastShownSlotRef = current;
+		lastShownSlotAccessor = current != null ? current.AccessorId : -1;
+		lastShownSlotIndex = current != null ? current.Index : -1;
 		Refresh();
 
 		// Force layout rebuild to ensure first-time visuals are correct
@@ -116,48 +139,58 @@ public class SlotDetailInterface : MonoBehaviour
 
 	public void Refresh()
 	{
-		if (ReelDetailsRoot == null || ReelDetailItemPrefab == null) return;
+		if (refreshInProgress) return;
+		refreshInProgress = true;
 
-		// clear existing children
-		for (int i = ReelDetailsRoot.childCount - 1; i >= 0; i--)
+		try
 		{
-			var child = ReelDetailsRoot.GetChild(i);
-			// Preserve AddReelButton (or its parent container) if it's under ReelDetailsRoot
-			if (AddReelButton != null)
+			if (ReelDetailsRoot == null || ReelDetailItemPrefab == null) return;
+
+			// clear existing children
+			for (int i = ReelDetailsRoot.childCount - 1; i >= 0; i--)
 			{
-				if (child == AddReelButton.transform || AddReelButton.transform.IsChildOf(child))
-					continue;
+				var child = ReelDetailsRoot.GetChild(i);
+				// Preserve AddReelButton (or its parent container) if it's under ReelDetailsRoot
+				if (AddReelButton != null)
+				{
+					if (child == AddReelButton.transform || AddReelButton.transform.IsChildOf(child))
+						continue;
+				}
+
+				Destroy(child.gameObject);
 			}
 
-			Destroy(child.gameObject);
+			if (current == null || current.CurrentReelData == null) return;
+
+			var list = current.CurrentReelData;
+			for (int i = 0; i < list.Count; i++)
+			{
+				var rd = list[i];
+				var item = Instantiate(ReelDetailItemPrefab, ReelDetailsRoot);
+				item.Setup(rd, i);
+
+				// wire up each reel's symbol menu to open our AddRemoveSymbolsMenu
+				item.ConfigureSymbolMenu(current, OpenAddRemoveSymbolsMenu);
+
+				// Determine if remove should be allowed (do not allow removing the last reel)
+				bool allowRemove = list.Count > 1;
+
+				// wire up remove button to detach this reel from the slot and refresh
+				item.ConfigureRemoval(current, () => {
+					// refresh UI after removal
+					Refresh();
+				}, allowRemove);
+			}
+
+			// Ensure AddReelButton remains the last child in its parent (typically ReelDetailsRoot)
+			if (AddReelButton != null && AddReelButton.transform.parent == ReelDetailsRoot)
+			{
+				AddReelButton.transform.SetAsLastSibling();
+			}
 		}
-
-		if (current == null || current.CurrentReelData == null) return;
-
-		var list = current.CurrentReelData;
-		for (int i = 0; i < list.Count; i++)
+		finally
 		{
-			var rd = list[i];
-			var item = Instantiate(ReelDetailItemPrefab, ReelDetailsRoot);
-			item.Setup(rd, i);
-
-			// wire up each reel's symbol menu to open our AddRemoveSymbolsMenu
-			item.ConfigureSymbolMenu(current, OpenAddRemoveSymbolsMenu);
-
-			// Determine if remove should be allowed (do not allow removing the last reel)
-			bool allowRemove = list.Count > 1;
-
-			// wire up remove button to detach this reel from the slot and refresh
-			item.ConfigureRemoval(current, () => {
-				// refresh UI after removal
-				Refresh();
-			}, allowRemove);
-		}
-
-		// Ensure AddReelButton remains the last child in its parent (typically ReelDetailsRoot)
-		if (AddReelButton != null && AddReelButton.transform.parent == ReelDetailsRoot)
-		{
-			AddReelButton.transform.SetAsLastSibling();
+			refreshInProgress = false;
 		}
 	}
 
@@ -200,22 +233,26 @@ public class SlotDetailInterface : MonoBehaviour
 			if (updated == null) return;
 			if (current == null || current.CurrentReelData == null) return;
 
-			// If any reel in the current slot references this strip, refresh the UI
+			// If any reel in the current slot references this strip, refresh the UI.
+			// IMPORTANT: do NOT assign the manager's canonical strip instance into the reel's data here
+			// because that would create shared strip instances between slots. Only refresh the UI so the
+			// currently displayed strip shows the latest runtime symbols. Slot-level ownership must remain
+			// with the slot's ReelData instance (no automatic cross-slot assignment).
 			foreach (var rd in current.CurrentReelData)
 			{
 				if (rd == null) continue;
 				var strip = rd.CurrentReelStrip;
 				if (strip == null) continue;
-				// Match by accessor or instance key; if matched, adopt the updated strip reference to ensure the reel uses latest runtime data
+				// Match by accessor or instance key; if matched, refresh UI but do NOT mutate rd
 				if (strip.AccessorId == updated.AccessorId || (!string.IsNullOrEmpty(strip.InstanceKey) && strip.InstanceKey == updated.InstanceKey))
 				{
 					try
 					{
-						// Force the reel data to adopt the updated strip object so subsequent UI reads reflect runtime changes
-						rd.SetReelStrip(updated);
+						// Previously we called rd.SetReelStrip(updated) here which caused manager instances to be
+						// injected into multiple ReelData objects and produced shared state across slots. Avoid that.
+						Refresh();
 					}
 					catch { }
-					Refresh();
 					break;
 				}
 			}

@@ -39,14 +39,28 @@ public class SlotInventoryInterface : InventoryInterfaceBase
 			SlotsData foundSlot = null;
 			if (pd2?.CurrentSlots != null)
 			{
-				string display = itemData.DisplayName;
-				foreach (var s in pd2.CurrentSlots)
+				// Prefer explicit association via DefinitionKey (stores slot AccessorId)
+				if (!string.IsNullOrEmpty(itemData.DefinitionKey))
 				{
-					if (s == null) continue;
-					if (("Slot " + s.Index) == display || s.Index.ToString() == display)
+					if (int.TryParse(itemData.DefinitionKey, out var accessor) && accessor > 0)
 					{
-						foundSlot = s;
-						break;
+						foundSlot = pd2.CurrentSlots.Find(s => s != null && s.AccessorId == accessor);
+					}
+					// If accessor parsed as 0 or negative, treat as uninitialized/legacy and fall back to display-name matching
+				}
+
+				// Fall back to legacy display name matching
+				if (foundSlot == null)
+				{
+					string display = itemData.DisplayName;
+					foreach (var s in pd2.CurrentSlots)
+					{
+						if (s == null) continue;
+						if (("Slot " + s.Index) == display || s.Index.ToString() == display)
+						{
+							foundSlot = s;
+							break;
+						}
 					}
 				}
 			}

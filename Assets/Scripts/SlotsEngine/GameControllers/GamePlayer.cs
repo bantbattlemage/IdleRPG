@@ -296,7 +296,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		{
 			playerData.AddSlots(newSlots.CurrentSlotsData);
 			// Inventory registration for tracking
-			playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, null));
+			playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, newSlots.CurrentSlotsData.AccessorId.ToString()));
 
 			// NEW: Register runtime reel strips used by this slot and add associated symbol inventory items
 			try

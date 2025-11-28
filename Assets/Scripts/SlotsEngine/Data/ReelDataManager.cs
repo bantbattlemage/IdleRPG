@@ -15,14 +15,33 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 
 	public override void AddNewData(ReelData newData)
 	{
+		int beforeCount = LocalData != null ? LocalData.Count : 0;
+		int incomingAccessor = newData != null ? newData.AccessorId : -1;
+		UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: incomingAccessor={incomingAccessor}, localBefore={beforeCount}");
+		// If this ReelData already has a persisted AccessorId and is present in LocalData, avoid re-adding
+		if (newData != null && newData.AccessorId > 0 && LocalData != null && LocalData.ContainsKey(newData.AccessorId))
+		{
+			UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: accessor {newData.AccessorId} already present, skipping");
+			return;
+		}
 		base.AddNewData(newData);
+		int afterCount = LocalData != null ? LocalData.Count : 0;
+		UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: added accessor={newData?.AccessorId ?? -1}, localAfter={afterCount}");
 
-		if (newData?.CurrentSymbolData != null)
+		if (newData?.CurrentSymbolData != null && SymbolDataManager.Instance != null)
 		{
 			for (int i = 0; i < newData.CurrentSymbolData.Count; i++)
 			{
 				var sym = newData.CurrentSymbolData[i];
-				if (sym != null) SymbolDataManager.Instance.AddNewData(sym);
+				if (sym != null && sym.AccessorId == 0)
+				{
+					UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: registering new SymbolData for reelAccessor={newData.AccessorId} symbolName={sym.Name}");
+					SymbolDataManager.Instance.AddNewData(sym);
+				}
+				else if (sym != null)
+				{
+					UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: skipping persisted SymbolData name={sym.Name} accessor={sym.AccessorId}");
+				}
 			}
 
 			newData.SetCurrentSymbolData(newData.CurrentSymbolData);

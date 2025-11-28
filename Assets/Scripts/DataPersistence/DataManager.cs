@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// Base class for persistence-backed data managers.
-/// Provides a `SerializableDictionary` keyed by unique int AccessorIds, lifecycle registration with
+/// Provides a `SerializableDictionary` keyed by unique int AccessorId, lifecycle registration with
 /// `DataPersistenceManager`, and helper APIs for add/get/clear operations.
 /// 
 /// Type Parameters:
@@ -120,6 +120,24 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
         if (LocalData == null)
         {
             LocalData = new SerializableDictionary<int, D>();
+        }
+
+        // If the incoming data already has a positive AccessorId:
+        // - if the id is already present in LocalData, assume it's already registered and do nothing
+        //   (prevents double-registration/duplication when managers are initialized multiple times)
+        // - if the id is not present, adopt that id to preserve persisted identity
+        if (newData != null && newData.AccessorId > 0)
+        {
+            if (LocalData.ContainsKey(newData.AccessorId))
+            {
+                // Already registered; do not add again
+                return;
+            }
+            else
+            {
+                LocalData.Add(newData.AccessorId, newData);
+                return;
+            }
         }
 
         int id = GenerateUniqueAccessorId(LocalData.Keys);

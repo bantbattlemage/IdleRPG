@@ -30,6 +30,10 @@ public class DataPersistenceManager : MonoBehaviour
 
 	public static DataPersistenceManager Instance { get; private set; }
 
+	// Indicates whether a load operation is currently in progress. Other systems can use this
+	// to avoid creating or registering new runtime data while persisted data is being restored.
+	public bool IsLoading { get; private set; } = false;
+
 	// Debounce coroutine handle for batching save requests
 	private Coroutine saveCoroutine;
 
@@ -175,6 +179,19 @@ public class DataPersistenceManager : MonoBehaviour
 		}
 
 		// push the loaded data to all other scripts that need it
+		// Load core managers first to populate their LocalData dictionaries. This prevents other
+		// objects (e.g., SlotsDataManager) from attempting to register nested data (reels/strips/symbols)
+		// before the managers have loaded their persisted entries, which would otherwise produce duplicate instances.
+		IsLoading = true;
+		try { Debug.Log("[Diag] Loading SymbolDataManager"); SymbolDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SymbolDataManager.LocalCount={(SymbolDataManager.Instance!=null && SymbolDataManager.Instance.GetAllData()!=null?SymbolDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] SymbolDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading ReelStripDataManager"); ReelStripDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelStripDataManager.LocalCount={(ReelStripDataManager.Instance!=null && ReelStripDataManager.Instance.ReadOnlyLocalData!=null?ReelStripDataManager.Instance.ReadOnlyLocalData.Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] ReelStripDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading ReelDataManager"); ReelDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelDataManager.LocalCount={(ReelDataManager.Instance!=null && ReelDataManager.Instance.GetAllData()!=null?ReelDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] ReelDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading SlotsDataManager"); SlotsDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SlotsDataManager.LocalCount={(SlotsDataManager.Instance!=null && SlotsDataManager.Instance.GetAllData()!=null?SlotsDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] SlotsDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading PlayerDataManager"); PlayerDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] PlayerDataManager.LocalCount={(PlayerDataManager.Instance!=null && PlayerDataManager.Instance.GetAllData()!=null?PlayerDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] PlayerDataManager.Load failed: {ex.Message}"); }
+		
+
+		// Now notify remaining registered persistence objects. Managers above will still be iterated here,
+		// but their LoadData implementations are idempotent so it's safe to call again.
 		foreach (IDataPersistence dataPersistenceObj in dataPersistenceObjects)
 		{
 			try
@@ -186,6 +203,7 @@ public class DataPersistenceManager : MonoBehaviour
 				Debug.LogError($"Error while loading data into {dataPersistenceObj.GetType().Name}: {e}");
 			}
 		}
+		IsLoading = false;
 	}
 
 	/// <summary>
@@ -296,4 +314,5 @@ public class DataPersistenceManager : MonoBehaviour
 		if (string.IsNullOrEmpty(cleaned)) return defaultProfileId;
 		return cleaned;
 	}
+
 }

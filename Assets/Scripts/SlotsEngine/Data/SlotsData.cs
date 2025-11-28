@@ -109,26 +109,81 @@ public class SlotsData : Data
 		if (reelData == null) return;
 		if (currentReelData == null) currentReelData = new List<ReelData>();
 
+		// Prevent sharing ReelData across multiple SlotsData: check global slots for references
+		try
+		{
+			if (SlotsDataManager.Instance != null)
+			{
+				var allSlots = SlotsDataManager.Instance.GetAllData();
+				if (allSlots != null)
+				{
+					foreach (var s in allSlots)
+					{
+						if (s == null || ReferenceEquals(s, this) || s.CurrentReelData == null) continue;
+						foreach (var other in s.CurrentReelData)
+						{
+							if (other == null) continue;
+							// If this reel is referenced by another SlotsData (by accessor or reference) clone it so
+							// this slot receives a unique instance rather than sharing.
+							if ((reelData.AccessorId > 0 && other.AccessorId == reelData.AccessorId) || ReferenceEquals(other, reelData))
+							{
+								Debug.Log($"[SlotsData] ReelData accessor={reelData.AccessorId} already referenced by another SlotsData (accessor={s.AccessorId}). Cloning ReelData instance for this slot.");
+								// perform clone
+								reelData = CloneReelData(reelData);
+								// continue checks against other slots using cloned instance
+							}
+						
+							// Prevent sharing any SymbolData between reels/slots
+							if (reelData.CurrentSymbolData != null && other.CurrentSymbolData != null)
+							{
+								for (int a = 0; a < reelData.CurrentSymbolData.Count; a++)
+								{
+									var symA = reelData.CurrentSymbolData[a];
+									if (symA == null) continue;
+									for (int b = 0; b < other.CurrentSymbolData.Count; b++)
+									{
+										var symB = other.CurrentSymbolData[b];
+										if (symB == null) continue;
+										if (symA.AccessorId > 0 && symA.AccessorId == symB.AccessorId)
+										{
+											Debug.LogWarning($"[SlotsData] AddNewReel prevented: SymbolData accessor={symA.AccessorId} already used by another reel in slotAccessor={s.AccessorId}");
+											return;
+										}
+										if (ReferenceEquals(symA, symB))
+										{
+											Debug.LogWarning($"[SlotsData] AddNewReel prevented: SymbolData instance already referenced by another reel in slotAccessor={s.AccessorId}");
+											return;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		catch (Exception ex) { Debug.LogWarning($"[SlotsData] AddNewReel: failed to verify sharing: {ex.Message}"); }
+
 		for (int i = 0; i < currentReelData.Count; i++)
 		{
 			var existing = currentReelData[i];
 			if (existing == null) continue;
+			// If adding a reel whose accessor matches an existing one, clone to ensure uniqueness
 			if (reelData.AccessorId > 0 && existing.AccessorId == reelData.AccessorId)
 			{
-				Debug.LogWarning($"[SlotsData] Duplicate add ignored for reelAccessor={reelData.AccessorId} on slotAccessor={AccessorId}");
-				return;
+				reelData = CloneReelData(reelData);
 			}
 			var r1 = reelData.CurrentReelStrip;
 			var r2 = existing.CurrentReelStrip;
 			if (r1 != null && r2 != null && !string.IsNullOrEmpty(r1.InstanceKey) && r1.InstanceKey == r2.InstanceKey)
 			{
-				Debug.LogWarning($"[SlotsData] Duplicate add (strip instance) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}");
-				return;
+				// Clone to avoid sharing the same strip instance
+				reelData = CloneReelData(reelData);
 			}
 			if (ReferenceEquals(existing, reelData))
 			{
-				Debug.LogWarning($"[SlotsData] Duplicate add (reference) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}");
-				return;
+				// clone to ensure uniqueness
+				reelData = CloneReelData(reelData);
 			}
 		}
 
@@ -145,6 +200,62 @@ public class SlotsData : Data
 
 		if (reelData != null)
 		{
+			// Prevent sharing across slots similar to AddNewReel
+			try
+			{
+				if (SlotsDataManager.Instance != null)
+				{
+					var allSlots = SlotsDataManager.Instance.GetAllData();
+					if (allSlots != null)
+					{
+						foreach (var s in allSlots)
+						{
+							if (s == null || ReferenceEquals(s, this) || s.CurrentReelData == null) continue;
+							foreach (var other in s.CurrentReelData)
+							{
+								if (other == null) continue;
+								if (reelData.AccessorId > 0 && other.AccessorId == reelData.AccessorId)
+								{
+									Debug.LogWarning($"[SlotsData] InsertReelAt prevented: ReelData accessor={reelData.AccessorId} already referenced by SlotsData accessor={s.AccessorId}");
+									return;
+								}
+								if (ReferenceEquals(other, reelData))
+								{
+									Debug.LogWarning($"[SlotsData] InsertReelAt prevented: ReelData instance already referenced by another SlotsData (slotAccessor={s.AccessorId})");
+									return;
+								}
+
+								// Prevent sharing SymbolData as well
+								if (reelData.CurrentSymbolData != null && other.CurrentSymbolData != null)
+								{
+									for (int a = 0; a < reelData.CurrentSymbolData.Count; a++)
+									{
+										var symA = reelData.CurrentSymbolData[a];
+										if (symA == null) continue;
+										for (int b = 0; b < other.CurrentSymbolData.Count; b++)
+										{
+											var symB = other.CurrentSymbolData[b];
+											if (symB == null) continue;
+											if (symA.AccessorId > 0 && symA.AccessorId == symB.AccessorId)
+											{
+												Debug.LogWarning($"[SlotsData] InsertReelAt prevented: SymbolData accessor={symA.AccessorId} already used by another reel in slotAccessor={s.AccessorId}");
+												return;
+											}
+											if (ReferenceEquals(symA, symB))
+											{
+												Debug.LogWarning($"[SlotsData] InsertReelAt prevented: SymbolData instance already referenced by another reel in slotAccessor={s.AccessorId}");
+												return;
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex) { Debug.LogWarning($"[SlotsData] InsertReelAt: failed to verify sharing: {ex.Message}"); }
+
 			for (int i = 0; i < currentReelData.Count; i++)
 			{
 				var existing = currentReelData[i];
@@ -175,5 +286,42 @@ public class SlotsData : Data
 
 		currentReelData.Remove(reelData);
 		Debug.Log($"[SlotsData] Removed reelAccessor={reelData.AccessorId} from slotAccessor={AccessorId}. reelCount={currentReelData.Count}");
+	}
+
+	// Helper: deep-clone a ReelData (strip and symbol runtime lists) to ensure per-slot uniqueness
+	private ReelData CloneReelData(ReelData src)
+	{
+		if (src == null) return null;
+		// Clone strip if present
+		ReelStripData clonedStrip = null;
+		try
+		{
+			var s = src.CurrentReelStrip;
+			if (s != null)
+			{
+				// Create an empty strip without auto-populated runtime symbols so we can clone explicitly
+				clonedStrip = new ReelStripData(s.Definition, s.StripSize, s.SymbolDefinitions, null, null, populateRuntimeSymbols: false);
+				// clear auto-populated symbols
+				var existing = clonedStrip.RuntimeSymbols != null ? clonedStrip.RuntimeSymbols.Count : 0;
+				for (int i = existing - 1; i >= 0; i--) clonedStrip.RemoveRuntimeSymbolAt(i);
+				if (s.RuntimeSymbols != null)
+				{
+					foreach (var sym in s.RuntimeSymbols)
+					{
+						if (sym == null) { clonedStrip.AddRuntimeSymbol(null); continue; }
+						var cs = new SymbolData(sym.Name, sym.Sprite, sym.BaseValue, sym.MinWinDepth, sym.Weight, sym.PayScaling, sym.IsWild, sym.AllowWildMatch, sym.WinMode, sym.TotalCountTrigger, sym.MaxPerReel, sym.MatchGroupId);
+						cs.EventTriggerScript = sym.EventTriggerScript;
+						clonedStrip.AddRuntimeSymbol(cs);
+					}
+				}
+				if (clonedStrip.AccessorId == 0 && ReelStripDataManager.Instance != null) ReelStripDataManager.Instance.AddNewData(clonedStrip);
+			}
+		}
+		catch (Exception ex) { Debug.LogWarning($"CloneReelData: failed to clone strip: {ex.Message}"); clonedStrip = null; }
+
+		// Create new ReelData copying core config and associating cloned strip
+		var clone = new ReelData(src.ReelSpinDuration, src.SymbolCount, null, src.BaseDefinition, clonedStrip ?? src.CurrentReelStrip);
+		if (ReelDataManager.Instance != null) ReelDataManager.Instance.AddNewData(clone);
+		return clone;
 	}
 }

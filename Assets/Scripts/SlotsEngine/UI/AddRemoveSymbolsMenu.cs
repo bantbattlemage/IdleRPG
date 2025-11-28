@@ -38,26 +38,10 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 	public void Show(ReelStripData strip, SlotsData slot)
 	{
-		// Prefer canonical manager instance if available so UI reflects runtime-managed data.
-		if (strip != null && ReelStripDataManager.Instance != null)
-		{
-			if (strip.AccessorId > 0 && ReelStripDataManager.Instance.TryGetData(strip.AccessorId, out var foundById))
-			{
-				strip = foundById;
-			}
-			else if (!string.IsNullOrEmpty(strip.InstanceKey))
-			{
-				var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
-				if (all != null)
-				{
-					foreach (var kv in all)
-					{
-						var s = kv.Value; if (s == null) continue;
-						if (!string.IsNullOrEmpty(s.InstanceKey) && s.InstanceKey == strip.InstanceKey) { strip = s; break; }
-					}
-				}
-			}
-		}
+		// Do NOT prefer canonical manager instance here — keep the strip reference passed in so we
+		// operate on the slot-owned instance. Using the manager instance can cause UI edits to
+		// appear across multiple slots by introducing shared references.
+		// previous code attempted to replace 'strip' with the manager's copy; avoid that.
 
 		currentStrip = strip;
 		currentSlot = slot;
@@ -74,9 +58,10 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		if (updated == null) return;
 		if (currentStrip == null) return;
 		// If this update pertains to the strip we're currently viewing, refresh to reflect external changes
+		// Do NOT adopt the manager-provided reference into our local currentStrip; only refresh so UI reflects
+		// the changed data. This avoids switching our local owned instance to a shared manager instance.
 		if (updated.AccessorId == currentStrip.AccessorId || (!string.IsNullOrEmpty(updated.InstanceKey) && updated.InstanceKey == currentStrip.InstanceKey))
 		{
-			currentStrip = updated; // adopt the updated reference
 			Refresh();
 		}
 	}

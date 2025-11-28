@@ -33,28 +33,30 @@ public class ReelDetailItem : MonoBehaviour
 		// Try to use current reel strip; may be null for legacy/empty setups
 		var strip = data.CurrentReelStrip;
 
-		// Prefer the canonical manager-registered strip if available to ensure we reflect runtime-managed symbols
-		if (strip != null && ReelStripDataManager.Instance != null)
-		{
-			// First try by accessor id
-			if (strip.AccessorId > 0 && ReelStripDataManager.Instance.TryGetData(strip.AccessorId, out var canonicalById))
-			{
-				strip = canonicalById;
-			}
-			else if (!string.IsNullOrEmpty(strip.InstanceKey))
-			{
-				// fallback: search manager dictionary for matching instance key
-				var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
-				if (all != null)
-				{
-					foreach (var kv in all)
-					{
-						var s = kv.Value; if (s == null) continue;
-						if (!string.IsNullOrEmpty(s.InstanceKey) && s.InstanceKey == strip.InstanceKey) { strip = s; break; }
-					}
-				}
-			}
-		}
+		// Do NOT prefer the canonical manager-registered strip here. Using the manager instance can cause
+		// UI for different slots to reflect the same manager copy and create apparent cross-slot sharing.
+		// Display should reflect the reel's owned strip instance.
+		//if (strip != null && ReelStripDataManager.Instance != null)
+		//{
+		//    // First try by accessor id
+		//    if (strip.AccessorId > 0 && ReelStripDataManager.Instance.TryGetData(strip.AccessorId, out var canonicalById))
+		//    {
+		//        strip = canonicalById;
+		//    }
+		//    else if (!string.IsNullOrEmpty(strip.InstanceKey))
+		//    {
+		//        // fallback: search manager dictionary for matching instance key
+		//        var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
+		//        if (all != null)
+		//        {
+		//            foreach (var kv in all)
+		//            {
+		//                var s = kv.Value; if (s == null) continue;
+		//                if (!string.IsNullOrEmpty(s.InstanceKey) && s.InstanceKey == strip.InstanceKey) { strip = s; break; }
+		//            }
+		//        }
+		//    }
+		//}
 
 		lastStrip = strip; // cache for later menu wiring
 

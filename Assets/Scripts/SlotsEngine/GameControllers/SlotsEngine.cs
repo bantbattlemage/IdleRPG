@@ -58,7 +58,107 @@ public class SlotsEngine : MonoBehaviour
 	public void InitializeSlotsEngine(Transform canvasTransform, SlotsData data)
 	{
 		currentSlotsData = data;
-		try { if (SlotsDataManager.Instance != null && currentSlotsData != null) SlotsDataManager.Instance.UpdateSlotsData(currentSlotsData); } catch (Exception ex) { Debug.LogException(ex); }
+
+		// Ensure ReelData instances are not shared across multiple SlotsData entries.
+		// If another SlotsData already references the same ReelData accessor, clone the ReelData so this engine
+		// has its own independent instance. This prevents mutations (remove/add) in one slot from affecting others.
+		try
+		{
+			if (currentSlotsData?.CurrentReelData != null && SlotsDataManager.Instance != null)
+			{
+				var allSlots = SlotsDataManager.Instance.GetAllData();
+				for (int i = 0; i < currentSlotsData.CurrentReelData.Count; i++)
+				{
+					var rd = currentSlotsData.CurrentReelData[i];
+					if (rd == null) continue;
+					// If this ReelData references a persisted accessor, adopt the manager's canonical instance
+					if (rd.AccessorId > 0)
+					{
+						if (ReelDataManager.Instance != null)
+						{
+							if (ReelDataManager.Instance.TryGetData(rd.AccessorId, out var canonicalRd))
+							{
+								currentSlotsData.CurrentReelData[i] = canonicalRd;
+								rd = canonicalRd;
+							}
+							else
+							{
+								// Persisted ReelData accessor present in save but manager missing the mapping: register this instance
+								ReelDataManager.Instance.AddNewData(rd);
+							}
+						}
+					}
+					else
+					{
+						// For non-persisted ReelData (AccessorId == 0), ensure it is not shared by reference across slots. If it is,
+						// clone to provide a unique instance for this slot. This avoids creating duplicates for persisted data.
+						bool sharedByReference = false;
+						foreach (var s in allSlots)
+						{
+							if (s == null) continue;
+							if (ReferenceEquals(s, currentSlotsData)) continue;
+							if (s.CurrentReelData == null) continue;
+							foreach (var otherRd in s.CurrentReelData)
+							{
+								if (otherRd == null) continue;
+								if (ReferenceEquals(rd, otherRd)) { sharedByReference = true; break; }
+							}
+							if (sharedByReference) break;
+						}
+						if (sharedByReference)
+						{
+							try
+							{
+								// Deep-clone strip and symbols to avoid sharing across slots for transient runtime data
+								ReelStripData clonedStrip = null;
+								var src = rd.CurrentReelStrip;
+								if (src != null)
+								{
+									// Create an empty strip (no auto-population) so we can deep-clone runtime symbols explicitly
+									clonedStrip = new ReelStripData(src.Definition, src.StripSize, src.SymbolDefinitions, null, null, populateRuntimeSymbols: false);
+									var existingCount = clonedStrip.RuntimeSymbols != null ? clonedStrip.RuntimeSymbols.Count : 0;
+									for (int rem = existingCount - 1; rem >= 0; rem--) clonedStrip.RemoveRuntimeSymbolAt(rem);
+									if (src.RuntimeSymbols != null)
+									{
+										for (int si = 0; si < src.RuntimeSymbols.Count; si++)
+										{
+											var s = src.RuntimeSymbols[si];
+											if (s == null) { clonedStrip.AddRuntimeSymbol(null); continue; }
+											var cloneSym = new SymbolData(s.Name, s.Sprite, s.BaseValue, s.MinWinDepth, s.Weight, s.PayScaling, s.IsWild, s.AllowWildMatch, s.WinMode, s.TotalCountTrigger, s.MaxPerReel, s.MatchGroupId);
+											cloneSym.EventTriggerScript = s.EventTriggerScript;
+											clonedStrip.AddRuntimeSymbol(cloneSym);
+										}
+									}
+									if (clonedStrip.AccessorId == 0 && ReelStripDataManager.Instance != null) ReelStripDataManager.Instance.AddNewData(clonedStrip);
+								}
+								var clone = new ReelData(rd.ReelSpinDuration, rd.SymbolCount, null, rd.BaseDefinition, clonedStrip ?? rd.CurrentReelStrip);
+								if (ReelDataManager.Instance != null) ReelDataManager.Instance.AddNewData(clone);
+								currentSlotsData.CurrentReelData[i] = clone;
+								Debug.Log($"[SlotsEngine] Cloned shared ReelData accessor={rd.AccessorId} -> newAccessor={clone.AccessorId} for slotAccessor={currentSlotsData.AccessorId}");
+							}
+							catch (Exception ex)
+							{
+								Debug.LogWarning($"[SlotsEngine] Failed to clone shared ReelData: {ex.Message}");
+							}
+						}
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"SlotsEngine.InitializeSlotsEngine: failed during ReelData canonicalization: {ex.Message}");
+		}
+		// Ensure the SlotsDataManager is aware of this SlotsData so global UI/listeners can resolve associations
+		try
+		{
+			// NOTE: SlotsData registration with SlotsDataManager is performed by the creator (SlotsEngineManager)
+			// after the engine has been added to its internal list so the manager can map updates back to a live engine.
+		}
+		catch (Exception ex)
+		{
+			Debug.LogWarning($"SlotsEngine.InitializeSlotsEngine: failed to register SlotsData with manager: {ex.Message}");
+		}
 		eventManager = new EventManager();
 		if (pendingReelChangedHandlers.Count > 0)
 		{

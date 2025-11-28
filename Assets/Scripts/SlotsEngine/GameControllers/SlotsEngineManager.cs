@@ -96,9 +96,11 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 		SlotsEngine newSlots = Instantiate(slotsEnginePrefab, transform).GetComponent<SlotsEngine>();
 		GameObject newReelsGroup = Instantiate(reelsGroupPrefab, targetTransform);
 		if (existingData != null) newSlots.InitializeSlotsEngine(newReelsGroup.transform, existingData); else newSlots.InitializeSlotsEngine(newReelsGroup.transform, testDefinition);
+		// Register the engine with the manager first so the SlotsDataManager can find the live engine
+		slotsEngines.Add(newSlots);
+		pageToUse.AddSlotsToPage(newSlots);
 		try { if (SlotsDataManager.Instance != null && newSlots.CurrentSlotsData != null) SlotsDataManager.Instance.UpdateSlotsData(newSlots.CurrentSlotsData); } catch (Exception ex) { Debug.LogException(ex); }
 		newSlots.RegisterReelChanged(OnSlotReelChangedEvent);
-		slotsEngines.Add(newSlots); pageToUse.AddSlotsToPage(newSlots);
 
 		// Always activate the page containing the newly created slot
 		currentSlotPageIndex = slotsDisplayPages.IndexOf(pageToUse);

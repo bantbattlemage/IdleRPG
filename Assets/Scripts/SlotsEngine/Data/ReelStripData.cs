@@ -39,7 +39,7 @@ public class ReelStripData : Data
 
     public void SetEditLock(bool locked) { editLocked = locked; }
 
-    public ReelStripData(ReelStripDefinition def, int size, SymbolDefinition[] syms, int[] counts = null, bool[] depletable = null)
+    public ReelStripData(ReelStripDefinition def, int size, SymbolDefinition[] syms, int[] counts = null, bool[] depletable = null, bool populateRuntimeSymbols = true)
     {
         stripSize = size;
         definition = def;
@@ -62,9 +62,9 @@ public class ReelStripData : Data
             for (int i = 0; i < symbolDefinitions.Length; i++) symbolDefinitionKeys[i] = symbolDefinitions[i] != null ? symbolDefinitions[i].name : null;
         }
 
-        // Initialize runtime symbols from definitions (each gets its own instance)
+        // Initialize runtime symbols from definitions (each gets its own instance) only when requested.
         runtimeSymbols = new List<SymbolData>();
-        if (symbolDefinitions != null)
+        if (populateRuntimeSymbols && symbolDefinitions != null)
         {
             for (int i = 0; i < symbolDefinitions.Length; i++)
             {
@@ -72,7 +72,7 @@ public class ReelStripData : Data
                 if (defSym == null) { runtimeSymbols.Add(null); continue; }
                 var inst = defSym.CreateInstance();
                 RegisterRuntimeSymbol(inst);
-                runtimeSymbols.Add(inst); // ADD missing push
+                runtimeSymbols.Add(inst);
             }
         }
 
@@ -178,7 +178,7 @@ public class ReelStripData : Data
                 if (def == null) { runtimeSymbols.Add(null); continue; }
                 var inst = def.CreateInstance();
                 RegisterRuntimeSymbol(inst);
-                runtimeSymbols.Add(inst); // ADD missing push
+                runtimeSymbols.Add(inst);
             }
         }
 
