@@ -74,12 +74,12 @@ public class ReelDetailItem : MonoBehaviour
 
 		if (ReelSymbolDetailItemPrefab == null)
 		{
-			Debug.LogWarning($"ReelDetailItem: ReelSymbolDetailItemPrefab is not assigned on {name}. Cannot instantiate symbol items.");
+			Debug.LogWarning($"[ReelDetailItem] Missing ReelSymbolDetailItemPrefab on {name}");
 			return;
 		}
 		if (SymbolDetailsRoot == null)
 		{
-			Debug.LogWarning($"ReelDetailItem: SymbolDetailsRoot is not assigned on {name}. Cannot parent instantiated items.");
+			Debug.LogWarning($"[ReelDetailItem] Missing SymbolDetailsRoot on {name}");
 			return;
 		}
 
@@ -101,6 +101,7 @@ public class ReelDetailItem : MonoBehaviour
 					itm.Setup((SymbolDefinition)null, i);
 				}
 			}
+			Debug.Log($"[ReelDetailItem] Setup boundReelAccessor={boundReel.AccessorId}, stripAccessor={strip?.AccessorId}, runtimeCount={runtimeLen}, target={target}");
 		}
 		else
 		{
@@ -119,13 +120,10 @@ public class ReelDetailItem : MonoBehaviour
 					itm.Setup((SymbolDefinition)null, i);
 				}
 			}
+			Debug.LogWarning($"[ReelDetailItem] No runtime symbols for stripAccessor={strip?.AccessorId}. Using authoring definitions. defsLen={defsLen}, target={target}");
 		}
 	}
 
-	/// <summary>
-	/// After Setup is called, configure each instantiated child `ReelSymbolDetailItem` to open
-	/// the AddRemoveSymbolsMenu using the provided slot context and callback.
-	/// </summary>
 	public void ConfigureSymbolMenu(SlotsData slot, System.Action<ReelStripData, SlotsData> onOpen)
 	{
 		if (SymbolDetailsRoot == null) return;
@@ -141,43 +139,33 @@ public class ReelDetailItem : MonoBehaviour
 		}
 	}
 
-	/// <summary>
-	/// Configure the remove-reel button to remove the bound reel from the provided slot.
-	/// </summary>
 	public void ConfigureRemoval(SlotsData slot, System.Action onRemoved = null, bool allowRemove = true)
 	{
 		boundSlot = slot;
 		if (RemoveReelButton == null) return;
 
-		// Show/hide remove button based on allowRemove flag
 		RemoveReelButton.gameObject.SetActive(true);
 		RemoveReelButton.interactable = allowRemove;
 
 		RemoveReelButton.onClick.RemoveAllListeners();
 		RemoveReelButton.onClick.AddListener(() =>
 		{
-			// Safety checks
 			if (boundReel == null || boundSlot == null) return;
 
 			try
 			{
-				// If removal is disabled via UI, do nothing
-				if (!allowRemove) return;
-
-				// Try to find a live engine for this slot so we can remove the visual reel
 				var mgr = SlotsEngineManager.Instance;
 				if (mgr != null)
 				{
 					var engine = mgr.FindEngineForSlotsData(boundSlot);
 					if (engine != null)
 					{
-						// If engine is spinning, surface an error
 						if (engine.CurrentState == State.Spinning)
 						{
+							Debug.LogWarning($"[ReelDetailItem] Remove blocked: engine spinning for slotAccessor={boundSlot.AccessorId}");
 							throw new System.InvalidOperationException("Cannot remove reel while engine is spinning.");
 						}
 
-						// Find index of the ReelData within the engine's data list using AccessorId or strip InstanceKey when available
 						int idx = -1;
 						if (engine.CurrentSlotsData != null && engine.CurrentSlotsData.CurrentReelData != null)
 						{
@@ -186,55 +174,44 @@ public class ReelDetailItem : MonoBehaviour
 								var rd = engine.CurrentSlotsData.CurrentReelData[i];
 								if (rd == null) continue;
 
-								// Prefer matching by AccessorId when present
 								if (boundReel.AccessorId > 0 && rd.AccessorId == boundReel.AccessorId) { idx = i; break; }
 
-								// Next prefer matching by associated strip instance key when available
 								var brStrip = boundReel.CurrentReelStrip;
 								var rdStrip = rd.CurrentReelStrip;
 								if (brStrip != null && rdStrip != null && !string.IsNullOrEmpty(brStrip.InstanceKey) && brStrip.InstanceKey == rdStrip.InstanceKey) { idx = i; break; }
 
-								// Fallback to reference equality
 								if (ReferenceEquals(rd, boundReel)) { idx = i; break; }
 							}
 						}
 
 						if (idx >= 0 && idx < engine.CurrentReels.Count)
 						{
-							// Use engine API to remove the visual reel; this also updates engine data and persistence
+							Debug.Log($"[ReelDetailItem] Removing reel idx={idx} for slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}");
 							engine.RemoveReel(engine.CurrentReels[idx]);
-							// Persist updated slots data
 							SlotsDataManager.Instance?.UpdateSlotsData(engine.CurrentSlotsData);
-							// Notify caller
 							onRemoved?.Invoke();
 							return;
+						}
+						else
+						{
+							Debug.LogWarning($"[ReelDetailItem] Could not map bound reel to engine list for slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}");
 						}
 					}
 				}
 
 				// Fallback: no live engine found - operate on data model directly
 				boundSlot.RemoveReel(boundReel);
-
-				// NOTE: Do not remove the underlying ReelData from ReelDataManager here. Removing the
-				// ReelData would prevent it from being available to re-add to other slots via the
-				// AddReelInterface. Only remove reel data when explicitly desired elsewhere.
-
-				// Persist slots update
 				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
-
-				// Notify listeners / update UI via callback
+				Debug.Log($"[ReelDetailItem] Removed reel via data-only path for slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}");
 				onRemoved?.Invoke();
 			}
 			catch (System.Exception ex)
 			{
-				Debug.LogWarning($"ReelDetailItem: failed to remove reel: {ex.Message}");
+				Debug.LogWarning($"[ReelDetailItem] Failed to remove reel for slotAccessor={boundSlot?.AccessorId}, reelAccessor={boundReel?.AccessorId}: {ex.Message}");
 			}
 		});
 	}
 
-	/// <summary>
-	/// Disable symbol menu buttons so symbols are visible but not interactive.
-	/// </summary>
 	public void DisableSymbolMenus()
 	{
 		if (SymbolDetailsRoot == null) return;
@@ -250,9 +227,6 @@ public class ReelDetailItem : MonoBehaviour
 		}
 	}
 
-	/// <summary>
-	/// Configure the add-reel button to attach this reel to the provided slot.
-	/// </summary>
 	public void ConfigureAddition(SlotsData slot, System.Action onAdded = null)
 	{
 		boundSlot = slot;
@@ -266,31 +240,27 @@ public class ReelDetailItem : MonoBehaviour
 			if (boundReel == null || boundSlot == null) return;
 			try
 			{
-				// Try to find live engine to ensure it's safe to add
 				var mgr = SlotsEngineManager.Instance;
 				if (mgr != null)
 				{
 					var engine = mgr.FindEngineForSlotsData(boundSlot);
 					if (engine != null && engine.CurrentState == State.Spinning)
 					{
+						Debug.LogWarning($"[ReelDetailItem] Add blocked: engine spinning for slotAccessor={boundSlot.AccessorId}");
 						throw new System.InvalidOperationException("Cannot add reel while engine is spinning.");
 					}
 				}
 
-				// Add to data model
 				boundSlot.AddNewReel(boundReel);
 
-				// Ensure reel persisted if not already
 				if (boundReel.AccessorId == 0) ReelDataManager.Instance?.AddNewData(boundReel);
-
-				// Persist slots update which will propagate to any live engine
 				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
-
+				Debug.Log($"[ReelDetailItem] Added reel to slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}. dataReels={boundSlot.CurrentReelData?.Count ?? 0}");
 				onAdded?.Invoke();
 			}
 			catch (System.Exception ex)
 			{
-				Debug.LogWarning($"ReelDetailItem: failed to add reel: {ex.Message}");
+				Debug.LogWarning($"[ReelDetailItem] Failed to add reel for slotAccessor={boundSlot?.AccessorId}, reelAccessor={boundReel?.AccessorId}: {ex.Message}");
 			}
 		});
 	}

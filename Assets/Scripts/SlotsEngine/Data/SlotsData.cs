@@ -106,7 +106,34 @@ public class SlotsData : Data
 
 	public void AddNewReel(ReelData reelData)
 	{
+		if (reelData == null) return;
+		if (currentReelData == null) currentReelData = new List<ReelData>();
+
+		for (int i = 0; i < currentReelData.Count; i++)
+		{
+			var existing = currentReelData[i];
+			if (existing == null) continue;
+			if (reelData.AccessorId > 0 && existing.AccessorId == reelData.AccessorId)
+			{
+				Debug.LogWarning($"[SlotsData] Duplicate add ignored for reelAccessor={reelData.AccessorId} on slotAccessor={AccessorId}");
+				return;
+			}
+			var r1 = reelData.CurrentReelStrip;
+			var r2 = existing.CurrentReelStrip;
+			if (r1 != null && r2 != null && !string.IsNullOrEmpty(r1.InstanceKey) && r1.InstanceKey == r2.InstanceKey)
+			{
+				Debug.LogWarning($"[SlotsData] Duplicate add (strip instance) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}");
+				return;
+			}
+			if (ReferenceEquals(existing, reelData))
+			{
+				Debug.LogWarning($"[SlotsData] Duplicate add (reference) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}");
+				return;
+			}
+		}
+
 		currentReelData.Add(reelData);
+		Debug.Log($"[SlotsData] Added reelAccessor={reelData.AccessorId} to slotAccessor={AccessorId}. reelCount={currentReelData.Count}");
 	}
 
 	public void InsertReelAt(int index, ReelData reelData)
@@ -116,7 +143,22 @@ public class SlotsData : Data
 			throw new ArgumentOutOfRangeException(nameof(index));
 		}
 
+		if (reelData != null)
+		{
+			for (int i = 0; i < currentReelData.Count; i++)
+			{
+				var existing = currentReelData[i];
+				if (existing == null) continue;
+				if (reelData.AccessorId > 0 && existing.AccessorId == reelData.AccessorId) { Debug.LogWarning($"[SlotsData] Duplicate insert ignored for reelAccessor={reelData.AccessorId} on slotAccessor={AccessorId}"); return; }
+				var r1 = reelData.CurrentReelStrip;
+				var r2 = existing.CurrentReelStrip;
+				if (r1 != null && r2 != null && !string.IsNullOrEmpty(r1.InstanceKey) && r1.InstanceKey == r2.InstanceKey) { Debug.LogWarning($"[SlotsData] Duplicate insert (strip instance) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}"); return; }
+				if (ReferenceEquals(existing, reelData)) { Debug.LogWarning($"[SlotsData] Duplicate insert (reference) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}"); return; }
+			}
+		}
+
 		currentReelData.Insert(index, reelData);
+		Debug.Log($"[SlotsData] Inserted reelAccessor={reelData.AccessorId} at index={index} for slotAccessor={AccessorId}. reelCount={currentReelData.Count}");
 	}
 
 	public void RemoveReel(ReelData reelData)
@@ -126,12 +168,12 @@ public class SlotsData : Data
 			throw new Exception("tried to remove reel that isn't registered!");
 		}
 
-		// Guard: do not allow removing the last remaining reel
 		if (currentReelData.Count <= 1)
 		{
 			throw new InvalidOperationException("Cannot remove the only reel from a slot. A slot must have at least one reel.");
 		}
 
 		currentReelData.Remove(reelData);
+		Debug.Log($"[SlotsData] Removed reelAccessor={reelData.AccessorId} from slotAccessor={AccessorId}. reelCount={currentReelData.Count}");
 	}
 }

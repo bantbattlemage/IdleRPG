@@ -116,7 +116,7 @@ public class ReelData : Data
 			baseDefinition = DefinitionResolver.Resolve<ReelDefinition>(baseDefinitionKey);
 		}
 
-		// Resolve existing runtime strip by accessor id first (preserves instance GUID)
+		// Resolve existing runtime strip by accessor id first (preserves instance GUID). Do not auto-create.
 		if (currentReelStrip == null && currentReelStripAccessorId > 0 && ReelStripDataManager.Instance != null)
 		{
 			if (ReelStripDataManager.Instance.TryGetData(currentReelStripAccessorId, out var rs))
@@ -125,15 +125,11 @@ public class ReelData : Data
 			}
 		}
 
-		// Fallback: create from definition if no persisted runtime instance
-		if (currentReelStrip == null && !string.IsNullOrEmpty(defaultReelStripKey))
+		// Strict mode: if we still do not have a runtime strip, do not fallback to creating from definition.
+		// This enforces canonical accessor-based restoration and avoids adhoc instances.
+		if (currentReelStrip == null)
 		{
-			var def = DefinitionResolver.Resolve<ReelStripDefinition>(defaultReelStripKey);
-			if (def != null)
-			{
-				var rs = def.CreateInstance();
-				SetReelStrip(rs);
-			}
+			throw new InvalidOperationException("ReelData.EnsureResolved: missing associated ReelStripData runtime instance. Persisted data must reference a valid ReelStrip accessor id.");
 		}
 
 		int len = 0;
@@ -189,36 +185,18 @@ public class ReelData : Data
 				string key = currentSymbolKeys[i];
 				if (string.IsNullOrEmpty(key))
 				{
-					// Be tolerant of missing persisted keys introduced by runtime edits.
-					// Prefer to fallback to any in-memory currentSymbolData entry or the associated runtime strip symbol at the same index.
-					if (currentSymbolData != null && i < currentSymbolData.Count && currentSymbolData[i] != null)
-					{
-						resolved = currentSymbolData[i];
-					}
-					else if (currentReelStrip != null && currentReelStrip.RuntimeSymbols != null && i < currentReelStrip.RuntimeSymbols.Count && currentReelStrip.RuntimeSymbols[i] != null)
-					{
-						resolved = currentReelStrip.RuntimeSymbols[i];
-						// Ensure persisted references updated when we can reconstruct from strip
-						RegisterSymbolForPersistence(resolved);
-						currentSymbolAccessorIds[i] = resolved.AccessorId;
-						currentSymbolKeys[i] = resolved.SpriteKey ?? resolved.Name;
-					}
-					else
-					{
-						// No fallback available: allow a null entry rather than throwing so caller can handle missing data.
-						resolved = null;
-					}
+					// Strict mode: do not attempt to reconstruct from strip. Symbol entries without keys/accessors are invalid.
+					resolved = null;
 				}
 				else
 				{
-					// Try to resolve sprite and find a matching persisted SymbolData or an authoring definition.
+					// Resolve sprite and find a matching persisted SymbolData. Do not create adhoc instances from definitions.
 					Sprite sprite = AssetResolver.ResolveSprite(key);
 					if (sprite == null)
 					{
 						throw new InvalidOperationException($"ReelData.EnsureResolved: failed to resolve Sprite for key '{key}' while restoring ReelData. Persisted symbol keys must resolve to valid Sprite assets.");
 					}
 
-					// First preference: find an existing persisted SymbolData with the same SpriteKey
 					SymbolData persisted = null;
 					if (SymbolDataManager.Instance != null)
 					{
@@ -238,31 +216,8 @@ public class ReelData : Data
 					}
 					else
 					{
-						// Next, try to find a matching authoring-time SymbolDefinition
-						SymbolDefinition def = null;
-						if (SymbolDefinitionManager.Instance != null)
-						{
-							SymbolDefinitionManager.Instance.TryGetDefinition(key, out def);
-						}
-
-						if (def != null)
-						{
-							// Create runtime SymbolData from definition (enforces proper naming and match-group semantics)
-							var runtimeSymbol = def.CreateInstance();
-							if (runtimeSymbol.Sprite == null)
-							{
-								runtimeSymbol.Sprite = sprite;
-							}
-							resolved = runtimeSymbol;
-							RegisterSymbolForPersistence(resolved);
-							currentSymbolAccessorIds[i] = resolved.AccessorId;
-							currentSymbolKeys[i] = key;
-						}
-						else
-						{
-							// No matching persisted SymbolData and no authoring definition for this sprite key: treat as an error.
-							throw new InvalidOperationException($"ReelData.EnsureResolved: failed to resolve SymbolData for persisted key '{key}'. No matching SymbolDefinition or existing SymbolData found. Persisted data must reference a valid definition or SymbolData accessor.");
-						}
+						// Strict mode: no matching persisted SymbolData; fail fast to enforce canonical data usage.
+						throw new InvalidOperationException($"ReelData.EnsureResolved: failed to resolve SymbolData for persisted key '{key}'. No matching persisted SymbolData found. Persisted data must reference a valid SymbolData accessor.");
 					}
 				}
 			}
@@ -270,28 +225,7 @@ public class ReelData : Data
 		}
 		currentSymbolData = result;
 
-		// Adjust currentSymbolData list if runtime strip symbol count changed
-		if (currentReelStrip != null && currentReelStrip.RuntimeSymbols != null)
-		{
-			int runtimeCount = currentReelStrip.RuntimeSymbols.Count;
-			if (currentSymbolData != null)
-			{
-				if (currentSymbolData.Count > runtimeCount)
-				{
-					currentSymbolData.RemoveRange(runtimeCount, currentSymbolData.Count - runtimeCount);
-					SyncSymbolPersistenceArrays();
-				}
-				else if (currentSymbolData.Count < runtimeCount && currentSymbolData.Count < symbolCount)
-				{
-					for (int i = currentSymbolData.Count; i < Math.Min(runtimeCount, symbolCount); i++)
-					{
-						var rs = currentReelStrip.RuntimeSymbols[i];
-						currentSymbolData.Add(rs);
-					}
-					SyncSymbolPersistenceArrays();
-				}
-			}
-		}
+		// In strict mode, do not auto-adjust currentSymbolData based on strip runtime changes; require explicit updates.
 	}
 
 	private void RegisterSymbolForPersistence(SymbolData symbol)

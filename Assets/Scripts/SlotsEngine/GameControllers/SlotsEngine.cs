@@ -688,33 +688,34 @@ public class SlotsEngine : MonoBehaviour
 	public bool TryApplySlotsDataUpdate(SlotsData newData)
 	{
 		if (newData == null) return false;
-		// Do not apply while spinning
 		if (this.CurrentState == State.Spinning)
 		{
 			throw new InvalidOperationException("Cannot apply SlotsData update while engine is spinning.");
 		}
 
-		// Compute old/new lists
 		var oldList = currentSlotsData?.CurrentReelData ?? new List<ReelData>();
 		var newList = newData?.CurrentReelData ?? new List<ReelData>();
 		int oldCount = oldList.Count;
 		int newCount = newList.Count;
 		int common = Math.Min(oldCount, newCount);
+		int visualCount = reels?.Count ?? 0;
 
-		// Update existing reels where reel data reference changed
-		for (int i = 0; i < common; i++)
+		Debug.Log($"[SlotsEngine] TryApplySlotsDataUpdate start oldCount={oldCount} newCount={newCount} reelsListCount={visualCount}");
+
+		// Update existing visuals where the data reference has changed for indexes covered by both lists and visuals
+		int updateLimit = Math.Min(common, visualCount);
+		for (int i = 0; i < updateLimit; i++)
 		{
 			if (!ReferenceEquals(oldList[i], newList[i]))
 			{
-				// Reinitialize existing GameReel with new ReelData
 				try
 				{
 					var strip = newList[i]?.CurrentReelStrip ?? newList[i]?.DefaultReelStrip;
 					if (i < reels.Count && reels[i] != null)
 					{
 						reels[i].InitializeReel(newList[i], i, eventManager, strip, this);
+						Debug.Log($"[SlotsEngine] Updated existing reel index={i} stripAccessor={strip?.AccessorId} rdAccessor={newList[i]?.AccessorId}");
 					}
-					// update underlying data reference so engine reflects new model
 					if (currentSlotsData != null && currentSlotsData.CurrentReelData != null && i < currentSlotsData.CurrentReelData.Count)
 					{
 						currentSlotsData.CurrentReelData[i] = newList[i];
@@ -722,55 +723,58 @@ public class SlotsEngine : MonoBehaviour
 				}
 				catch (Exception ex)
 				{
-					Debug.LogWarning($"TryApplySlotsDataUpdate: failed to update reel at index {i}: {ex.Message}");
+					Debug.LogWarning($"[SlotsEngine] Failed to update reel at index {i}: {ex.Message}");
 				}
 			}
 		}
 
-		// If new has additional reels, append them
-		if (newCount > oldCount)
+		// If visuals have fewer reels than new data, append missing visuals regardless of oldCount
+		if (visualCount < newCount)
 		{
-			for (int i = oldCount; i < newCount; i++)
+			for (int i = visualCount; i < newCount; i++)
 			{
 				try
 				{
-					// spawn visual reel under existing group
+					var rd = newList[i];
+					if (rd == null)
+					{
+						Debug.LogWarning($"[SlotsEngine] Skipping add at index={i}: newList entry is null");
+						continue;
+					}
+					var strip = rd.CurrentReelStrip ?? rd.DefaultReelStrip;
 					Transform parent = currentReelsGroup != null ? currentReelsGroup : reelsRootTransform;
 					if (parent == null) parent = reelsRootTransform;
-					GameObject g = Instantiate(reelPrefab, parent);
+					var g = Instantiate(reelPrefab, parent);
 					var reel = g.GetComponent<GameReel>();
-					var strip = newList[i]?.CurrentReelStrip ?? newList[i]?.DefaultReelStrip;
-					int newIndex = i;
-					reel.InitializeReel(newList[i], newIndex, eventManager, strip, this);
+					reel.InitializeReel(rd, i, eventManager, strip, this);
 					reels.Add(reel);
-
-					// Ensure engine's data list is in sync
-					if (currentSlotsData != null) currentSlotsData.AddNewReel(newList[i]);
+					Debug.Log($"[SlotsEngine] Added missing visual reel index={i} rdAccessor={rd.AccessorId} stripAccessor={strip?.AccessorId}. reelsCountNow={reels.Count}");
 				}
 				catch (Exception ex)
 				{
-					Debug.LogWarning($"TryApplySlotsDataUpdate: failed to add new reel at index {i}: {ex.Message}");
+					Debug.LogWarning($"[SlotsEngine] Failed to add missing visual reel at index {i}: {ex.Message}");
 				}
 			}
 		}
 
-		// If new has fewer reels, remove excess from the end
-		if (newCount < oldCount)
+		// If visuals have more reels than new data, remove excess visuals
+		visualCount = reels?.Count ?? 0;
+		if (visualCount > newCount)
 		{
-			for (int i = oldCount - 1; i >= newCount; i--)
+			for (int i = visualCount - 1; i >= newCount; i--)
 			{
 				try
 				{
 					if (i >= 0 && i < reels.Count)
 					{
 						var reelToRemove = reels[i];
-						// Use engine API to remove reel (will update data and visuals)
 						RemoveReel(reelToRemove);
+						Debug.Log($"[SlotsEngine] Removed excess visual reel index={i}. reelsCountNow={reels.Count}");
 					}
 				}
 				catch (Exception ex)
 				{
-					Debug.LogWarning($"TryApplySlotsDataUpdate: failed to remove reel at index {i}: {ex.Message}");
+					Debug.LogWarning($"[SlotsEngine] Failed to remove visual reel at index {i}: {ex.Message}");
 				}
 			}
 		}
@@ -778,9 +782,9 @@ public class SlotsEngine : MonoBehaviour
 		// Replace engine's SlotsData reference with newData so further operations reflect persisted model
 		currentSlotsData = newData;
 
-		// Recompute layout and visuals
 		try { RepositionReels(); RegenerateAllReelDummies(); } catch { }
 
+		Debug.Log($"[SlotsEngine] TryApplySlotsDataUpdate end reelsCount={reels?.Count ?? 0} dataReels={currentSlotsData?.CurrentReelData?.Count ?? 0}");
 		return true;
 	}
 }
