@@ -677,4 +677,107 @@ public class SlotsEngine : MonoBehaviour
 		// Inform listeners
 		try { eventManager?.BroadcastEvent(SlotsEvent.ReelRemoved, reel); } catch { }
 	}
+
+	/// <summary>
+	/// Attempt to apply a SlotsData update surgically: update changed reels, add/remove reels as needed.
+	/// Returns true if update applied; throws InvalidOperationException if engine is spinning and update cannot be applied.
+	/// </summary>
+	public bool TryApplySlotsDataUpdate(SlotsData newData)
+	{
+		if (newData == null) return false;
+		// Do not apply while spinning
+		if (this.CurrentState == State.Spinning)
+		{
+			throw new InvalidOperationException("Cannot apply SlotsData update while engine is spinning.");
+		}
+
+		// Compute old/new lists
+		var oldList = currentSlotsData?.CurrentReelData ?? new List<ReelData>();
+		var newList = newData?.CurrentReelData ?? new List<ReelData>();
+		int oldCount = oldList.Count;
+		int newCount = newList.Count;
+		int common = Math.Min(oldCount, newCount);
+
+		// Update existing reels where reel data reference changed
+		for (int i = 0; i < common; i++)
+		{
+			if (!ReferenceEquals(oldList[i], newList[i]))
+			{
+				// Reinitialize existing GameReel with new ReelData
+				try
+				{
+					var strip = newList[i]?.CurrentReelStrip ?? newList[i]?.DefaultReelStrip;
+					if (i < reels.Count && reels[i] != null)
+					{
+						reels[i].InitializeReel(newList[i], i, eventManager, strip, this);
+					}
+					// update underlying data reference so engine reflects new model
+					if (currentSlotsData != null && currentSlotsData.CurrentReelData != null && i < currentSlotsData.CurrentReelData.Count)
+					{
+						currentSlotsData.CurrentReelData[i] = newList[i];
+					}
+				}
+				catch (Exception ex)
+				{
+					Debug.LogWarning($"TryApplySlotsDataUpdate: failed to update reel at index {i}: {ex.Message}");
+				}
+			}
+		}
+
+		// If new has additional reels, append them
+		if (newCount > oldCount)
+		{
+			for (int i = oldCount; i < newCount; i++)
+			{
+				try
+				{
+					// spawn visual reel under existing group
+					Transform parent = currentReelsGroup != null ? currentReelsGroup : reelsRootTransform;
+					if (parent == null) parent = reelsRootTransform;
+					GameObject g = Instantiate(reelPrefab, parent);
+					var reel = g.GetComponent<GameReel>();
+					var strip = newList[i]?.CurrentReelStrip ?? newList[i]?.DefaultReelStrip;
+					int newIndex = i;
+					reel.InitializeReel(newList[i], newIndex, eventManager, strip, this);
+					reels.Add(reel);
+
+					// Ensure engine's data list is in sync
+					if (currentSlotsData != null) currentSlotsData.AddNewReel(newList[i]);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogWarning($"TryApplySlotsDataUpdate: failed to add new reel at index {i}: {ex.Message}");
+				}
+			}
+		}
+
+		// If new has fewer reels, remove excess from the end
+		if (newCount < oldCount)
+		{
+			for (int i = oldCount - 1; i >= newCount; i--)
+			{
+				try
+				{
+					if (i >= 0 && i < reels.Count)
+					{
+						var reelToRemove = reels[i];
+						// Use engine API to remove reel (will update data and visuals)
+						RemoveReel(reelToRemove);
+					}
+				}
+				catch (Exception ex)
+				{
+					Debug.LogWarning($"TryApplySlotsDataUpdate: failed to remove reel at index {i}: {ex.Message}");
+				}
+			}
+		}
+
+		// Replace engine's SlotsData reference with newData so further operations reflect persisted model
+		currentSlotsData = newData;
+
+		// Recompute layout and visuals
+		try { RepositionReels(); RegenerateAllReelDummies(); } catch { }
+
+		return true;
+	}
 }

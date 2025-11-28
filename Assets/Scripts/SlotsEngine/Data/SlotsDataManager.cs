@@ -64,6 +64,48 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 
 		// Debounced save request instead of immediate disk write
 		DataPersistenceManager.Instance?.RequestSave();
+
+		// Propagate changes to live SlotsEngine in a safe, surgical manner when possible
+		try
+		{
+			var mgr = SlotsEngineManager.Instance;
+			if (mgr != null)
+			{
+				var engine = mgr.FindEngineForSlotsData(slotsData);
+				if (engine != null)
+				{
+					// Try a surgical update first; this will throw if engine is spinning
+					try
+					{
+						engine.TryApplySlotsDataUpdate(slotsData);
+						SlotsEngineManager.Instance.AdjustSlotCanvas(engine);
+					}
+					catch (System.InvalidOperationException)
+					{
+						// Engine is spinning; surface error to caller
+						throw;
+					}
+					catch
+					{
+						// Other errors: attempt conservative reinit if engine is idle, otherwise surface
+						if (engine.CurrentState != State.Spinning)
+						{
+							engine.InitializeSlotsEngine(engine.ReelsRootTransform, slotsData);
+							SlotsEngineManager.Instance.AdjustSlotCanvas(engine);
+						}
+						else
+						{
+							throw new System.InvalidOperationException("Failed to apply SlotsData update and engine is spinning.");
+						}
+					}
+				}
+			}
+		}
+		catch
+		{
+			// Rethrow to surface to caller
+			throw;
+		}
 	}
 
 	public void RemoveSlotsDataIfExists(SlotsData data)

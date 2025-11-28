@@ -126,6 +126,12 @@ public class SlotsData : Data
 			throw new Exception("tried to remove reel that isn't registered!");
 		}
 
+		// Guard: do not allow removing the last remaining reel
+		if (currentReelData.Count <= 1)
+		{
+			throw new InvalidOperationException("Cannot remove the only reel from a slot. A slot must have at least one reel.");
+		}
+
 		currentReelData.Remove(reelData);
 	}
 }

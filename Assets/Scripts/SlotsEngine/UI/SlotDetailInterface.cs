@@ -130,6 +130,15 @@ public class SlotDetailInterface : MonoBehaviour
 
 			// wire up each reel's symbol menu to open our AddRemoveSymbolsMenu
 			item.ConfigureSymbolMenu(current, OpenAddRemoveSymbolsMenu);
+
+			// Determine if remove should be allowed (do not allow removing the last reel)
+			bool allowRemove = list.Count > 1;
+
+			// wire up remove button to detach this reel from the slot and refresh
+			item.ConfigureRemoval(current, () => {
+				// refresh UI after removal
+				Refresh();
+			}, allowRemove);
 		}
 
 		// Ensure AddReelButton remains the last child in its parent (typically ReelDetailsRoot)

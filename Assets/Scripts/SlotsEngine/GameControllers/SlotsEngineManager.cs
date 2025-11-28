@@ -238,4 +238,13 @@ public class SlotsEngineManager : Singleton<SlotsEngineManager>
 	{
 		if (obj is GameReel gr) AdjustSlotCanvas(gr.OwnerEngine); else AdjustSlotsCanvases();
 	}
+
+	/// <summary>
+	/// Find the live SlotsEngine instance that is associated with the provided SlotsData (by reference or accessor id).
+	/// </summary>
+	public SlotsEngine FindEngineForSlotsData(SlotsData slotsData)
+	{
+		if (slotsData == null) return null;
+		return slotsEngines.FirstOrDefault(e => e != null && e.CurrentSlotsData != null && (e.CurrentSlotsData == slotsData || (e.CurrentSlotsData.AccessorId > 0 && e.CurrentSlotsData.AccessorId == slotsData.AccessorId)));
+	}
 }

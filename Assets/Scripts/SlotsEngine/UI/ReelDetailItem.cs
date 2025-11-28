@@ -8,9 +8,12 @@ public class ReelDetailItem : MonoBehaviour
 	public TMP_Text ReelIndexText;
 	public RectTransform SymbolDetailsRoot;
 	public ReelSymbolDetailItem ReelSymbolDetailItemPrefab;
+	public Button RemoveReelButton; // new: button to remove this reel from its slot
 
 	// cached strip used to configure symbol item menu callbacks after Setup
 	private ReelStripData lastStrip;
+	private ReelData boundReel;
+	private SlotsData boundSlot;
 
 	public void Setup(ReelData data, int index)
 	{
@@ -23,6 +26,8 @@ public class ReelDetailItem : MonoBehaviour
 		}
 
 		if (data == null) return;
+
+		boundReel = data;
 
 		// Try to use current reel strip; may be null for legacy/empty setups
 		var strip = data.CurrentReelStrip;
@@ -133,5 +138,95 @@ public class ReelDetailItem : MonoBehaviour
 				rs.ConfigureMenu(lastStrip, slot, onOpen);
 			}
 		}
+	}
+
+	/// <summary>
+	/// Configure the remove-reel button to remove the bound reel from the provided slot.
+	/// </summary>
+	public void ConfigureRemoval(SlotsData slot, System.Action onRemoved = null, bool allowRemove = true)
+	{
+		boundSlot = slot;
+		if (RemoveReelButton == null) return;
+
+		// Show/hide remove button based on allowRemove flag
+		RemoveReelButton.gameObject.SetActive(true);
+		RemoveReelButton.interactable = allowRemove;
+
+		RemoveReelButton.onClick.RemoveAllListeners();
+		RemoveReelButton.onClick.AddListener(() =>
+		{
+			// Safety checks
+			if (boundReel == null || boundSlot == null) return;
+
+			try
+			{
+				// If removal is disabled via UI, do nothing
+				if (!allowRemove) return;
+
+				// Try to find a live engine for this slot so we can remove the visual reel
+				var mgr = SlotsEngineManager.Instance;
+				if (mgr != null)
+				{
+					var engine = mgr.FindEngineForSlotsData(boundSlot);
+					if (engine != null)
+					{
+						// If engine is spinning, surface an error
+						if (engine.CurrentState == State.Spinning)
+						{
+							throw new System.InvalidOperationException("Cannot remove reel while engine is spinning.");
+						}
+
+						// Find index of the ReelData within the engine's data list using AccessorId or strip InstanceKey when available
+						int idx = -1;
+						if (engine.CurrentSlotsData != null && engine.CurrentSlotsData.CurrentReelData != null)
+						{
+							for (int i = 0; i < engine.CurrentSlotsData.CurrentReelData.Count; i++)
+							{
+								var rd = engine.CurrentSlotsData.CurrentReelData[i];
+								if (rd == null) continue;
+
+								// Prefer matching by AccessorId when present
+								if (boundReel.AccessorId > 0 && rd.AccessorId == boundReel.AccessorId) { idx = i; break; }
+
+								// Next prefer matching by associated strip instance key when available
+								var brStrip = boundReel.CurrentReelStrip;
+								var rdStrip = rd.CurrentReelStrip;
+								if (brStrip != null && rdStrip != null && !string.IsNullOrEmpty(brStrip.InstanceKey) && brStrip.InstanceKey == rdStrip.InstanceKey) { idx = i; break; }
+
+								// Fallback to reference equality
+								if (ReferenceEquals(rd, boundReel)) { idx = i; break; }
+							}
+						}
+
+						if (idx >= 0 && idx < engine.CurrentReels.Count)
+						{
+							// Use engine API to remove the visual reel; this also updates engine data and persistence
+							engine.RemoveReel(engine.CurrentReels[idx]);
+							// Persist updated slots data
+							SlotsDataManager.Instance?.UpdateSlotsData(engine.CurrentSlotsData);
+							// Notify caller
+							onRemoved?.Invoke();
+							return;
+						}
+					}
+				}
+
+				// Fallback: no live engine found - operate on data model directly
+				boundSlot.RemoveReel(boundReel);
+
+				// Remove persisted reel data and any contained symbol data
+				ReelDataManager.Instance?.RemoveDataIfExists(boundReel);
+
+				// Persist slots update
+				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
+
+				// Notify listeners / update UI via callback
+				onRemoved?.Invoke();
+			}
+			catch (System.Exception ex)
+			{
+				Debug.LogWarning($"ReelDetailItem: failed to remove reel: {ex.Message}");
+			}
+		});
 	}
 }
