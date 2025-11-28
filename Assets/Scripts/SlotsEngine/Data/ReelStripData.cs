@@ -507,7 +507,7 @@ public class ReelStripData : Data
         {
             float total = 0f;
             for (int i = 0; i < candidates.Count; i++) total += candidates[i].weight;
-            float r = UnityEngine.Random.value * total;
+            float r = (float)(RNGManager.UnseededDouble() * total);
             for (int i = 0; i < candidates.Count; i++)
             {
                 r -= candidates[i].weight;

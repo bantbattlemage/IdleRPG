@@ -1,12 +1,18 @@
 using System;
+using UnityEngine;
 
 /// <summary>
 /// Centralized seeded RNG manager. Use <see cref="SetSeed(int)"/> to create deterministic sequences.
 /// Thread-safe access to System.Random methods used across the project.
+///
+/// Also exposes a purposefully-non-seeded API surface (`UnseededRange`) for call sites that
+/// intentionally require non-deterministic randomness (e.g., cosmetic/debug choices). Routing
+/// non-seeded calls through this helper makes the intent explicit and centralizes any
+/// engine-specific implementation details.
 /// </summary>
 public static class RNGManager
 {
-    private static Random rng = new Random(Environment.TickCount);
+    private static System.Random rng = new System.Random(Environment.TickCount);
     private static readonly object sync = new object();
     private static int currentSeed = Environment.TickCount;
 
@@ -18,7 +24,7 @@ public static class RNGManager
         lock (sync)
         {
             currentSeed = seed;
-            rng = new Random(seed);
+            rng = new System.Random(seed);
         }
     }
 
@@ -31,7 +37,7 @@ public static class RNGManager
     }
 
     /// <summary>
-    /// Returns a non-negative random integer.
+    /// Returns a non-negative random integer (from the seeded generator managed by RNGManager).
     /// </summary>
     /// <returns>A non-negative random integer.</returns>
     public static int Next()
@@ -40,42 +46,32 @@ public static class RNGManager
     }
 
     /// <summary>
-    /// Returns a non-negative random integer less than the specified maximum.
+    /// Returns a non-negative random integer less than the specified maximum (seeded generator).
     /// </summary>
-    /// <param name="maxValue">The exclusive upper bound of the random number returned.
-
-    /// <returns>A non-negative random integer less than maxValue.</returns>
     public static int Next(int maxValue)
     {
         lock (sync) { return rng.Next(maxValue); }
     }
 
     /// <summary>
-    /// Returns a random integer within a specified range.
+    /// Returns a random integer within a specified range (seeded generator).
     /// </summary>
-    /// <param name="minValue">The inclusive lower bound of the random number returned.</param>
-    /// <param name="maxValue">The exclusive upper bound of the random number returned.</param>
-    /// <returns>A random integer between minValue and maxValue.</returns>
     public static int Next(int minValue, int maxValue)
     {
         lock (sync) { return rng.Next(minValue, maxValue); }
     }
 
     /// <summary>
-    /// Returns a random double-precision floating-point number between 0.0 and 1.0.
+    /// Returns a random double in [0.0, 1.0) from the seeded generator.
     /// </summary>
-    /// <returns>A random double-precision floating-point number between 0.0 and 1.0.</returns>
     public static double NextDouble()
     {
         lock (sync) { return rng.NextDouble(); }
     }
 
     /// <summary>
-    /// Returns a random float in [minInclusive, maxExclusive).
+    /// Returns a random float in [minInclusive, maxExclusive) using the seeded generator.
     /// </summary>
-    /// <param name="minInclusive">The inclusive lower bound of the random number returned.</param>
-    /// <param name="maxExclusive">The exclusive upper bound of the random number returned.</param>
-    /// <returns>A random float between minInclusive and maxExclusive.</returns>
     public static float RangeFloat(float minInclusive, float maxExclusive)
     {
         if (maxExclusive <= minInclusive) return minInclusive;
@@ -87,18 +83,60 @@ public static class RNGManager
     }
 
     /// <summary>
-    /// Returns an int in [minInclusive, maxExclusive).
+    /// Returns an int in [minInclusive, maxExclusive) using the seeded generator.
     /// </summary>
-    /// <param name="minInclusive">The inclusive lower bound of the random number returned.</param>
-    /// <param name="maxExclusive">The exclusive upper bound of the random number returned.</param>
-    /// <returns>An int between minInclusive and maxExclusive.</returns>
     public static int Range(int minInclusive, int maxExclusive)
     {
         return Next(minInclusive, maxExclusive);
     }
 
     /// <summary>
-    /// Return the current seed used by the RNGManager.
+    /// Purposefully non-seeded random integer in [minInclusive, maxExclusive).
+    /// Use this when a callsite intentionally requires non-deterministic behavior that
+    /// should not be affected by the seeded RNG set via SetSeed(). Examples: cosmetic debug
+    /// choices, unique temporary ids, or editor-only randomness.
+    ///
+    /// Implementation: prefer UnityEngine.Random.Range when running under Unity so we use
+    /// the engine's global non-seeded RNG; otherwise fall back to an ephemeral System.Random
+    /// seeded from Environment.TickCount so each call is effectively non-deterministic.
+    /// </summary>
+    public static int UnseededRange(int minInclusive, int maxExclusive)
+    {
+        // Defensive normalization
+        if (maxExclusive <= minInclusive) return minInclusive;
+
+        try
+        {
+            // Prefer Unity's non-seeded RNG when available
+            return UnityEngine.Random.Range(minInclusive, maxExclusive);
+        }
+        catch
+        {
+            // Fallback: ephemeral System.Random instance (non-seeded semantics)
+            var tmp = new System.Random(Environment.TickCount ^ Guid.NewGuid().GetHashCode());
+            return tmp.Next(minInclusive, maxExclusive);
+        }
+    }
+
+    /// <summary>
+    /// Purposefully non-seeded double in [0.0, 1.0).
+    /// Prefers UnityEngine.Random.value when running in Unity to reuse engine RNG; falls back to an ephemeral System.Random.
+    /// </summary>
+    public static double UnseededDouble()
+    {
+        try
+        {
+            return UnityEngine.Random.value; // float promoted to double
+        }
+        catch
+        {
+            var tmp = new System.Random(Environment.TickCount ^ Guid.NewGuid().GetHashCode());
+            return tmp.NextDouble();
+        }
+    }
+
+    /// <summary>
+    /// Return the current seed used by the RNGManager (seeded generator).
     /// </summary>
     public static int CurrentSeed => currentSeed;
 }

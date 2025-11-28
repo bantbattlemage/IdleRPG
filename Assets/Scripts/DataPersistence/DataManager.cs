@@ -152,11 +152,11 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
         if (maxId == int.MaxValue)
         {
             // fall back to random id generation as a last resort. Use HashSet for fast containment checks.
-            int fallbackId = Random.Range(1, int.MaxValue);
+            int fallbackId = RNGManager.UnseededRange(1, int.MaxValue);
             int safety = 0;
             while (idSet.Contains(fallbackId))
             {
-                fallbackId = Random.Range(1, int.MaxValue);
+                fallbackId = RNGManager.UnseededRange(1, int.MaxValue);
                 if (++safety > 1000)
                 {
                     // Extremely unlikely: all sampled ids collided; pick first unused by linear scan starting at 1
