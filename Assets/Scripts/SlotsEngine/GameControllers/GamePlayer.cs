@@ -514,7 +514,7 @@ public class GamePlayer : Singleton<GamePlayer>
 
 				}
 
-				// Additionally, mark any SlotEngine inventory item that references this slot's display as unassociated
+				// Additionally, remove any SlotEngine inventory item that references this slot
 				try
 				{
 					var slotDisplay = "Slot " + slotsToRemove.CurrentSlotsData.Index;
@@ -522,16 +522,15 @@ public class GamePlayer : Singleton<GamePlayer>
 					if (slotItems != null)
 					{
 						int targetAccessor = slotsToRemove.CurrentSlotsData.AccessorId;
-						foreach (var sItem in slotItems)
+						// iterate over a copy since RemoveInventoryItem will modify the underlying list
+						foreach (var sItem in slotItems.ToList())
 						{
 							if (sItem == null) continue;
-							// If the slot has a persisted accessor, prefer matching by DefinitionAccessorId to avoid ambiguous display-name collisions
 							if (targetAccessor > 0)
 							{
 								if (sItem.DefinitionAccessorId == targetAccessor)
 								{
-									sItem.SetDisplayName(slotDisplay + " (unassociated)");
-									sItem.SetDefinitionAccessorId(0);
+									playerData.RemoveInventoryItem(sItem);
 								}
 							}
 							else
@@ -539,8 +538,7 @@ public class GamePlayer : Singleton<GamePlayer>
 								// Legacy fallback: only match by display name for items that don't already reference an accessor
 								if (sItem.DefinitionAccessorId == 0 && sItem.DisplayName == slotDisplay)
 								{
-									sItem.SetDisplayName(slotDisplay + " (unassociated)");
-									sItem.SetDefinitionAccessorId(0);
+									playerData.RemoveInventoryItem(sItem);
 								}
 							}
 						}
@@ -548,7 +546,7 @@ public class GamePlayer : Singleton<GamePlayer>
 				}
 				catch (Exception ex)
 				{
-					Debug.LogWarning($"RemoveSlots: failed to mark SlotEngine inventory items unassociated: {ex.Message}");
+					Debug.LogWarning($"RemoveSlots: failed to remove SlotEngine inventory items: {ex.Message}");
 				}
 			}
 		}
