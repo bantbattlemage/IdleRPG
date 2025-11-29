@@ -29,7 +29,7 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 	}
 
-	public void InitializePlayer(BetLevelDefinition defaultBetLevel)
+	public void InitializePlayer(BetLevelDefinition defaultBetLevel, bool isNewGame = false)
 	{
 		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetUpPressed, OnBetUpPressed);
 		GlobalEventManager.Instance.RegisterEvent(SlotsEvent.BetDownPressed, OnBetDownPressed);
@@ -39,9 +39,19 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
 
+		// Only spawn a default slot when explicitly starting a new game. When continuing/loading an existing
+		// profile that contains zero saved slots, do not auto-create a slot so the user's "no slots" choice
+		// is preserved.
 		if (playerData.CurrentSlots == null || playerData.CurrentSlots.Count == 0)
 		{
-			SpawnSlots();
+			if (isNewGame)
+			{
+				SpawnSlots();
+			}
+			else
+			{
+				Debug.Log("Player has no persisted slots and this is a continue/load; not spawning default slots.");
+			}
 		}
 		else
 		{

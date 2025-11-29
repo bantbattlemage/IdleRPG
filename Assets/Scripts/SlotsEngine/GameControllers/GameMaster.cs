@@ -54,7 +54,8 @@ public class GameMaster : Singleton<GameMaster>
 
 		SlotConsoleController.Instance.InitializeConsole();
 
-		player.InitializePlayer(defaultBetLevel);
+		// Pass the newGame flag so the player knows whether to spawn default slots when none exist
+		player.InitializePlayer(defaultBetLevel, newGame);
 		player.BeginGame();
 	}
 }
