@@ -113,7 +113,9 @@ public static class RNGManager
         catch
         {
             // Fallback: ephemeral System.Random instance (non-seeded semantics)
-            var tmp = new System.Random(Environment.TickCount ^ Guid.NewGuid().GetHashCode());
+            // Use GlobalAccessorIdProvider for a fast unique int source instead of GUID-based GetHashCode
+            int uniquePart = GlobalAccessorIdProvider.GetNextId();
+            var tmp = new System.Random(Environment.TickCount ^ uniquePart);
             return tmp.Next(minInclusive, maxExclusive);
         }
     }
@@ -130,7 +132,8 @@ public static class RNGManager
         }
         catch
         {
-            var tmp = new System.Random(Environment.TickCount ^ Guid.NewGuid().GetHashCode());
+            int uniquePart = GlobalAccessorIdProvider.GetNextId();
+            var tmp = new System.Random(Environment.TickCount ^ uniquePart);
             return tmp.NextDouble();
         }
     }

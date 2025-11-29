@@ -127,7 +127,7 @@ public class SlotDetailInterface : MonoBehaviour
 					var strip = rd.CurrentReelStrip;
 					if (strip == null) { Debug.Log($"SlotDetailInterface: Reel[{i}] CurrentReelStrip is null"); continue; }
 					int runtimeCount = strip.RuntimeSymbols != null ? strip.RuntimeSymbols.Count : 0;
-					Debug.Log($"SlotDetailInterface: Reel[{i}] -> stripAccessor={strip.AccessorId} instanceKey={strip.InstanceKey} runtimeCount={runtimeCount}");
+					Debug.Log($"SlotDetailInterface: Reel[{i}] -> stripAccessor={strip.AccessorId} runtimeCount={runtimeCount}");
 				}
 			}
 		}
@@ -243,8 +243,8 @@ public class SlotDetailInterface : MonoBehaviour
 				if (rd == null) continue;
 				var strip = rd.CurrentReelStrip;
 				if (strip == null) continue;
-				// Match by accessor or instance key; if matched, refresh UI but do NOT mutate rd
-				if (strip.AccessorId == updated.AccessorId || (!string.IsNullOrEmpty(strip.InstanceKey) && strip.InstanceKey == updated.InstanceKey))
+				// Match by accessor id; if matched, refresh UI but do NOT mutate rd
+				if (strip.AccessorId == updated.AccessorId)
 				{
 					try
 					{

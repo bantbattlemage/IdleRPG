@@ -178,16 +178,53 @@ public class DataPersistenceManager : MonoBehaviour
 			return;
 		}
 
+		// Initialize global accessor provider from persisted snapshot BEFORE managers load so generated ids won't collide
+		GlobalAccessorIdProvider.InitializeFromPersisted(gameData.LastAssignedAccessorId);
+
 		// push the loaded data to all other scripts that need it
 		// Load core managers first to populate their LocalData dictionaries. This prevents other
 		// objects (e.g., SlotsDataManager) from attempting to register nested data (reels/strips/symbols)
 		// before the managers have loaded their persisted entries, which would otherwise produce duplicate instances.
 		IsLoading = true;
-		try { Debug.Log("[Diag] Loading SymbolDataManager"); SymbolDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SymbolDataManager.LocalCount={(SymbolDataManager.Instance!=null && SymbolDataManager.Instance.GetAllData()!=null?SymbolDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] SymbolDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading ReelStripDataManager"); ReelStripDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelStripDataManager.LocalCount={(ReelStripDataManager.Instance!=null && ReelStripDataManager.Instance.ReadOnlyLocalData!=null?ReelStripDataManager.Instance.ReadOnlyLocalData.Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] ReelStripDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading ReelDataManager"); ReelDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelDataManager.LocalCount={(ReelDataManager.Instance!=null && ReelDataManager.Instance.GetAllData()!=null?ReelDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] ReelDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading SlotsDataManager"); SlotsDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SlotsDataManager.LocalCount={(SlotsDataManager.Instance!=null && SlotsDataManager.Instance.GetAllData()!=null?SlotsDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] SlotsDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading PlayerDataManager"); PlayerDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] PlayerDataManager.LocalCount={(PlayerDataManager.Instance!=null && PlayerDataManager.Instance.GetAllData()!=null?PlayerDataManager.Instance.GetAllData().Count:0)}"); } catch (Exception ex) { Debug.LogWarning($"[Diag] PlayerDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading SymbolDataManager"); SymbolDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SymbolDataManager.LocalCount={(SymbolDataManager.Instance!=null && SymbolDataManager.Instance.GetAllData()!=null?SymbolDataManager.Instance.GetAllData().Count:0)}");
+			// Register existing symbol accessors with global provider
+			if (SymbolDataManager.Instance != null)
+			{
+				var all = SymbolDataManager.Instance.GetAllData();
+				if (all != null)
+				{
+					foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); }
+				}
+			}
+		} catch (Exception ex) { Debug.LogWarning($"[Diag] SymbolDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading ReelStripDataManager"); ReelStripDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelStripDataManager.LocalCount={(ReelStripDataManager.Instance!=null && ReelStripDataManager.Instance.ReadOnlyLocalData!=null?ReelStripDataManager.Instance.ReadOnlyLocalData.Count:0)}");
+			if (ReelStripDataManager.Instance != null)
+			{
+				var all = ReelStripDataManager.Instance.GetAllData();
+				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
+			}
+		} catch (Exception ex) { Debug.LogWarning($"[Diag] ReelStripDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading ReelDataManager"); ReelDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelDataManager.LocalCount={(ReelDataManager.Instance!=null && ReelDataManager.Instance.GetAllData()!=null?ReelDataManager.Instance.GetAllData().Count:0)}");
+			if (ReelDataManager.Instance != null)
+			{
+				var all = ReelDataManager.Instance.GetAllData();
+				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
+			}
+		} catch (Exception ex) { Debug.LogWarning($"[Diag] ReelDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading SlotsDataManager"); SlotsDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SlotsDataManager.LocalCount={(SlotsDataManager.Instance!=null && SlotsDataManager.Instance.GetAllData()!=null?SlotsDataManager.Instance.GetAllData().Count:0)}");
+			if (SlotsDataManager.Instance != null)
+			{
+				var all = SlotsDataManager.Instance.GetAllData();
+				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
+			}
+		} catch (Exception ex) { Debug.LogWarning($"[Diag] SlotsDataManager.Load failed: {ex.Message}"); }
+		try { Debug.Log("[Diag] Loading PlayerDataManager"); PlayerDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] PlayerDataManager.LocalCount={(PlayerDataManager.Instance!=null && PlayerDataManager.Instance.GetAllData()!=null?PlayerDataManager.Instance.GetAllData().Count:0)}");
+			if (PlayerDataManager.Instance != null)
+			{
+				var all = PlayerDataManager.Instance.GetAllData();
+				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
+			}
+		} catch (Exception ex) { Debug.LogWarning($"[Diag] PlayerDataManager.Load failed: {ex.Message}"); }
 		
 
 		// Now notify remaining registered persistence objects. Managers above will still be iterated here,

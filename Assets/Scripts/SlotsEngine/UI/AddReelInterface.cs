@@ -59,7 +59,7 @@ public class AddReelInterface : MonoBehaviour
 			var rr = allReels[r];
 			if (rr == null) { Debug.Log($"[AddReelInterface] Reel[{r}] is null"); continue; }
 			var rs = rr.CurrentReelStrip;
-			Debug.Log($"[AddReelInterface] Reel[{r}] accessor={rr.AccessorId} symbolCount={rr.CurrentSymbolData?.Count ?? 0} stripAccessor={rs?.AccessorId ?? 0} stripKey={rs?.InstanceKey ?? "<none>"}");
+			Debug.Log($"[AddReelInterface] Reel[{r}] accessor={rr.AccessorId} symbolCount={rr.CurrentSymbolData?.Count ?? 0} stripAccessor={rs?.AccessorId ?? 0}");
 		}
 
 		int shownIndex = 0;
@@ -103,15 +103,6 @@ public class AddReelInterface : MonoBehaviour
 			// Try by accessor id
 			if (s.AccessorId > 0 && ReelStripDataManager.Instance.ReadOnlyLocalData != null && ReelStripDataManager.Instance.ReadOnlyLocalData.ContainsKey(s.AccessorId))
 				return ReelStripDataManager.Instance.ReadOnlyLocalData[s.AccessorId];
-			// Try by instance key
-			if (!string.IsNullOrEmpty(s.InstanceKey) && ReelStripDataManager.Instance.ReadOnlyLocalData != null)
-			{
-				foreach (var kv in ReelStripDataManager.Instance.ReadOnlyLocalData)
-				{
-					var cand = kv.Value; if (cand == null) continue;
-					if (!string.IsNullOrEmpty(cand.InstanceKey) && cand.InstanceKey == s.InstanceKey) return cand;
-				}
-			}
 			return s;
 		}
 
@@ -142,20 +133,6 @@ public class AddReelInterface : MonoBehaviour
 						Debug.Log($"[AddReelInterface] Reel accessor={reel.AccessorId} is associated with Slot accessor={s.AccessorId} by canonical strip AccessorId match ({reelStripCanonical.AccessorId}).");
 						return true;
 					}
-					if (!string.IsNullOrEmpty(reelStripCanonical.InstanceKey) && !string.IsNullOrEmpty(rdStripCanonical.InstanceKey) && reelStripCanonical.InstanceKey == rdStripCanonical.InstanceKey)
-					{
-						Debug.Log($"[AddReelInterface] Reel accessor={reel.AccessorId} is associated with Slot accessor={s.AccessorId} by canonical strip InstanceKey match ({reelStripCanonical.InstanceKey}).");
-						return true;
-					}
-				}
-
-				// fallback to direct instance key match if canonicalization unavailable
-				var rStrip = reel.CurrentReelStrip;
-				var rdStrip = rd.CurrentReelStrip;
-				if (rStrip != null && rdStrip != null && !string.IsNullOrEmpty(rStrip.InstanceKey) && rStrip.InstanceKey == rdStrip.InstanceKey)
-				{
-					Debug.Log($"[AddReelInterface] Reel accessor={reel.AccessorId} is associated with Slot accessor={s.AccessorId} by strip.InstanceKey match ({rStrip.InstanceKey}).");
-					return true;
 				}
 
 				// fallback to reference equality

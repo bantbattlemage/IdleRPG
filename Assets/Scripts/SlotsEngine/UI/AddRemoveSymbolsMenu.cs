@@ -38,14 +38,9 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 	public void Show(ReelStripData strip, SlotsData slot)
 	{
-		// Do NOT prefer canonical manager instance here — keep the strip reference passed in so we
-		// operate on the slot-owned instance. Using the manager instance can cause UI edits to
-		// appear across multiple slots by introducing shared references.
-		// previous code attempted to replace 'strip' with the manager's copy; avoid that.
-
+		// Keep the strip reference passed in so we operate directly on the slot-owned instance.
 		currentStrip = strip;
 		currentSlot = slot;
-		MigrateLegacyInventoryKeys();
 		if (MenuRoot != null) MenuRoot.gameObject.SetActive(true); else gameObject.SetActive(true);
 		Refresh();
 		Canvas.ForceUpdateCanvases();
@@ -58,33 +53,9 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		if (updated == null) return;
 		if (currentStrip == null) return;
 		// If this update pertains to the strip we're currently viewing, refresh to reflect external changes
-		// Do NOT adopt the manager-provided reference into our local currentStrip; only refresh so UI reflects
-		// the changed data. This avoids switching our local owned instance to a shared manager instance.
-		if (updated.AccessorId == currentStrip.AccessorId || (!string.IsNullOrEmpty(updated.InstanceKey) && updated.InstanceKey == currentStrip.InstanceKey))
+		if (updated.AccessorId == currentStrip.AccessorId)
 		{
 			Refresh();
-		}
-	}
-
-	private bool IsGuid(string s)
-	{
-		if (string.IsNullOrEmpty(s)) return false;
-		return Guid.TryParse(s, out _);
-	}
-
-	// Convert any legacy non-GUID definition keys to null (they were old definition asset names)
-	private void MigrateLegacyInventoryKeys()
-	{
-		var pd = GamePlayer.Instance?.PlayerData; if (pd == null) return;
-		var syms = pd.GetItemsOfType(InventoryItemType.Symbol); if (syms == null) return;
-		for (int i = 0; i < syms.Count; i++)
-		{
-			var itm = syms[i]; if (itm == null) continue;
-			var key = itm.DefinitionKey;
-			if (!string.IsNullOrEmpty(key) && !IsGuid(key))
-			{
-				itm.SetDefinitionKey(null); // legacy clear
-			}
 		}
 	}
 
@@ -101,7 +72,7 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		if (player == null) return;
 		var inventorySyms = player.GetItemsOfType(InventoryItemType.Symbol) ?? new List<InventoryItemData>();
 
-		string stripInstanceKey = currentStrip != null ? currentStrip.InstanceKey : null;
+		int stripAccessor = currentStrip != null ? currentStrip.AccessorId : 0;
 
 		var associatedThis = new List<InventoryItemData>();
 		var unassociated = new List<InventoryItemData>();
@@ -110,25 +81,19 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		for (int i = 0; i < inventorySyms.Count; i++)
 		{
 			var inv = inventorySyms[i]; if (inv == null) continue;
-			var key = inv.DefinitionKey;
-			if (string.IsNullOrEmpty(key))
+			var defId = inv.DefinitionAccessorId;
+			if (defId == 0)
 			{
 				unassociated.Add(inv);
 				continue;
 			}
-			if (key == stripInstanceKey)
+			if (defId == stripAccessor)
 			{
 				associatedThis.Add(inv);
 			}
-			else if (IsGuid(key))
-			{
-				associatedOther.Add(inv); // GUID but different strip
-			}
 			else
 			{
-				// legacy key encountered mid-session: treat as unassociated
-				inv.SetDefinitionKey(null);
-				unassociated.Add(inv);
+				associatedOther.Add(inv);
 			}
 		}
 
@@ -145,8 +110,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		for (int i = 0; i < associatedOther.Count; i++)
 		{
 			var itm = Instantiate(SymbolDetailsItemPrefab, SymbolListRoot);
-			// Allow transfer: enable Add when symbol belongs to another strip
-			// Previous behavior wired transfer handler into the "add" slot; now provide it as explicit onTransfer and enable transfer button.
 			itm.Setup(associatedOther[i], onAdd: null, onRemove: OnRemoveInventoryItem, allowAdd: false, allowRemove: false, onTransfer: OnTransferInventoryItem, allowTransfer: true, targetStrip: currentStrip);
 		}
 	}
@@ -195,29 +158,23 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		var pd = GamePlayer.Instance?.PlayerData; if (pd == null) return;
 
 		// Diagnostic: log incoming inventory item details
-		Debug.Log($"OnAddInventoryItem: incoming item DisplayName='{item.DisplayName}' SpriteKey='{item.SpriteKey}' SymbolAccessorId={item.SymbolAccessorId} DefinitionKey='{item.DefinitionKey}'");
+		Debug.Log($"OnAddInventoryItem: incoming item DisplayName='{item.DisplayName}' SpriteKey='{item.SpriteKey}' SymbolAccessorId={item.SymbolAccessorId} DefinitionAccessorId='{item.DefinitionAccessorId}'");
 
-		// Capture previous association (if any) so transfer semantics can remove the symbol from its old strip.
-		string previousDefinitionKey = item.DefinitionKey;
+		int previousDefinitionAccessorId = item.DefinitionAccessorId;
 
 		LogRuntimeSymbols("Before Add");
 
 		// If this inventory item was previously associated with another strip, pre-clear matching runtime symbols
-		// on that strip so transfer will appear as a move rather than duplicate across strips.
-		// Only run transfer removal when the item was actually associated (GUID instance key); do not remove
-		// matching symbols across strips for unassociated inventory items (same sprite may legitimately exist on multiple strips).
-		if (!string.IsNullOrEmpty(previousDefinitionKey) && IsGuid(previousDefinitionKey) && ReelStripDataManager.Instance != null)
+		if (previousDefinitionAccessorId != 0 && ReelStripDataManager.Instance != null)
 		{
 			var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
 			if (all != null)
 			{
-				// Copy values to avoid collection-modified exceptions while we remove symbols which may trigger updates
 				var strips = new List<ReelStripData>(all.Values);
 				foreach (var other in strips)
 				{
 					if (other == null) continue;
-					// Only target the strip referenced by the previousDefinitionKey (avoid aggressive cross-strip removals)
-					if (!string.Equals(other.InstanceKey, previousDefinitionKey, StringComparison.OrdinalIgnoreCase)) continue;
+					if (other.AccessorId != previousDefinitionAccessorId) continue;
 					var list = other.RuntimeSymbols;
 					if (list == null) continue;
 					for (int ri = list.Count - 1; ri >= 0; ri--)
@@ -229,7 +186,7 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 						if (!match && !string.IsNullOrEmpty(item.DisplayName) && string.Equals(rs.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) match = true;
 						if (match)
 						{
-							Debug.Log($"OnAddInventoryItem: removing matching symbol from other strip (instanceKey={other.InstanceKey}) as part of transfer.");
+							Debug.Log($"OnAddInventoryItem: removing matching symbol from other strip (accessorId={other.AccessorId}) as part of transfer.");
 							other.RemoveRuntimeSymbolAt(ri);
 							ReelStripDataManager.Instance.UpdateRuntimeStrip(other);
 						}
@@ -238,7 +195,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			}
 		}
 
-		// Prefer an explicit spriteKey stored on the inventory item. If absent, try to match a definition on the current strip.
 		Sprite sprite = null;
 		string spriteKey = null;
 		if (!string.IsNullOrEmpty(item.SpriteKey))
@@ -247,7 +203,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			sprite = AssetResolver.ResolveSprite(item.SpriteKey);
 		}
 
-		// If we still don't have a sprite, try to match definitions on the current strip (authoring assets)
 		SymbolDefinition matchedDef = null;
 		if (string.IsNullOrEmpty(spriteKey) && currentStrip != null && currentStrip.SymbolDefinitions != null)
 		{
@@ -274,7 +229,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			}
 		}
 
-		// If still not matched, try global definition search (covers runtime-only flows)
 		if (matchedDef == null)
 		{
 			var global = FindGlobalSymbolDefinition(item.DisplayName);
@@ -290,7 +244,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			}
 		}
 
-		// Diagnostic: report matched definition and resolved sprite key
 		Debug.Log($"OnAddInventoryItem: matchedDef={(matchedDef!=null?matchedDef.name:"<null>")} matchedDef.SymbolName={(matchedDef!=null?matchedDef.SymbolName:"<null>")} resolvedSpriteKey={spriteKey}");
 
 		if (matchedDef == null && string.IsNullOrEmpty(item.SpriteKey) && (item.SymbolAccessorId <= 0))
@@ -298,7 +251,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			throw new InvalidOperationException($"AddRemoveSymbolsMenu: inventory item '{item.DisplayName}' cannot be added because it has no matching SymbolDefinition, no spriteKey, and no SymbolAccessorId. Fix the inventory item or associate it with a definition.");
 		}
 
-		// Create a fresh runtime symbol instance for the target strip
 		SymbolData newRuntime = null;
 		if (matchedDef != null)
 		{
@@ -307,28 +259,25 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		}
 		else if (item.SymbolAccessorId > 0 && SymbolDataManager.Instance != null && SymbolDataManager.Instance.TryGetData(item.SymbolAccessorId, out var persisted))
 		{
-			// Clone persisted into a fresh runtime instance to avoid shared references across strips
 			newRuntime = new SymbolData(persisted.Name, persisted.Sprite, persisted.BaseValue, persisted.MinWinDepth, persisted.Weight, persisted.PayScaling, persisted.IsWild, persisted.AllowWildMatch, persisted.WinMode, persisted.TotalCountTrigger, persisted.MaxPerReel, persisted.MatchGroupId);
 			newRuntime.EventTriggerScript = persisted.EventTriggerScript;
 			if (newRuntime.Sprite != null) newRuntime.SetSpriteKey(newRuntime.Sprite.name);
 		}
 		else if (!string.IsNullOrEmpty(spriteKey) && sprite != null)
 		{
-			// Create minimal symbol data from sprite
 			newRuntime = new SymbolData(item.DisplayName ?? spriteKey, sprite, 0, -1, 1f, PayScaling.DepthSquared, false, true);
 			newRuntime.SetSpriteKey(spriteKey);
 		}
 		else
 		{
-			throw new InvalidOperationException($"AddRemoveSymbolsMenu: unable to construct runtime symbol for inventory item '{item.DisplayName}'.");
+			throw new InvalidOperationException($"AddRemoveSymbolsMenu: unable to construct runtime symbol for inventory item '{item.DisplayName}'.")
+;
 		}
 
-		// Add runtime and associate inventory
 		currentStrip.AddRuntimeSymbol(newRuntime);
-		item.SetDefinitionKey(currentStrip.InstanceKey);
+		item.SetDefinitionAccessorId(currentStrip.AccessorId);
 		item.SetSymbolAccessorId(newRuntime.AccessorId);
 
-		// Persist and refresh
 		ReelStripDataManager.Instance.UpdateRuntimeStrip(currentStrip);
 		LogRuntimeSymbols("After Add");
 		Refresh();
@@ -337,35 +286,19 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 	private void OnRemoveInventoryItem(InventoryItemData item)
 	{
 		if (item == null) return;
-		// Determine target strip: prefer the strip referenced by the inventory item (GUID) if present,
-		// otherwise fall back to the currently-open strip shown in the menu.
 		var pd = GamePlayer.Instance?.PlayerData; if (pd == null) return;
 
-		// By default operate on the strip currently shown in the menu. Only when there is no
-		// currently-open strip do we attempt to locate a target strip by the inventory item's
-		// DefinitionKey. This prevents accidentally removing symbols from other strips when
-		// the user is managing a different strip.
 		ReelStripData targetStrip = currentStrip;
-		if (targetStrip == null && !string.IsNullOrEmpty(item.DefinitionKey) && IsGuid(item.DefinitionKey) && ReelStripDataManager.Instance != null)
+		if (targetStrip == null && item.DefinitionAccessorId != 0 && ReelStripDataManager.Instance != null)
 		{
-			// try to find the strip that matches the inventory item's DefinitionKey
-			var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
-			if (all != null)
-			{
-				foreach (var kv in all)
-				{
-					var s = kv.Value; if (s == null) continue;
-					if (!string.IsNullOrEmpty(s.InstanceKey) && string.Equals(s.InstanceKey, item.DefinitionKey, StringComparison.OrdinalIgnoreCase)) { targetStrip = s; break; }
-				}
-			}
+			if (ReelStripDataManager.Instance.TryGetData(item.DefinitionAccessorId, out var found)) targetStrip = found;
 		}
 
 		if (targetStrip == null || ReelStripDataManager.Instance == null) return;
 
-		// If removing from the strip the item was associated with, disassociate it.
-		if (!string.IsNullOrEmpty(item.DefinitionKey) && targetStrip.InstanceKey == item.DefinitionKey)
+		if (item.DefinitionAccessorId != 0 && targetStrip.AccessorId == item.DefinitionAccessorId)
 		{
-			item.SetDefinitionKey(null);
+			item.SetDefinitionAccessorId(0);
 		}
 
 		LogRuntimeSymbols("Before Remove");
@@ -402,8 +335,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 		ReelStripDataManager.Instance.UpdateRuntimeStrip(targetStrip);
 
-		// If the menu is currently showing the same strip we removed from, refresh the menu; otherwise
-		// if we removed from a different strip we should still refresh to reflect inventory changes.
 		if (targetStrip == currentStrip)
 		{
 			LogRuntimeSymbols("After Remove");
@@ -411,15 +342,13 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		}
 		else
 		{
-			// If targetStrip differs from currentStrip, still log for diagnostics and refresh the menu
-			Debug.Log($"OnRemoveInventoryItem: removed symbol from other strip InstanceKey={targetStrip.InstanceKey}");
+			Debug.Log($"OnRemoveInventoryItem: removed symbol from other strip AccessorId={targetStrip.AccessorId}");
 			Refresh();
 		}
 	}
 
 	private void OnTransferInventoryItem(InventoryItemData item)
 	{
-		// Treat transfer same as add but item currently belongs to another strip
 		OnAddInventoryItem(item);
 	}
 }

@@ -10,7 +10,8 @@ public class ReelStripData : Data
     [SerializeField] private int stripSize;
     [SerializeField] private string[] symbolDefinitionKeys; // original authoring definition keys
     [SerializeField] private string definitionKey;          // reel strip definition asset key
-    [SerializeField] private string instanceKey;            // unique per runtime instance (used for per-strip associations)
+    // instance identifier replaced GUID-based key with integer accessor id for per-strip associations
+    [SerializeField] private int instanceId;                 // unique per runtime instance (used for per-strip associations)
 
     // New: Persist runtime symbol accessor ids so we can reconstruct mutable runtime symbols
     [SerializeField] private int[] runtimeSymbolAccessorIds; // parallel to runtimeSymbols list
@@ -33,7 +34,7 @@ public class ReelStripData : Data
     public int StripSize => stripSize;
     public SymbolDefinition[] SymbolDefinitions { get { EnsureResolved(); return symbolDefinitions; } }
     public ReelStripDefinition Definition { get { EnsureResolved(); return definition; } }
-    public string InstanceKey => instanceKey;
+    public int InstanceId => instanceId;
     public IReadOnlyList<SymbolData> RuntimeSymbols { get { EnsureResolved(); return runtimeSymbols; } }
     public bool IsEditLocked => editLocked;
 
@@ -54,7 +55,8 @@ public class ReelStripData : Data
         remainingCounts = fixedCounts != null ? (int[])fixedCounts.Clone() : null;
         internalPicksSoFar = 0;
         definitionKey = def != null ? def.name : null;
-        instanceKey = Guid.NewGuid().ToString();
+        // assign a runtime instance id (kept for non-manager identity if needed)
+        instanceId = GlobalAccessorIdProvider.GetNextId();
 
         if (symbolDefinitions != null)
         {

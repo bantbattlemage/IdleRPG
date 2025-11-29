@@ -40,6 +40,7 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
 
     /// <summary>
     /// Default load implementation ensures LocalData exists. Concrete managers should override to pull from GameData.
+    /// Also registers existing keys with the GlobalAccessorIdProvider so the global counter advances past them.
     /// </summary>
     public virtual void LoadData(GameData persistantData)
     {
@@ -47,6 +48,21 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
         if (LocalData == null)
         {
             LocalData = new SerializableDictionary<int, D>();
+        }
+
+        // If game data is present, register any existing keys so global id provider doesn't reuse them
+        if (persistantData != null)
+        {
+            // Attempt to initialize provider from persisted snapshot (GameData.LastAssignedAccessorId)
+            GlobalAccessorIdProvider.InitializeFromPersisted(persistantData.LastAssignedAccessorId);
+
+            if (LocalData != null)
+            {
+                foreach (var key in LocalData.Keys)
+                {
+                    GlobalAccessorIdProvider.RegisterExistingId(key);
+                }
+            }
         }
     }
 
@@ -59,6 +75,12 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
         if (LocalData == null)
         {
             LocalData = new SerializableDictionary<int, D>();
+        }
+
+        // Persist the global last assigned id into GameData so the provider can resume across sessions.
+        if (persistantData != null)
+        {
+            persistantData.LastAssignedAccessorId = GlobalAccessorIdProvider.SnapshotLastAssigned();
         }
     }
 
@@ -136,11 +158,14 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
             else
             {
                 LocalData.Add(newData.AccessorId, newData);
+                // Ensure global provider advances past this id
+                GlobalAccessorIdProvider.RegisterExistingId(newData.AccessorId);
                 return;
             }
         }
 
-        int id = GenerateUniqueAccessorId(LocalData.Keys);
+        // Use centralized provider to get globally unique id
+        int id = GlobalAccessorIdProvider.GetNextId();
         newData.AccessorId = id;
         LocalData.Add(id, newData);
     }
@@ -148,6 +173,7 @@ public abstract class DataManager<T, D> : Singleton<T>, IDataPersistence, IDataM
     /// <summary>
     /// Generates a compact unique id by selecting the max existing id and adding one.
     /// Falls back to a random unused id if int.MaxValue is reached.
+    /// Deprecated in favor of GlobalAccessorIdProvider but kept for compatibility if needed.
     /// </summary>
     protected int GenerateUniqueAccessorId(IEnumerable<int> existingIds)
     {

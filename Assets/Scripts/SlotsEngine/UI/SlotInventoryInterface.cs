@@ -39,14 +39,10 @@ public class SlotInventoryInterface : InventoryInterfaceBase
 			SlotsData foundSlot = null;
 			if (pd2?.CurrentSlots != null)
 			{
-				// Prefer explicit association via DefinitionKey (stores slot AccessorId)
-				if (!string.IsNullOrEmpty(itemData.DefinitionKey))
+				// Prefer explicit association via DefinitionAccessorId (stores slot AccessorId)
+				if (itemData.DefinitionAccessorId != 0)
 				{
-					if (int.TryParse(itemData.DefinitionKey, out var accessor) && accessor > 0)
-					{
-						foundSlot = pd2.CurrentSlots.Find(s => s != null && s.AccessorId == accessor);
-					}
-					// If accessor parsed as 0 or negative, treat as uninitialized/legacy and fall back to display-name matching
+					foundSlot = pd2.CurrentSlots.Find(s => s != null && s.AccessorId == itemData.DefinitionAccessorId);
 				}
 
 				// Fall back to legacy display name matching
@@ -81,7 +77,7 @@ public class SlotInventoryInterface : InventoryInterfaceBase
 		if (SlotDetailsInterface == null || slot == null)
 		{
 			// fallback to generic
-			ShowItemDetails(new InventoryItemData($"Slot {slot?.Index}", InventoryItemType.SlotEngine, slot?.BaseDefinition?.name));
+			ShowItemDetails(new InventoryItemData($"Slot {slot?.Index}", InventoryItemType.SlotEngine, slot?.BaseDefinition?.name != null ? 0 : 0));
 			return;
 		}
 

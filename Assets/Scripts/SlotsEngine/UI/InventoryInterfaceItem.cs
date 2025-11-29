@@ -19,7 +19,7 @@ public class InventoryInterfaceItem : MonoBehaviour
         onSelect = onSelectCallback;
         if (nameText != null) nameText.text = data?.DisplayName ?? "(unnamed)";
         if (typeText != null) typeText.text = data != null ? data.ItemType.ToString() : string.Empty;
-        if (idText != null) idText.text = data?.Id ?? string.Empty;
+        if (idText != null) idText.text = data != null ? data.Id.ToString() : string.Empty;
 
         if (removeButton != null)
         {

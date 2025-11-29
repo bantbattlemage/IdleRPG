@@ -33,30 +33,7 @@ public class ReelDetailItem : MonoBehaviour
 		// Try to use current reel strip; may be null for legacy/empty setups
 		var strip = data.CurrentReelStrip;
 
-		// Do NOT prefer the canonical manager-registered strip here. Using the manager instance can cause
-		// UI for different slots to reflect the same manager copy and create apparent cross-slot sharing.
-		// Display should reflect the reel's owned strip instance.
-		//if (strip != null && ReelStripDataManager.Instance != null)
-		//{
-		//    // First try by accessor id
-		//    if (strip.AccessorId > 0 && ReelStripDataManager.Instance.TryGetData(strip.AccessorId, out var canonicalById))
-		//    {
-		//        strip = canonicalById;
-		//    }
-		//    else if (!string.IsNullOrEmpty(strip.InstanceKey))
-		//    {
-		//        // fallback: search manager dictionary for matching instance key
-		//        var all = ReelStripDataManager.Instance.ReadOnlyLocalData;
-		//        if (all != null)
-		//        {
-		//            foreach (var kv in all)
-		//            {
-		//                var s = kv.Value; if (s == null) continue;
-		//                if (!string.IsNullOrEmpty(s.InstanceKey) && s.InstanceKey == strip.InstanceKey) { strip = s; break; }
-		//            }
-		//        }
-		//    }
-		//}
+		// Keep the strip reference owned by the reel; do not attempt string-key fallbacks.
 
 		lastStrip = strip; // cache for later menu wiring
 
@@ -177,10 +154,6 @@ public class ReelDetailItem : MonoBehaviour
 								if (rd == null) continue;
 
 								if (boundReel.AccessorId > 0 && rd.AccessorId == boundReel.AccessorId) { idx = i; break; }
-
-								var brStrip = boundReel.CurrentReelStrip;
-								var rdStrip = rd.CurrentReelStrip;
-								if (brStrip != null && rdStrip != null && !string.IsNullOrEmpty(brStrip.InstanceKey) && brStrip.InstanceKey == rdStrip.InstanceKey) { idx = i; break; }
 
 								if (ReferenceEquals(rd, boundReel)) { idx = i; break; }
 							}

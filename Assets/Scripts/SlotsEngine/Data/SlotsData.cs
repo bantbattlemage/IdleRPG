@@ -123,16 +123,18 @@ public class SlotsData : Data
 						foreach (var other in s.CurrentReelData)
 						{
 							if (other == null) continue;
-							// If this reel is referenced by another SlotsData (by accessor or reference) clone it so
-							// this slot receives a unique instance rather than sharing.
-							if ((reelData.AccessorId > 0 && other.AccessorId == reelData.AccessorId) || ReferenceEquals(other, reelData))
+							// If this reel is referenced by another SlotsData (by accessor or reference) prevent adding to expose upstream issues.
+							if (reelData.AccessorId > 0 && other.AccessorId == reelData.AccessorId)
 							{
-								Debug.Log($"[SlotsData] ReelData accessor={reelData.AccessorId} already referenced by another SlotsData (accessor={s.AccessorId}). Cloning ReelData instance for this slot.");
-								// perform clone
-								reelData = CloneReelData(reelData);
-								// continue checks against other slots using cloned instance
+								Debug.LogWarning($"[SlotsData] AddNewReel prevented: ReelData accessor={reelData.AccessorId} already referenced by another SlotsData (accessor={s.AccessorId}).");
+								return;
 							}
-						
+							if (ReferenceEquals(other, reelData))
+							{
+								Debug.LogWarning($"[SlotsData] AddNewReel prevented: ReelData instance already referenced by another SlotsData (accessor={s.AccessorId}).");
+								return;
+							}
+
 							// Prevent sharing any SymbolData between reels/slots
 							if (reelData.CurrentSymbolData != null && other.CurrentSymbolData != null)
 							{
@@ -168,22 +170,25 @@ public class SlotsData : Data
 		{
 			var existing = currentReelData[i];
 			if (existing == null) continue;
-			// If adding a reel whose accessor matches an existing one, clone to ensure uniqueness
+			// If adding a reel whose accessor matches an existing one, prevent adding to expose upstream issue
 			if (reelData.AccessorId > 0 && existing.AccessorId == reelData.AccessorId)
 			{
-				reelData = CloneReelData(reelData);
+				Debug.LogWarning($"[SlotsData] AddNewReel prevented: ReelData accessor={reelData.AccessorId} already present in slotAccessor={AccessorId}.");
+				return;
 			}
 			var r1 = reelData.CurrentReelStrip;
 			var r2 = existing.CurrentReelStrip;
-			if (r1 != null && r2 != null && !string.IsNullOrEmpty(r1.InstanceKey) && r1.InstanceKey == r2.InstanceKey)
+			// Only consider registered accessor ids for strip uniqueness. Do not rely on legacy string keys.
+			if (r1 != null && r2 != null && r1.AccessorId > 0 && r1.AccessorId == r2.AccessorId)
 			{
-				// Clone to avoid sharing the same strip instance
-				reelData = CloneReelData(reelData);
+				// Prevent sharing the same strip instance
+				Debug.LogWarning($"[SlotsData] AddNewReel prevented: ReelStrip AccessorId={r1.AccessorId} already used by another reel in this slot (slotAccessor={AccessorId}).");
+				return;
 			}
 			if (ReferenceEquals(existing, reelData))
 			{
-				// clone to ensure uniqueness
-				reelData = CloneReelData(reelData);
+				Debug.LogWarning($"[SlotsData] AddNewReel prevented: ReelData reference already present in this slot (slotAccessor={AccessorId}).");
+				return;
 			}
 		}
 
@@ -263,7 +268,8 @@ public class SlotsData : Data
 				if (reelData.AccessorId > 0 && existing.AccessorId == reelData.AccessorId) { Debug.LogWarning($"[SlotsData] Duplicate insert ignored for reelAccessor={reelData.AccessorId} on slotAccessor={AccessorId}"); return; }
 				var r1 = reelData.CurrentReelStrip;
 				var r2 = existing.CurrentReelStrip;
-				if (r1 != null && r2 != null && !string.IsNullOrEmpty(r1.InstanceKey) && r1.InstanceKey == r2.InstanceKey) { Debug.LogWarning($"[SlotsData] Duplicate insert (strip instance) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}"); return; }
+				// Only consider registered accessor ids for strip uniqueness. Do not rely on legacy string keys.
+				if (r1 != null && r2 != null && r1.AccessorId > 0 && r1.AccessorId == r2.AccessorId) { Debug.LogWarning($"[SlotsData] Duplicate insert (strip AccessorId) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}"); return; }
 				if (ReferenceEquals(existing, reelData)) { Debug.LogWarning($"[SlotsData] Duplicate insert (reference) ignored for slotAccessor={AccessorId}, reelAccessor={reelData.AccessorId}"); return; }
 			}
 		}
@@ -292,16 +298,13 @@ public class SlotsData : Data
 	private ReelData CloneReelData(ReelData src)
 	{
 		if (src == null) return null;
-		// Clone strip if present
 		ReelStripData clonedStrip = null;
 		try
 		{
 			var s = src.CurrentReelStrip;
 			if (s != null)
 			{
-				// Create an empty strip without auto-populated runtime symbols so we can clone explicitly
 				clonedStrip = new ReelStripData(s.Definition, s.StripSize, s.SymbolDefinitions, null, null, populateRuntimeSymbols: false);
-				// clear auto-populated symbols
 				var existing = clonedStrip.RuntimeSymbols != null ? clonedStrip.RuntimeSymbols.Count : 0;
 				for (int i = existing - 1; i >= 0; i--) clonedStrip.RemoveRuntimeSymbolAt(i);
 				if (s.RuntimeSymbols != null)
@@ -319,7 +322,6 @@ public class SlotsData : Data
 		}
 		catch (Exception ex) { Debug.LogWarning($"CloneReelData: failed to clone strip: {ex.Message}"); clonedStrip = null; }
 
-		// Create new ReelData copying core config and associating cloned strip
 		var clone = new ReelData(src.ReelSpinDuration, src.SymbolCount, null, src.BaseDefinition, clonedStrip ?? src.CurrentReelStrip);
 		if (ReelDataManager.Instance != null) ReelDataManager.Instance.AddNewData(clone);
 		return clone;

@@ -162,10 +162,10 @@ public abstract class InventoryInterfaceBase : MonoBehaviour
 
         if (ItemDetailsNameText != null) ItemDetailsNameText.text = item.DisplayName ?? "(unnamed)";
 
-        // Build a simple description: include type, id, and definition key if present
+        // Build a simple description: include type, id, and definition accessor id if present
         string desc = "";
         desc += $"Type: {item.ItemType}\n";
-        if (!string.IsNullOrEmpty(item.DefinitionKey)) desc += $"Definition: {item.DefinitionKey}\n";
+        if (item.DefinitionAccessorId != 0) desc += $"DefinitionAccessorId: {item.DefinitionAccessorId}\n";
         desc += $"ID: {item.Id}\n";
 
         if (ItemDetailsDescriptionText != null) ItemDetailsDescriptionText.text = desc;

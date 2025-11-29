@@ -39,9 +39,6 @@ public class GamePlayer : Singleton<GamePlayer>
 
 		playerData = PlayerDataManager.Instance.GetPlayerData();
 
-		// Initialize inventory if missing (legacy saved data support)
-		EnsureInventoryInitialized();
-
 		if (playerData.CurrentSlots == null || playerData.CurrentSlots.Count == 0)
 		{
 			SpawnSlots();
@@ -162,13 +159,13 @@ public class GamePlayer : Singleton<GamePlayer>
 				foreach (var s in slotItems)
 				{
 					if (s == null) continue;
-					// Prefer explicit DefinitionKey (accessor) match
-					if (!string.IsNullOrEmpty(s.DefinitionKey) && int.TryParse(s.DefinitionKey, out var accessor) && accessor > 0 && accessor == slot.CurrentSlotsData?.AccessorId)
+					// Prefer explicit DefinitionAccessorId match
+					if (s.DefinitionAccessorId != 0 && s.DefinitionAccessorId == slot.CurrentSlotsData?.AccessorId)
 					{
 						return true;
 					}
 					// Legacy fallback: display-name match for items that don't reference an accessor
-					if (string.IsNullOrEmpty(s.DefinitionKey) && s.DisplayName == ("Slot " + slot.CurrentSlotsData?.Index))
+					if (s.DefinitionAccessorId == 0 && s.DisplayName == ("Slot " + slot.CurrentSlotsData?.Index))
 					{
 						return true;
 					}
@@ -286,8 +283,8 @@ public class GamePlayer : Singleton<GamePlayer>
 						foreach (var s in slotItems)
 						{
 							if (s == null) continue;
-							// Prefer DefinitionKey match (stores accessor id) then fall back to display name matching
-							if (!string.IsNullOrEmpty(s.DefinitionKey) && int.TryParse(s.DefinitionKey, out var accessor) && accessor > 0 && accessor == slot.CurrentSlotsData?.AccessorId) { slotIsInventoryBacked = true; break; }
+							// Prefer DefinitionAccessorId match then fall back to display name matching
+							if (s.DefinitionAccessorId != 0 && s.DefinitionAccessorId == slot.CurrentSlotsData?.AccessorId) { slotIsInventoryBacked = true; break; }
 							if (s.DisplayName == ("Slot " + slot.CurrentSlotsData?.Index)) { slotIsInventoryBacked = true; break; }
 						}
 					}
@@ -439,7 +436,7 @@ public class GamePlayer : Singleton<GamePlayer>
 			if (createInventoryItems)
 			{
 				// Inventory registration for tracking
-				playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, newSlots.CurrentSlotsData.AccessorId.ToString()));
+				playerData.AddInventoryItem(new InventoryItemData("Slot " + newSlots.CurrentSlotsData.Index, InventoryItemType.SlotEngine, newSlots.CurrentSlotsData.AccessorId));
 
 				// NEW: Register runtime reel strips used by this slot and add associated symbol inventory items
 				try
@@ -486,17 +483,17 @@ public class GamePlayer : Singleton<GamePlayer>
 				{
 					if (reel == null) continue;
 					var strip = reel.CurrentReelStrip;
-					if (strip == null || string.IsNullOrEmpty(strip.InstanceKey)) continue;
+					if (strip == null) continue;
 
-					// Clear DefinitionKey for ReelStrip inventory items matching this strip
+					// Clear DefinitionAccessorId for ReelStrip inventory items matching this strip
 					var reelStripItems = playerData.GetItemsOfType(InventoryItemType.ReelStrip);
 					if (reelStripItems != null)
 					{
 						foreach (var item in reelStripItems)
 						{
-							if (item != null && item.DefinitionKey == strip.InstanceKey)
+							if (item != null && item.DefinitionAccessorId == strip.AccessorId)
 							{
-								item.SetDefinitionKey(null);
+								item.SetDefinitionAccessorId(0);
 							}
 						}
 					}
@@ -518,22 +515,22 @@ public class GamePlayer : Singleton<GamePlayer>
 						foreach (var sItem in slotItems)
 						{
 							if (sItem == null) continue;
-							// If the slot has a persisted accessor, prefer matching by DefinitionKey to avoid ambiguous display-name collisions
+							// If the slot has a persisted accessor, prefer matching by DefinitionAccessorId to avoid ambiguous display-name collisions
 							if (targetAccessor > 0)
 							{
-								if (!string.IsNullOrEmpty(sItem.DefinitionKey) && sItem.DefinitionKey == targetAccessor.ToString())
+								if (sItem.DefinitionAccessorId == targetAccessor)
 								{
 									sItem.SetDisplayName(slotDisplay + " (unassociated)");
-									sItem.SetDefinitionKey(null);
+									sItem.SetDefinitionAccessorId(0);
 								}
 							}
 							else
 							{
 								// Legacy fallback: only match by display name for items that don't already reference an accessor
-								if (string.IsNullOrEmpty(sItem.DefinitionKey) && sItem.DisplayName == slotDisplay)
+								if (sItem.DefinitionAccessorId == 0 && sItem.DisplayName == slotDisplay)
 								{
 									sItem.SetDisplayName(slotDisplay + " (unassociated)");
-									sItem.SetDefinitionKey(null);
+									sItem.SetDefinitionAccessorId(0);
 								}
 							}
 						}
@@ -662,7 +659,7 @@ public class GamePlayer : Singleton<GamePlayer>
 			{
 				slots.SpinOrStopReels(true);
 			}
-			else
+			else if(!spinPurchase && slots.CurrentState == State.Spinning)
 			{
 				// Request stop at engine level; engines will defer or ignore repeated requests.
 				slots.RequestStopWhenReady();
@@ -693,25 +690,17 @@ public class GamePlayer : Singleton<GamePlayer>
 		}
 	}
 
-	// --- Centralized inventory helper methods ---
-	private void EnsureInventoryInitialized()
-	{
-		if (playerData == null) return;
-		// Ensure PlayerData's Inventory getter will initialize a PlayerInventory if missing
-		var _ = playerData.Inventory;
-	}
-
 	private void AddSymbolInventory(Sprite sprite, string displayName = null)
 	{
 		if (playerData == null) return;
 		string name = string.IsNullOrEmpty(displayName) ? "Symbol" + (playerData.Inventory?.Items.Count + 1) : displayName;
 		if (sprite != null)
 		{
-			playerData.AddInventoryItem(new InventoryItemData(name, InventoryItemType.Symbol, null, sprite.name));
+			playerData.AddInventoryItem(new InventoryItemData(name, InventoryItemType.Symbol, 0, sprite.name));
 		}
 		else
 		{
-			playerData.AddInventoryItem(new InventoryItemData(name, InventoryItemType.Symbol, null));
+			playerData.AddInventoryItem(new InventoryItemData(name, InventoryItemType.Symbol, 0));
 		}
 	}
 

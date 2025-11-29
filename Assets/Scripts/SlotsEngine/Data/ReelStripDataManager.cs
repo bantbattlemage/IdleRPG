@@ -99,22 +99,6 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 		// Notify UI and other systems that a reel strip has changed so they can refresh
 		GlobalEventManager.Instance?.BroadcastEvent(SlotsEvent.ReelStripUpdated, strip);
 
-		// Editor/dev diagnostic: log runtime symbol details to help debug missing sprites
-		#if UNITY_EDITOR || DEVELOPMENT_BUILD
-		if (strip.RuntimeSymbols != null)
-		{
-			var sb = new System.Text.StringBuilder();
-			for (int i = 0; i < strip.RuntimeSymbols.Count; i++)
-			{
-				var s = strip.RuntimeSymbols[i];
-				if (s == null) { sb.Append("(null)"); }
-				else { sb.AppendFormat("{0}(id={1},key={2},hasSprite={3})", s.Name ?? "<unnamed>", s.AccessorId, string.IsNullOrEmpty(s.SpriteKey) ? "<none>" : s.SpriteKey, s.Sprite != null); }
-				if (i + 1 < strip.RuntimeSymbols.Count) sb.Append(", ");
-			}
-			Debug.Log($"ReelStripDataManager: Updated stripAccessorId={strip.AccessorId} runtimeSymbols=[{sb}]");
-		}
-		#endif
-
 		// Ensure any ReelData objects referencing this strip adopt the canonical updated instance so UI/engines read updated runtime symbols
 		// NOTE: Do NOT forcibly assign the manager's canonical strip instance into all ReelData objects. Doing so can create
 		// unintended shared references across slots. Instead, broadcast the update and let slot-specific UI/engine code adopt
@@ -153,7 +137,7 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 		if (LocalData.ContainsKey(strip.AccessorId))
 		{
 			LocalData.Remove(strip.AccessorId);
-			// Disassociate any inventory items pointing to this strip's instance key
+			// Disassociate any inventory items pointing to this strip's accessor id
 			var pd = GamePlayer.Instance?.PlayerData;
 			if (pd != null)
 			{
@@ -162,7 +146,7 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 				{
 					foreach (var inv in syms)
 					{
-						if (inv != null && inv.DefinitionKey == strip.InstanceKey) inv.SetDefinitionKey(null);
+						if (inv != null && inv.DefinitionAccessorId == strip.AccessorId) inv.SetDefinitionAccessorId(0);
 					}
 				}
 			}
@@ -205,7 +189,7 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 					if (i + 1 < strip.RuntimeSymbols.Count) sb.Append(", ");
 				}
 			}
-			Debug.Log($"[DebugDump] StripAccessor={strip.AccessorId} InstanceKey={strip.InstanceKey} runtimeSymbols=[{sb}]");
+			Debug.Log($"[DebugDump] StripAccessor={strip.AccessorId} runtimeSymbols=[{sb}]");
 		}
 	}
 }

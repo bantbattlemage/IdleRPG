@@ -18,32 +18,31 @@ public enum InventoryItemType
 [Serializable]
 public class InventoryItemData
 {
-	[SerializeField] private string id;
+	[SerializeField] private int id;
 	[SerializeField] private string displayName;
 	[SerializeField] private InventoryItemType itemType;
-	[SerializeField] private string definitionKey;
+	// Associate inventory items to runtime data entries by accessor id. 0 == unassociated.
+	[SerializeField] private int definitionAccessorId;
 	// Optional: explicit sprite key (asset name or addressable key) for resolving visuals.
 	[SerializeField] private string spriteKey;
 	// Persist optional reference to a SymbolData accessor id so inventory items can keep a stable reference
 	[SerializeField] private int symbolAccessorId;
 
-	public string Id => id;
+	public int Id => id;
 	public string DisplayName => displayName;
 	public InventoryItemType ItemType => itemType;
-	public string DefinitionKey => definitionKey;
+	public int DefinitionAccessorId => definitionAccessorId;
 	public string SpriteKey => spriteKey;
 	public int SymbolAccessorId => symbolAccessorId;
 
-	public InventoryItemData(string display, InventoryItemType type, string defKey)
+	public InventoryItemData(string display, InventoryItemType type, int defAccessorId = 0)
 	{
-		id = Guid.NewGuid().ToString();
+		id = GlobalAccessorIdProvider.GetNextId();
 		displayName = display;
 		itemType = type;
-		definitionKey = defKey;
+		definitionAccessorId = defAccessorId;
 		spriteKey = null;
 		symbolAccessorId = 0;
-
-		// If this is a Symbol-type inventory item but no explicit sprite key was supplied, leave symbolAccessorId unset.
 	}
 
 	/// <summary>
@@ -51,17 +50,15 @@ public class InventoryItemData
 	/// If the item is a Symbol and the sprite key resolves to a sprite, create a corresponding SymbolData and
 	/// register it with the SymbolDataManager so the inventory item holds a reference to the runtime SymbolData.
 	/// </summary>
-	public InventoryItemData(string display, InventoryItemType type, string defKey, string spriteKey)
+	public InventoryItemData(string display, InventoryItemType type, int defAccessorId, string spriteKey)
 	{
-		id = Guid.NewGuid().ToString();
+		id = GlobalAccessorIdProvider.GetNextId();
 		displayName = display;
 		itemType = type;
-		definitionKey = defKey;
+		definitionAccessorId = defAccessorId;
 		this.spriteKey = spriteKey;
 		symbolAccessorId = 0;
 
-		// If the item represents a Symbol and we have a spriteKey, create a SymbolData object and register it so
-		// the inventory can maintain a direct reference to runtime SymbolData.
 		if (itemType == InventoryItemType.Symbol && !string.IsNullOrEmpty(this.spriteKey))
 		{
 			try
@@ -69,7 +66,6 @@ public class InventoryItemData
 				Sprite sprite = AssetResolver.ResolveSprite(this.spriteKey);
 				if (sprite != null)
 				{
-					// Prefer to derive the runtime SymbolData's name and canonical spriteKey from a matching SymbolDefinition
 					string symbolNameForData = displayName;
 					if (SymbolDefinitionManager.Instance != null)
 					{
@@ -96,10 +92,10 @@ public class InventoryItemData
 		}
 	}
 
-	// Update association key and request persistence save.
-	public void SetDefinitionKey(string newKey)
+	// Update association to a runtime data accessor id and request persistence save.
+	public void SetDefinitionAccessorId(int newAccessorId)
 	{
-		definitionKey = newKey;
+		definitionAccessorId = newAccessorId;
 		DataPersistenceManager.Instance?.RequestSave();
 	}
 
@@ -155,7 +151,7 @@ public class PlayerInventory
 		return items.FindAll(i => i.ItemType == type);
 	}
 
-	public InventoryItemData FindById(string id)
+	public InventoryItemData FindById(int id)
 	{
 		return items.Find(i => i.Id == id);
 	}
