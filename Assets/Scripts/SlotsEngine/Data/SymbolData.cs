@@ -89,6 +89,18 @@ public class SymbolData : Data
 		}
 	}
 
+	/// <summary>
+	/// Ensures RuntimeEventTrigger is initialized from the serialized eventTriggerScript.
+	/// Call this after deserialization (loading from save data) to restore event functionality.
+	/// </summary>
+	public void EnsureRuntimeEventTriggerInitialized()
+	{
+		if (RuntimeEventTrigger == null && eventTriggerScript != null)
+		{
+			RuntimeEventTrigger = eventTriggerScript as IEventTriggerScript;
+		}
+	}
+
 	// Backwards-compatible constructor (previous signature)
 	public SymbolData(string symbolName, Sprite symbolSprite, int baseVal, int minDepth, float symbolWeight, PayScaling scaling = PayScaling.DepthSquared, bool wild = false, bool allowWild = true)
 		: this(symbolName, symbolSprite, baseVal, minDepth, symbolWeight, scaling, wild, allowWild, SymbolWinMode.LineMatch, -1, -1, -1)

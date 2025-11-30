@@ -5,6 +5,18 @@ public class SymbolDataManager : DataManager<SymbolDataManager, SymbolData>
 	public override void LoadData(GameData persistantData)
 	{
 		LocalData = persistantData.CurrentSymbolData;
+		
+		// After loading, ensure RuntimeEventTrigger is initialized for all symbols
+		if (LocalData != null)
+		{
+			foreach (var symbolData in LocalData.Values)
+			{
+				if (symbolData != null)
+				{
+					symbolData.EnsureRuntimeEventTriggerInitialized();
+				}
+			}
+		}
 	}
 
 	public override void SaveData(GameData persistantData)

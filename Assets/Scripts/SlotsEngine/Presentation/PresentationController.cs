@@ -128,7 +128,8 @@ public class PresentationController : Singleton<PresentationController>
                     sd.IncrementPendingCallbacks();
                     try
                     {
-                        trigger.Execute(w, () => { sd.DecrementPendingCallbacks(); });
+                        // Pass the SlotsEngine to the trigger so it can build proper context
+                        trigger.Execute(w, () => { sd.DecrementPendingCallbacks(); }, slotsToPresent);
                     }
                     catch
                     {
