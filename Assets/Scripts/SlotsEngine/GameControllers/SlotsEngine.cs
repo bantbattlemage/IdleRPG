@@ -134,7 +134,6 @@ public class SlotsEngine : MonoBehaviour
 								var clone = new ReelData(rd.ReelSpinDuration, rd.SymbolCount, null, rd.BaseDefinition, clonedStrip ?? rd.CurrentReelStrip);
 								if (ReelDataManager.Instance != null) ReelDataManager.Instance.AddNewData(clone);
 								currentSlotsData.CurrentReelData[i] = clone;
-								Debug.Log($"[SlotsEngine] Cloned shared ReelData accessor={rd.AccessorId} -> newAccessor={clone.AccessorId} for slotAccessor={currentSlotsData.AccessorId}");
 							}
 							catch (Exception ex)
 							{
@@ -791,8 +790,6 @@ public class SlotsEngine : MonoBehaviour
 		int common = Math.Min(oldCount, newCount);
 		int visualCount = reels?.Count ?? 0;
 
-		Debug.Log($"[SlotsEngine] TryApplySlotsDataUpdate start oldCount={oldCount} newCount={newCount} reelsListCount={visualCount}");
-
 		// Update existing visuals where the data reference has changed for indexes covered by both lists and visuals
 		int updateLimit = Math.Min(common, visualCount);
 		for (int i = 0; i < updateLimit; i++)
@@ -805,7 +802,6 @@ public class SlotsEngine : MonoBehaviour
 					if (i < reels.Count && reels[i] != null)
 					{
 						reels[i].InitializeReel(newList[i], i, eventManager, strip, this);
-						Debug.Log($"[SlotsEngine] Updated existing reel index={i} stripAccessor={strip?.AccessorId} rdAccessor={newList[i]?.AccessorId}");
 					}
 					if (currentSlotsData != null && currentSlotsData.CurrentReelData != null && i < currentSlotsData.CurrentReelData.Count)
 					{
@@ -829,7 +825,6 @@ public class SlotsEngine : MonoBehaviour
 					var rd = newList[i];
 					if (rd == null)
 					{
-						Debug.LogWarning($"[SlotsEngine] Skipping add at index={i}: newList entry is null");
 						continue;
 					}
 					var strip = rd.CurrentReelStrip ?? rd.DefaultReelStrip;
@@ -839,7 +834,6 @@ public class SlotsEngine : MonoBehaviour
 					var reel = g.GetComponent<GameReel>();
 					reel.InitializeReel(rd, i, eventManager, strip, this);
 					reels.Add(reel);
-					Debug.Log($"[SlotsEngine] Added missing visual reel index={i} rdAccessor={rd.AccessorId} stripAccessor={strip?.AccessorId}. reelsCountNow={reels.Count}");
 				}
 				catch (Exception ex)
 				{
@@ -860,7 +854,6 @@ public class SlotsEngine : MonoBehaviour
 					{
 						var reelToRemove = reels[i];
 						RemoveReel(reelToRemove);
-						Debug.Log($"[SlotsEngine] Removed excess visual reel index={i}. reelsCountNow={reels.Count}");
 					}
 				}
 				catch (Exception ex)
@@ -875,7 +868,6 @@ public class SlotsEngine : MonoBehaviour
 
 		try { RepositionReels(); RegenerateAllReelDummies(); } catch { }
 
-		Debug.Log($"[SlotsEngine] TryApplySlotsDataUpdate end reelsCount={reels?.Count ?? 0} dataReels={currentSlotsData?.CurrentReelData?.Count ?? 0}");
 		return true;
 	}
 }

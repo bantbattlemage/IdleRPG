@@ -305,7 +305,7 @@ public class ReelStripData : Data
         EnsureResolved();
         if (editLocked)
         {
-            Debug.LogWarning("ReelStripData: Attempted to edit strip while spin is active. Edit ignored.");
+            // Silent ignore when edit is locked to avoid noisy logs during spin
             return;
         }
         if (symbol == null) return;
@@ -320,15 +320,13 @@ public class ReelStripData : Data
         EnsureResolved();
         if (editLocked)
         {
-            Debug.LogWarning("ReelStripData: Attempted to edit strip while spin is active. Edit ignored.");
+            // Silent ignore when edit is locked to avoid noisy logs during spin
             return;
         }
         if (runtimeSymbols == null || index < 0 || index >= runtimeSymbols.Count) return;
 
-        Debug.Log($"ReelStripData.RemoveRuntimeSymbolAt: removing index={index} currentCount={runtimeSymbols.Count}");
         var sym = runtimeSymbols[index];
         runtimeSymbols.RemoveAt(index);
-        Debug.Log($"ReelStripData.RemoveRuntimeSymbolAt: removed. newCount={runtimeSymbols.Count}");
         SyncPersistenceArrays();
         ReelStripDataManager.Instance.UpdateRuntimeStrip(this);
         CleanupSymbolIfOrphan(sym);
@@ -339,13 +337,11 @@ public class ReelStripData : Data
         EnsureResolved();
         if (editLocked)
         {
-            Debug.LogWarning("ReelStripData: Attempted to edit strip while spin is active. Edit ignored.");
+            // Silent ignore when edit is locked to avoid noisy logs during spin
             return;
         }
         if (runtimeSymbols == null || symbol == null) return;
-        Debug.Log($"ReelStripData.RemoveRuntimeSymbol: attempting to remove symbol accessor={symbol.AccessorId} name={symbol.Name} countBefore={runtimeSymbols.Count}");
         bool removed = runtimeSymbols.Remove(symbol);
-        Debug.Log($"ReelStripData.RemoveRuntimeSymbol: removed={removed} newCount={runtimeSymbols?.Count}");
         if (!removed) return;
         SyncPersistenceArrays();
         ReelStripDataManager.Instance.UpdateRuntimeStrip(this);

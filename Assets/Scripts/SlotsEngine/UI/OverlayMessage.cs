@@ -17,7 +17,7 @@ public class OverlayMessage : MonoBehaviour
 
 	void Start()
 	{
-		CreateConfirmCancelPanel("here are two choices", () => { DestroyMessage(); Debug.Log("Confirm"); }, () => { DestroyMessage(); Debug.Log("Cancel"); });
+		CreateConfirmCancelPanel("here are two choices", () => { DestroyMessage(); }, () => { DestroyMessage(); });
 	}
 
 	public void InitializeMessage(List<OverlayPanelSettings> panels = null, List<OverlayButtonSettings> buttons = null, string header = "")
@@ -71,7 +71,7 @@ public class OverlayMessage : MonoBehaviour
 		List<OverlayButtonSettings> buttonGroups = new List<OverlayButtonSettings>();
 		for (int i = 0; i < 3; i++)
 		{
-			UnityAction buttonCallback = () => { Debug.Log("Button clicked"); DestroyMessage(); };
+			UnityAction buttonCallback = () => { DestroyMessage(); };
 			string label = $"test{i}";
 
 			buttonGroups.Add(new OverlayButtonSettings(){ ButtonCallback = buttonCallback , ButtonLabel = label });

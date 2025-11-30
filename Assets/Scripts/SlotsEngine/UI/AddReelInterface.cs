@@ -52,16 +52,6 @@ public class AddReelInterface : MonoBehaviour
 		var allReels = ReelDataManager.Instance != null ? ReelDataManager.Instance.GetAllData() : new List<ReelData>();
 		var allSlots = SlotsDataManager.Instance != null ? SlotsDataManager.Instance.GetAllData() : new List<SlotsData>();
 
-		// Diagnostic: log counts and basic info to help reproduce missing reels
-		Debug.Log($"[AddReelInterface] Refresh called. allReels.Count={allReels.Count}, allSlots.Count={allSlots.Count}, targetSlotIndex={current.Index}, targetSlotAccessor={current.AccessorId}");
-		for (int r = 0; r < allReels.Count; r++)
-		{
-			var rr = allReels[r];
-			if (rr == null) { Debug.Log($"[AddReelInterface] Reel[{r}] is null"); continue; }
-			var rs = rr.CurrentReelStrip;
-			Debug.Log($"[AddReelInterface] Reel[{r}] accessor={rr.AccessorId} symbolCount={rr.CurrentSymbolData?.Count ?? 0} stripAccessor={rs?.AccessorId ?? 0}");
-		}
-
 		int shownIndex = 0;
 		for (int i = 0; i < allReels.Count; i++)
 		{
@@ -69,7 +59,6 @@ public class AddReelInterface : MonoBehaviour
 			if (rd == null) continue;
 			if (IsAssociatedWithAnySlot(rd, allSlots))
 			{
-				Debug.Log($"[AddReelInterface] Skipping Reel accessor={rd.AccessorId} because it is associated with a slot.");
 				continue; // only show unassociated reels
 			}
 
@@ -120,7 +109,6 @@ public class AddReelInterface : MonoBehaviour
 				// match by accessor id on ReelData
 				if (reel.AccessorId > 0 && rd.AccessorId == reel.AccessorId)
 				{
-					Debug.Log($"[AddReelInterface] Reel accessor={reel.AccessorId} is associated with Slot accessor={s.AccessorId} by Reel.AccessorId match.");
 					return true;
 				}
 
@@ -130,7 +118,6 @@ public class AddReelInterface : MonoBehaviour
 				{
 					if (reelStripCanonical.AccessorId > 0 && rdStripCanonical.AccessorId == reelStripCanonical.AccessorId)
 					{
-						Debug.Log($"[AddReelInterface] Reel accessor={reel.AccessorId} is associated with Slot accessor={s.AccessorId} by canonical strip AccessorId match ({reelStripCanonical.AccessorId}).");
 						return true;
 					}
 				}
@@ -138,7 +125,6 @@ public class AddReelInterface : MonoBehaviour
 				// fallback to reference equality
 				if (ReferenceEquals(rd, reel))
 				{
-					Debug.Log($"[AddReelInterface] Reel accessor={reel.AccessorId} is associated with Slot accessor={s.AccessorId} by reference equality.");
 					return true;
 				}
 			}

@@ -121,27 +121,8 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 
 	private void LogRuntimeSymbols(string prefix)
 	{
-		if (currentStrip == null) { Debug.Log($"{prefix}: currentStrip is null"); return; }
-		var list = currentStrip.RuntimeSymbols;
-		if (list == null) { Debug.Log($"{prefix}: runtimeSymbols is null"); return; }
-
-		// Build a detailed view: index:Name(id,key,hasSprite)
-		var names = new System.Text.StringBuilder();
-		for (int i = 0; i < list.Count; i++)
-		{
-			var s = list[i];
-			if (s == null)
-			{
-				names.Append("(null)");
-			}
-			else
-			{
-				bool hasSprite = s.Sprite != null;
-				names.AppendFormat("{0}(id={1},key={2},hasSprite={3})", s.Name ?? "<unnamed>", s.AccessorId, string.IsNullOrEmpty(s.SpriteKey) ? "<none>" : s.SpriteKey, hasSprite);
-			}
-			if (i + 1 < list.Count) names.Append(", ");
-		}
-		Debug.Log($"{prefix}: stripAccessorId={currentStrip.AccessorId} runtimeSymbols=[{names}]");
+		// Diagnostic logging intentionally removed to avoid noisy runtime logs in UI code.
+		return;
 	}
 
 	// Helper: find a global SymbolDefinition by flexible key (uses manager's matching logic)
@@ -157,10 +138,9 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		if (item == null || currentStrip == null) return;
 		var pd = GamePlayer.Instance?.PlayerData; if (pd == null) return;
 
-		// Diagnostic: log incoming inventory item details
-		Debug.Log($"OnAddInventoryItem: incoming item DisplayName='{item.DisplayName}' SpriteKey='{item.SpriteKey}' SymbolAccessorId={item.SymbolAccessorId} DefinitionAccessorId='{item.DefinitionAccessorId}'");
-
 		int previousDefinitionAccessorId = item.DefinitionAccessorId;
+
+		// Removed diagnostic log
 
 		LogRuntimeSymbols("Before Add");
 
@@ -186,7 +166,6 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 						if (!match && !string.IsNullOrEmpty(item.DisplayName) && string.Equals(rs.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase)) match = true;
 						if (match)
 						{
-							Debug.Log($"OnAddInventoryItem: removing matching symbol from other strip (accessorId={other.AccessorId}) as part of transfer.");
 							other.RemoveRuntimeSymbolAt(ri);
 							ReelStripDataManager.Instance.UpdateRuntimeStrip(other);
 						}
@@ -244,7 +223,7 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			}
 		}
 
-		Debug.Log($"OnAddInventoryItem: matchedDef={(matchedDef!=null?matchedDef.name:"<null>")} matchedDef.SymbolName={(matchedDef!=null?matchedDef.SymbolName:"<null>")} resolvedSpriteKey={spriteKey}");
+		// Removed diagnostic log
 
 		if (matchedDef == null && string.IsNullOrEmpty(item.SpriteKey) && (item.SymbolAccessorId <= 0))
 		{
@@ -313,17 +292,17 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 			if (item.SymbolAccessorId > 0 && rs.AccessorId == item.SymbolAccessorId)
 			{
 				matched = true;
-				Debug.Log($"OnRemoveInventoryItem: matched by SymbolAccessorId (item={item.SymbolAccessorId}) to runtimeSymbol AccessorId={rs.AccessorId}");
+				// diagnostic log removed
 			}
 			else if (!string.IsNullOrEmpty(item.SpriteKey) && !string.IsNullOrEmpty(rs.SpriteKey) && string.Equals(rs.SpriteKey, item.SpriteKey, StringComparison.OrdinalIgnoreCase))
 			{
 				matched = true;
-				Debug.Log($"OnRemoveInventoryItem: matched by SpriteKey (item={item.SpriteKey}) to runtimeSymbol SpriteKey={rs.SpriteKey}");
+				// diagnostic log removed
 			}
 			else if (!string.IsNullOrEmpty(item.DisplayName) && string.Equals(rs.Name, item.DisplayName, StringComparison.OrdinalIgnoreCase))
 			{
 				matched = true;
-				Debug.Log($"OnRemoveInventoryItem: matched by Name (item={item.DisplayName}) to runtimeSymbol Name={rs.Name}");
+				// diagnostic log removed
 			}
 
 			if (matched)
@@ -342,7 +321,7 @@ public class AddRemoveSymbolsMenu : MonoBehaviour
 		}
 		else
 		{
-			Debug.Log($"OnRemoveInventoryItem: removed symbol from other strip AccessorId={targetStrip.AccessorId}");
+			// informational log removed
 			Refresh();
 		}
 	}

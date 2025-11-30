@@ -40,7 +40,6 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		if (isNew)
 		{
 			AddNewData(slotsData);
-			Debug.Log($"[SlotsDataManager] Added new SlotsData accessor={slotsData.AccessorId} index={slotsData.Index} reels={slotsData.CurrentReelData?.Count ?? 0}");
 		}
 		else
 		{
@@ -50,7 +49,6 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 				if (reel != null && reel.AccessorId == 0)
 				{
 					ReelDataManager.Instance.AddNewData(reel);
-					Debug.Log($"[SlotsDataManager] Registered new ReelData for slot accessor={slotsData.AccessorId}, reelAccessor={reel.AccessorId}");
 				}
 			}
 
@@ -58,7 +56,6 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 
 			// Replace stored reference
 			LocalData[slotsData.AccessorId] = slotsData;
-			Debug.Log($"[SlotsDataManager] Updated SlotsData accessor={slotsData.AccessorId} reels={slotsData.CurrentReelData?.Count ?? 0}");
 		}
 
 		// Debounced save request instead of immediate disk write
@@ -82,15 +79,11 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 			return;
 		}
 
-		// Log before applying to engine
-		Debug.Log($"[SlotsDataManager] Applying update to engine slotAccessor={slotsData.AccessorId}, state={engine.CurrentState}, engineReels={engine.CurrentReels?.Count ?? 0}, dataReels={slotsData.CurrentReelData?.Count ?? 0}");
-
 		try
 		{
 			// Try a surgical update first; this will throw if engine is spinning
 			engine.TryApplySlotsDataUpdate(slotsData);
 			SlotsEngineManager.Instance.AdjustSlotCanvas(engine);
-			Debug.Log($"[SlotsDataManager] Applied TryApplySlotsDataUpdate successfully for slotAccessor={slotsData.AccessorId}. EngineReels now={engine.CurrentReels?.Count ?? 0}");
 		}
 		catch (System.InvalidOperationException ex)
 		{
@@ -105,7 +98,6 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 				Debug.LogWarning($"[SlotsDataManager] TryApplySlotsDataUpdate failed for slotAccessor={slotsData.AccessorId}. Reinitializing engine. Error: {ex.Message}");
 				engine.InitializeSlotsEngine(engine.ReelsRootTransform, slotsData);
 				SlotsEngineManager.Instance.AdjustSlotCanvas(engine);
-				Debug.Log($"[SlotsDataManager] Engine reinitialized for slotAccessor={slotsData.AccessorId}. EngineReels now={engine.CurrentReels?.Count ?? 0}");
 			}
 			else
 			{
@@ -121,19 +113,9 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 
 		if (LocalData.ContainsKey(data.AccessorId))
 		{
-			// Do NOT remove contained reel & symbol data here. Keeping ReelData and SymbolData
-			// allows previously created runtime reels/strips to remain available in the AddReel UI
-			// so players can re-use them across slots.
-			//
-			// Previous behavior removed each contained ReelData via ReelDataManager.Instance.RemoveDataIfExists(reel);
-			// That caused runtime reels to disappear from the ReelDataManager and made them unavailable
-			// for reattachment to new slots. To preserve player-owned runtime data, we only remove
-			// the SlotsData entry itself.
-
 			LocalData.Remove(data.AccessorId);
 			// Debounced save
 			DataPersistenceManager.Instance?.RequestSave();
-			Debug.Log($"[SlotsDataManager] Removed SlotsData accessor={data.AccessorId}");
 		}
 	}
 
@@ -143,6 +125,5 @@ public class SlotsDataManager : DataManager<SlotsDataManager, SlotsData>
 		ReelDataManager.Instance.ClearData();
 		SymbolDataManager.Instance.ClearData();
 		DataPersistenceManager.Instance?.RequestSave();
-		Debug.Log("[SlotsDataManager] Cleared all slots, reels, symbols data.");
 	}
 }

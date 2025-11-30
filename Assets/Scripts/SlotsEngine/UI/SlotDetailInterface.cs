@@ -109,32 +109,6 @@ public class SlotDetailInterface : MonoBehaviour
 		// Force layout rebuild to ensure first-time visuals are correct
 		Canvas.ForceUpdateCanvases();
 		if (ReelDetailsRoot != null) LayoutRebuilder.ForceRebuildLayoutImmediate(ReelDetailsRoot);
-
-		// Diagnostic dump: log canonical manager strips and mapping for current slot to help debug mismatched instances
-		try
-		{
-			if (ReelStripDataManager.Instance != null)
-			{
-				ReelStripDataManager.Instance.DebugDumpAllRuntimeSymbols();
-			}
-
-			if (current != null && current.CurrentReelData != null)
-			{
-				for (int i = 0; i < current.CurrentReelData.Count; i++)
-				{
-					var rd = current.CurrentReelData[i];
-					if (rd == null) { Debug.Log($"SlotDetailInterface: Reel[{i}] has null ReelData"); continue; }
-					var strip = rd.CurrentReelStrip;
-					if (strip == null) { Debug.Log($"SlotDetailInterface: Reel[{i}] CurrentReelStrip is null"); continue; }
-					int runtimeCount = strip.RuntimeSymbols != null ? strip.RuntimeSymbols.Count : 0;
-					Debug.Log($"SlotDetailInterface: Reel[{i}] -> stripAccessor={strip.AccessorId} runtimeCount={runtimeCount}");
-				}
-			}
-		}
-		catch (System.Exception ex)
-		{
-			Debug.LogWarning($"SlotDetailInterface: diagnostic dump failed: {ex.Message}");
-		}
 	}
 
 	public void Refresh()

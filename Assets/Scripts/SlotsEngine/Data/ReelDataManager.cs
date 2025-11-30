@@ -17,16 +17,14 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 	{
 		int beforeCount = LocalData != null ? LocalData.Count : 0;
 		int incomingAccessor = newData != null ? newData.AccessorId : -1;
-		UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: incomingAccessor={incomingAccessor}, localBefore={beforeCount}");
+
 		// If this ReelData already has a persisted AccessorId and is present in LocalData, avoid re-adding
 		if (newData != null && newData.AccessorId > 0 && LocalData != null && LocalData.ContainsKey(newData.AccessorId))
 		{
-			UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: accessor {newData.AccessorId} already present, skipping");
 			return;
 		}
 		base.AddNewData(newData);
 		int afterCount = LocalData != null ? LocalData.Count : 0;
-		UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: added accessor={newData?.AccessorId ?? -1}, localAfter={afterCount}");
 
 		if (newData?.CurrentSymbolData != null && SymbolDataManager.Instance != null)
 		{
@@ -35,12 +33,7 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 				var sym = newData.CurrentSymbolData[i];
 				if (sym != null && sym.AccessorId == 0)
 				{
-					UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: registering new SymbolData for reelAccessor={newData.AccessorId} symbolName={sym.Name}");
 					SymbolDataManager.Instance.AddNewData(sym);
-				}
-				else if (sym != null)
-				{
-					UnityEngine.Debug.Log($"[Diag] ReelDataManager.AddNewData: skipping persisted SymbolData name={sym.Name} accessor={sym.AccessorId}");
 				}
 			}
 
@@ -48,7 +41,6 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 		}
 
 		DataPersistenceManager.Instance?.RequestSave();
-		UnityEngine.Debug.Log($"[ReelDataManager] Added new ReelData accessor={newData.AccessorId}, symbolCount={newData.CurrentSymbolData?.Count ?? 0}, stripAccessor={newData.CurrentReelStrip?.AccessorId}");
 	}
 
 	public void RemoveDataIfExists(ReelData data)
@@ -70,7 +62,6 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 		{
 			LocalData.Remove(data.AccessorId);
 			DataPersistenceManager.Instance?.RequestSave();
-			UnityEngine.Debug.Log($"[ReelDataManager] Removed ReelData accessor={data.AccessorId}");
 		}
 	}
 
@@ -97,6 +88,5 @@ public class ReelDataManager : DataManager<ReelDataManager, ReelData>
 
 		reelData.SetCurrentSymbolData(list);
 		DataPersistenceManager.Instance?.RequestSave();
-		UnityEngine.Debug.Log($"[ReelDataManager] SoftUpdateSymbolCount reelAccessor={reelData.AccessorId}, desiredCount={desiredCount}, actualCount={list.Count}");
 	}
 }

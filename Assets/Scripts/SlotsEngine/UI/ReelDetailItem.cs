@@ -80,7 +80,6 @@ public class ReelDetailItem : MonoBehaviour
 					itm.Setup((SymbolDefinition)null, i);
 				}
 			}
-			Debug.Log($"[ReelDetailItem] Setup boundReelAccessor={boundReel.AccessorId}, stripAccessor={strip?.AccessorId}, runtimeCount={runtimeLen}, target={target}");
 		}
 		else
 		{
@@ -161,7 +160,6 @@ public class ReelDetailItem : MonoBehaviour
 
 						if (idx >= 0 && idx < engine.CurrentReels.Count)
 						{
-							Debug.Log($"[ReelDetailItem] Removing reel idx={idx} for slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}");
 							engine.RemoveReel(engine.CurrentReels[idx]);
 							SlotsDataManager.Instance?.UpdateSlotsData(engine.CurrentSlotsData);
 							onRemoved?.Invoke();
@@ -177,7 +175,6 @@ public class ReelDetailItem : MonoBehaviour
 				// Fallback: no live engine found - operate on data model directly
 				boundSlot.RemoveReel(boundReel);
 				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
-				Debug.Log($"[ReelDetailItem] Removed reel via data-only path for slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}");
 				onRemoved?.Invoke();
 			}
 			catch (System.Exception ex)
@@ -230,7 +227,6 @@ public class ReelDetailItem : MonoBehaviour
 
 				if (boundReel.AccessorId == 0) ReelDataManager.Instance?.AddNewData(boundReel);
 				SlotsDataManager.Instance?.UpdateSlotsData(boundSlot);
-				Debug.Log($"[ReelDetailItem] Added reel to slotAccessor={boundSlot.AccessorId}, reelAccessor={boundReel.AccessorId}. dataReels={boundSlot.CurrentReelData?.Count ?? 0}");
 				onAdded?.Invoke();
 			}
 			catch (System.Exception ex)

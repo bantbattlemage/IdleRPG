@@ -15,9 +15,6 @@ public class ReelSymbolDetailItem : MonoBehaviour
 
 	public void Setup(SymbolData data, int index)
 	{
-		// Diagnostic: report incoming data
-		Debug.Log($"ReelSymbolDetailItem.Setup(SymbolData) index={index} name={(data != null ? data.Name : "<null>")} hasSprite={(data != null && data.Sprite != null)}");
-
 		Sprite sprite = null;
 		if (data != null)
 		{
@@ -70,9 +67,6 @@ public class ReelSymbolDetailItem : MonoBehaviour
 
 	public void Setup(SymbolDefinition def, int index)
 	{
-		// Diagnostic
-		Debug.Log($"ReelSymbolDetailItem.Setup(SymbolDefinition) index={index} name={(def != null ? def.SymbolName : "<null>")} hasSprite={(def != null && def.SymbolSprite != null)}");
-
 		Sprite sprite = null;
 		if (def != null)
 		{

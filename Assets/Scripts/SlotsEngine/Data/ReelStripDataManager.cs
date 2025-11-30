@@ -16,13 +16,7 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 	public override void AddNewData(ReelStripData newData)
 	{
 		if (newData == null) return;
-		int beforeCount = LocalData != null ? LocalData.Count : 0;
-		int incomingAccessor = newData.AccessorId;
-		int symbolsToRegister = newData.RuntimeSymbols != null ? newData.RuntimeSymbols.Count : 0;
-		Debug.Log($"[Diag] ReelStripDataManager.AddNewData: incomingAccessor={incomingAccessor}, symbolsCount={symbolsToRegister}, localBefore={beforeCount}");
 		base.AddNewData(newData);
-		int afterCount = LocalData != null ? LocalData.Count : 0;
-		Debug.Log($"[Diag] ReelStripDataManager.AddNewData: added accessor={newData.AccessorId}, localAfter={afterCount}");
 		var list = newData.RuntimeSymbols;
 		if (list != null && SymbolDataManager.Instance != null)
 		{
@@ -33,12 +27,7 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 				// be loaded by SymbolDataManager.LoadData and should not be duplicated here.
 				if (sym != null && sym.AccessorId == 0)
 				{
-					Debug.Log($"[Diag] ReelStripDataManager.AddNewData: registering new SymbolData (name={sym.Name}, accessor=0)");
 					SymbolDataManager.Instance.AddNewData(sym);
-				}
-				else if (sym != null)
-				{
-					Debug.Log($"[Diag] ReelStripDataManager.AddNewData: skipping registration for persisted SymbolData name={sym.Name}, accessor={sym.AccessorId}");
 				}
 			}
 		}
@@ -98,37 +87,6 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 		DataPersistenceManager.Instance?.RequestSave();
 		// Notify UI and other systems that a reel strip has changed so they can refresh
 		GlobalEventManager.Instance?.BroadcastEvent(SlotsEvent.ReelStripUpdated, strip);
-
-		// Ensure any ReelData objects referencing this strip adopt the canonical updated instance so UI/engines read updated runtime symbols
-		// NOTE: Do NOT forcibly assign the manager's canonical strip instance into all ReelData objects. Doing so can create
-		// unintended shared references across slots. Instead, broadcast the update and let slot-specific UI/engine code adopt
-		// the updated instance deliberately (e.g., SlotDetailInterface handles ReelStripUpdated for the currently shown slot).
-		// The following canonicalization used to set rd.SetReelStrip(strip) for every ReelData; that behavior was removed
-		// to enforce per-slot ownership of ReelStripData.
-		/*
-		try
-		{
-			if (ReelDataManager.Instance != null)
-			{
-				var allReels = ReelDataManager.Instance.GetAllData();
-				for (int i = 0; i < allReels.Count; i++)
-				{
-					var rd = allReels[i];
-					if (rd == null) continue;
-					var cur = rd.CurrentReelStrip;
-					if (cur == null) continue;
-					if (cur.AccessorId == strip.AccessorId || (!string.IsNullOrEmpty(cur.InstanceKey) && cur.InstanceKey == strip.InstanceKey))
-					{
-						rd.SetReelStrip(strip);
-					}
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			Debug.LogWarning($"ReelStripDataManager.UpdateRuntimeStrip: failed to canonicalize ReelData references: {ex.Message}");
-		}
-		*/
 	}
 
 	public void RemoveDataIfExists(ReelStripData strip)
@@ -166,7 +124,6 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 	{
 		if (LocalData == null || LocalData.Count == 0)
 		{
-			Debug.Log("ReelStripDataManager: no runtime strips registered.");
 			return;
 		}
 
@@ -175,7 +132,6 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 			var strip = kv.Value;
 			if (strip == null)
 			{
-				Debug.Log($"Strip accessor={kv.Key} is null");
 				continue;
 			}
 			var sb = new System.Text.StringBuilder();
@@ -189,7 +145,7 @@ public class ReelStripDataManager : DataManager<ReelStripDataManager, ReelStripD
 					if (i + 1 < strip.RuntimeSymbols.Count) sb.Append(", ");
 				}
 			}
-			Debug.Log($"[DebugDump] StripAccessor={strip.AccessorId} runtimeSymbols=[{sb}]");
+			// Intentionally do not write to Debug.Log here to avoid noisy logs; callers can inspect returned data or opt-in to logging
 		}
 	}
 }

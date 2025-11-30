@@ -16,6 +16,8 @@ public class DataPersistenceManager : MonoBehaviour
 	[SerializeField] private bool disableDataPersistence = false;
 	[SerializeField] private bool initializeDataIfNull = false;
 	[SerializeField] private bool autoSaveOnQuitAndPause = true;
+	// Diagnostic toggle: set true in editor when you need verbose load/save diagnostics
+	[SerializeField] private bool enableDiagnostics = false;
 
 	[Header("File Storage Config")]
 	[SerializeField] private string fileName;
@@ -41,7 +43,7 @@ public class DataPersistenceManager : MonoBehaviour
 	{
 		if (Instance != null)
 		{
-			Debug.Log("Found more than one Data Persistence Manager in the scene. Destroying the newest one.");
+			Debug.LogWarning("Found more than one Data Persistence Manager in the scene. Destroying the newest one.");
 			Destroy(gameObject);
 			return;
 		}
@@ -138,7 +140,7 @@ public class DataPersistenceManager : MonoBehaviour
 			{
 				int s = PlayerPrefs.GetInt(devSeedKey);
 				RNGManager.SetSeed(s);
-				Debug.Log($"Applied dev RNG seed {s} for New Game.");
+				if (enableDiagnostics) Debug.Log($"Applied dev RNG seed {s} for New Game.");
 			}
 		}
 		catch (Exception ex)
@@ -174,7 +176,7 @@ public class DataPersistenceManager : MonoBehaviour
 		// if no data can be loaded, don't continue
 		if (gameData == null)
 		{
-			Debug.Log("No data was found. A New Game needs to be started before data can be loaded.");
+			Debug.LogWarning("No data was found. A New Game needs to be started before data can be loaded.");
 			return;
 		}
 
@@ -186,7 +188,8 @@ public class DataPersistenceManager : MonoBehaviour
 		// objects (e.g., SlotsDataManager) from attempting to register nested data (reels/strips/symbols)
 		// before the managers have loaded their persisted entries, which would otherwise produce duplicate instances.
 		IsLoading = true;
-		try { Debug.Log("[Diag] Loading SymbolDataManager"); SymbolDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SymbolDataManager.LocalCount={(SymbolDataManager.Instance!=null && SymbolDataManager.Instance.GetAllData()!=null?SymbolDataManager.Instance.GetAllData().Count:0)}");
+		try {
+			if (enableDiagnostics) Debug.Log("[Diag] Loading SymbolDataManager"); SymbolDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] SymbolDataManager.LocalCount={(SymbolDataManager.Instance!=null && SymbolDataManager.Instance.GetAllData()!=null?SymbolDataManager.Instance.GetAllData().Count:0)}");
 			// Register existing symbol accessors with global provider
 			if (SymbolDataManager.Instance != null)
 			{
@@ -196,35 +199,35 @@ public class DataPersistenceManager : MonoBehaviour
 					foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); }
 				}
 			}
-		} catch (Exception ex) { Debug.LogWarning($"[Diag] SymbolDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading ReelStripDataManager"); ReelStripDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelStripDataManager.LocalCount={(ReelStripDataManager.Instance!=null && ReelStripDataManager.Instance.ReadOnlyLocalData!=null?ReelStripDataManager.Instance.ReadOnlyLocalData.Count:0)}");
+		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] SymbolDataManager.Load failed: {ex.Message}"); }
+		try { if (enableDiagnostics) Debug.Log("[Diag] Loading ReelStripDataManager"); ReelStripDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] ReelStripDataManager.LocalCount={(ReelStripDataManager.Instance!=null && ReelStripDataManager.Instance.ReadOnlyLocalData!=null?ReelStripDataManager.Instance.ReadOnlyLocalData.Count:0)}");
 			if (ReelStripDataManager.Instance != null)
 			{
 				var all = ReelStripDataManager.Instance.GetAllData();
 				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
 			}
-		} catch (Exception ex) { Debug.LogWarning($"[Diag] ReelStripDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading ReelDataManager"); ReelDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] ReelDataManager.LocalCount={(ReelDataManager.Instance!=null && ReelDataManager.Instance.GetAllData()!=null?ReelDataManager.Instance.GetAllData().Count:0)}");
+		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] ReelStripDataManager.Load failed: {ex.Message}"); }
+		try { if (enableDiagnostics) Debug.Log("[Diag] Loading ReelDataManager"); ReelDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] ReelDataManager.LocalCount={(ReelDataManager.Instance!=null && ReelDataManager.Instance.GetAllData()!=null?ReelDataManager.Instance.GetAllData().Count:0)}");
 			if (ReelDataManager.Instance != null)
 			{
 				var all = ReelDataManager.Instance.GetAllData();
 				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
 			}
-		} catch (Exception ex) { Debug.LogWarning($"[Diag] ReelDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading SlotsDataManager"); SlotsDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] SlotsDataManager.LocalCount={(SlotsDataManager.Instance!=null && SlotsDataManager.Instance.GetAllData()!=null?SlotsDataManager.Instance.GetAllData().Count:0)}");
+		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] ReelDataManager.Load failed: {ex.Message}"); }
+		try { if (enableDiagnostics) Debug.Log("[Diag] Loading SlotsDataManager"); SlotsDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] SlotsDataManager.LocalCount={(SlotsDataManager.Instance!=null && SlotsDataManager.Instance.GetAllData()!=null?SlotsDataManager.Instance.GetAllData().Count:0)}");
 			if (SlotsDataManager.Instance != null)
 			{
 				var all = SlotsDataManager.Instance.GetAllData();
 				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
 			}
-		} catch (Exception ex) { Debug.LogWarning($"[Diag] SlotsDataManager.Load failed: {ex.Message}"); }
-		try { Debug.Log("[Diag] Loading PlayerDataManager"); PlayerDataManager.Instance?.LoadData(gameData); Debug.Log($"[Diag] PlayerDataManager.LocalCount={(PlayerDataManager.Instance!=null && PlayerDataManager.Instance.GetAllData()!=null?PlayerDataManager.Instance.GetAllData().Count:0)}");
+		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] SlotsDataManager.Load failed: {ex.Message}"); }
+		try { if (enableDiagnostics) Debug.Log("[Diag] Loading PlayerDataManager"); PlayerDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] PlayerDataManager.LocalCount={(PlayerDataManager.Instance!=null && PlayerDataManager.Instance.GetAllData()!=null?PlayerDataManager.Instance.GetAllData().Count:0)}");
 			if (PlayerDataManager.Instance != null)
 			{
 				var all = PlayerDataManager.Instance.GetAllData();
 				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
 			}
-		} catch (Exception ex) { Debug.LogWarning($"[Diag] PlayerDataManager.Load failed: {ex.Message}"); }
+		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] PlayerDataManager.Load failed: {ex.Message}"); }
 		
 
 		// Now notify remaining registered persistence objects. Managers above will still be iterated here,
