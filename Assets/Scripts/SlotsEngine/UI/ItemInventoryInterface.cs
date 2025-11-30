@@ -4,10 +4,21 @@ using System.Text;
 
 public class ItemInventoryInterface : InventoryInterfaceBase
 {
+    // Reference to symbol management menu for reel strips
+    public AddRemoveSymbolsMenu AddRemoveSymbolsMenuInstance;
+
     // Optional: override Start to call base and keep any future extension point
     private new void Start()
     {
         base.Start();
+
+        // Refresh inventory UI when reel strips are updated elsewhere (symbols added/removed, transfers)
+        GlobalEventManager.Instance?.RegisterEvent(SlotsEvent.ReelStripUpdated, OnReelStripUpdated);
+    }
+
+    private void OnDestroy()
+    {
+        GlobalEventManager.Instance?.UnregisterEvent(SlotsEvent.ReelStripUpdated, OnReelStripUpdated);
     }
 
     public override void Refresh()
@@ -124,11 +135,46 @@ public class ItemInventoryInterface : InventoryInterfaceBase
         return false;
     }
 
+    // Respond to global reel strip updates by refreshing inventory list if visible
+    private void OnReelStripUpdated(object obj)
+    {
+        // Only refresh if our inventory UI is currently visible
+        bool visible = InventoryRoot != null ? InventoryRoot.gameObject.activeSelf : gameObject.activeSelf;
+        if (!visible) return;
+        Refresh();
+    }
+
     protected override void OnItemSelected(InventoryItemData itemData)
     {
         if (itemData == null)
         {
             base.OnItemSelected(itemData);
+            return;
+        }
+
+        // New behavior: when selecting a ReelStrip inventory item, open the AddRemoveSymbolsMenu with that strip in context (no slot)
+        if (itemData.ItemType == InventoryItemType.ReelStrip)
+        {
+            if (AddRemoveSymbolsMenuInstance == null)
+            {
+                Debug.LogWarning("ItemInventoryInterface: AddRemoveSymbolsMenuInstance is not assigned.");
+                return;
+            }
+
+            ReelStripData strip = null;
+            int accessor = itemData.DefinitionAccessorId;
+            if (accessor != 0 && ReelStripDataManager.Instance != null)
+            {
+                ReelStripDataManager.Instance.TryGetData(accessor, out strip);
+            }
+
+            if (strip == null)
+            {
+                Debug.LogWarning($"ItemInventoryInterface: Could not resolve ReelStripData for inventory item id={itemData.Id}, accessor={accessor}.");
+                return;
+            }
+
+            AddRemoveSymbolsMenuInstance.Show(strip, null);
             return;
         }
 

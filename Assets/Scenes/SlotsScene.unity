@@ -726,6 +726,7 @@ MonoBehaviour:
   ItemDetailsNameText: {fileID: 1434129368}
   ItemDetailsDescriptionText: {fileID: 1029488875}
   ItemDetailsBackButton: {fileID: 841013252}
+  AddRemoveSymbolsMenuInstance: {fileID: 996890143}
 --- !u!114 &1022920315 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4374123336220288874, guid: 5d205dd4508c5c44782c3c6b5f867746, type: 3}
