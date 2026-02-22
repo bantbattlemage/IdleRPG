@@ -12,7 +12,8 @@ public enum InventoryItemType
 	Symbol,
 	Reel,
 	ReelStrip,
-	SlotEngine
+	SlotEngine,
+	Skill
 }
 
 [Serializable]

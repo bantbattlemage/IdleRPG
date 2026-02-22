@@ -15,6 +15,7 @@ public class GameData
 	public SerializableDictionary<int, SymbolData> CurrentSymbolData;
 	public SerializableDictionary<int, ReelStripData> CurrentReelStripData;
 	public SerializableDictionary<int, BetLevelData> BetLevelData;
+	public SerializableDictionary<int, PlayerSkillData> CurrentPlayerSkillData;
 
 	// Persist the last globally-assigned accessor id so a centralized provider can resume monotonic ids across sessions
 	public int LastAssignedAccessorId;
@@ -29,6 +30,7 @@ public class GameData
 		CurrentSymbolData = new SerializableDictionary<int, SymbolData>();
 		CurrentReelStripData = new SerializableDictionary<int, ReelStripData>();
 		BetLevelData = new SerializableDictionary<int, BetLevelData>();
+		CurrentPlayerSkillData = new SerializableDictionary<int, PlayerSkillData>();
 
 		LastAssignedAccessorId = 0;
 	}

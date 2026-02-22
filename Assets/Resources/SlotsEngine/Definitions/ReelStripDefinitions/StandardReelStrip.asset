@@ -17,5 +17,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 89533e4d39e492e4d912a48b82224fd3, type: 2}
   - {fileID: 11400000, guid: ad323b424767ab64aaae7fd5f5eebd13, type: 2}
   - {fileID: 11400000, guid: 6ec0b555e556e9945b7c76cc1b30e5a3, type: 2}
-  symbolCounts: 000000000000000000000000
-  symbolCountsDepletable: 010101
+  - {fileID: 11400000, guid: 76e79b251aac2ab489216f800f3ec4a0, type: 2}
+  symbolCounts: 00000000000000000000000000000000
+  symbolCountsDepletable: 01010101

@@ -13,3 +13,6 @@ MonoBehaviour:
   m_Name: TestWinEventTrigger
   m_EditorClassIdentifier: Assembly-CSharp::WinEventTrigger
   playStandardPresentation: 1
+  slotEvents:
+  - {fileID: 11400000, guid: e70a83bb44d685a428bd65c5e0792ad2, type: 2}
+  - {fileID: 11400000, guid: ac0f35744fc067b48b3f4ebcdbc7ab00, type: 2}

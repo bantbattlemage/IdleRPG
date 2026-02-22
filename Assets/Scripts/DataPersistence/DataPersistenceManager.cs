@@ -221,6 +221,13 @@ public class DataPersistenceManager : MonoBehaviour
 				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
 			}
 		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] SlotsDataManager.Load failed: {ex.Message}"); }
+		try { if (enableDiagnostics) Debug.Log("[Diag] Loading PlayerSkillDataManager"); PlayerSkillDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] PlayerSkillDataManager.LocalCount={(PlayerSkillDataManager.Instance!=null && PlayerSkillDataManager.Instance.GetAllData()!=null?PlayerSkillDataManager.Instance.GetAllData().Count:0)}");
+			if (PlayerSkillDataManager.Instance != null)
+			{
+				var all = PlayerSkillDataManager.Instance.GetAllData();
+				if (all != null) { foreach (var d in all) { if (d != null) GlobalAccessorIdProvider.RegisterExistingId(d.AccessorId); } }
+			}
+		} catch (Exception ex) { if (enableDiagnostics) Debug.LogWarning($"[Diag] PlayerSkillDataManager.Load failed: {ex.Message}"); }
 		try { if (enableDiagnostics) Debug.Log("[Diag] Loading PlayerDataManager"); PlayerDataManager.Instance?.LoadData(gameData); if (enableDiagnostics) Debug.Log($"[Diag] PlayerDataManager.LocalCount={(PlayerDataManager.Instance!=null && PlayerDataManager.Instance.GetAllData()!=null?PlayerDataManager.Instance.GetAllData().Count:0)}");
 			if (PlayerDataManager.Instance != null)
 			{
